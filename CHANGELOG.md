@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.2 (2026-11-11)
+- Stats tab: the type 1 / type 2 / crystal counts moved from a line under each shaft type into a tooltip;
+  hover the row to see them.
+- Shaft type bars are colored like the shaft's gem or material (colors in `shaft_types.txt`; a display
+  choice, easy to change).
+- No more "·" separators: the screen uses layout, commas and parentheses instead, and the chat summary
+  uses commas. The shaft details now show "Entered" and "Exit" as their own rows.
+
 ## 0.3.1 (2026-11-11)
 - Stats tab, "Shaft types seen": one row per shaft type (Jasper, Peridot, Vanguard, ...) with its share of
   your shafts, and a smaller line underneath with how many were type 1, type 2 and crystal. Names come

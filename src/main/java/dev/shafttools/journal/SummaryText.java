@@ -41,14 +41,14 @@ public final class SummaryText {
 		if (session != null) {
 			String line = " §7Session §f" + session.shafts() + (session.shafts() == 1 ? " shaft" : " shafts");
 			Long average = session.averageSearchMillis();
-			if (average != null) line += " §8· §7avg spawn §f" + duration(average);
+			if (average != null) line += "§7, avg spawn §f" + duration(average);
 			lines.add(line);
 		}
 		lines.add(RULE);
 		return lines;
 	}
 
-	/** E.g. "Lapis 2/2 · Tungsten 0/1": looted out of total, per type, in tab list order. */
+	/** E.g. "Lapis 2/2, Tungsten 0/1": looted out of total, per type, in tab list order. */
 	static String corpses(List<Corpse> corpses) {
 		Map<String, int[]> byType = new LinkedHashMap<>();
 		for (Corpse corpse : corpses) {
@@ -58,7 +58,7 @@ public final class SummaryText {
 		}
 		List<String> parts = new ArrayList<>();
 		byType.forEach((type, counts) -> parts.add((type.equals("Lapis") ? "§9" : "§f") + type + " " + counts[0] + "/" + counts[1]));
-		return String.join(" §8· ", parts);
+		return String.join("§7, ", parts);
 	}
 
 	private static String exit(String exit) {

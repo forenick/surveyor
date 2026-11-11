@@ -131,11 +131,20 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 		}
 		root.child(content);
-		root.child(label(switch (tab) {
-			case SESSION -> "§8Click a shaft for details  ·  < > earlier sessions";
-			case SESSIONS -> "§8Click a session to open it";
-			case STATS -> "§8Counted from your own " + entries.size() + " shafts";
-		}));
+		FlowLayout footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		footer.gap(16);
+		switch (tab) {
+			case SESSION -> {
+				footer.child(label("§8Click a shaft for details"));
+				footer.child(label("§8< > earlier sessions"));
+			}
+			case SESSIONS -> footer.child(label("§8Click a session to open it"));
+			case STATS -> {
+				footer.child(label("§8Counted from your own " + entries.size() + " shafts"));
+				footer.child(label("§8Hover a row for details"));
+			}
+		}
+		root.child(footer);
 	}
 
 	// ---- top bar ----
@@ -265,9 +274,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		JournalEntry entry = shafts.get(selected);
 
 		String id = entry.shaftId() == null ? "Unknown shaft" : entry.shaftId();
-		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? " §8· §dCrystal" : "")));
-		detail.child(wrapped("§7" + time(entry.enteredAt()) + " · " + exit(entry.exit())));
+		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? "  §dCrystal" : "")));
 		detail.child(spacer(4));
+		detail.child(keyValue("Entered", "§f" + time(entry.enteredAt())));
+		detail.child(keyValue("Exit", "§f" + exit(entry.exit())));
 		detail.child(keyValue("Spawned in", entry.searchMillis() == null ? "§8not timed" : spawn(entry.searchMillis())));
 		detail.child(keyValue("Inside", "§f" + SummaryText.duration(entry.durationMillis())));
 		if (!entry.mayhemBuffs().isEmpty()) detail.child(keyValue("Mayhem", "§e" + String.join(", ", entry.mayhemBuffs())));
@@ -314,7 +324,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		for (CorpseLoot loot : loots) byType.merge(loot.type(), 1, Integer::sum);
 		List<String> parts = new ArrayList<>();
 		byType.forEach((type, count) -> parts.add(count + " " + type));
-		return "Corpse loot · " + String.join(", ", parts);
+		return "Corpse loot (" + String.join(", ", parts) + ")";
 	}
 
 	private StackLayout slot(String name, String count, List<Component> tooltip) {
@@ -390,7 +400,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		spawn.child(keyValue("All-time average", spawn(stats.averageSearchMillis())));
 		JournalEntry fastest = stats.fastest();
 		spawn.child(keyValue("Fastest spawn", fastest == null ? "§8-"
-				: spawn(fastest.searchMillis()) + " §8" + fastest.shaftId() + " · " + day(fastest.enteredAt())));
+				: spawn(fastest.searchMillis()) + " §8" + fastest.shaftId() + ", " + day(fastest.enteredAt())));
 		spawn.child(section("Avg spawn per session, oldest first"));
 		spawn.child(chart(stats.oldestFirst()));
 		spawn.child(section("Personal bests"));
@@ -418,18 +428,17 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		odds.child(header("Shaft types seen"));
 		int typed = stats.typedShafts();
 		for (Map.Entry<String, Map<String, Integer>> type : stats.types().entrySet()) {
+			String name = shaftNames.name(type.getKey());
 			int total = type.getValue().values().stream().mapToInt(Integer::intValue).sum();
-			odds.child(barRow("§f" + shaftNames.name(type.getKey()), total / (double) typed,
-					Math.round(100.0 * total / typed) + "%", 0xFF55FFFF));
-			List<String> parts = new ArrayList<>();
+			FlowLayout row = barRow("§f" + name, total / (double) typed,
+					Math.round(100.0 * total / typed) + "%", 0xFF000000 | shaftNames.rgb(type.getKey()));
+			List<Component> tooltip = new ArrayList<>();
+			tooltip.add(Component.literal("§f" + name + " shafts §7" + total));
 			type.getValue().forEach((variant, count) -> {
-				if (!variant.equals("L")) parts.add(count + " " + variantName(variant));
+				if (!variant.equals("L")) tooltip.add(Component.literal("§7" + capitalized(variantName(variant)) + " §f" + count));
 			});
-			if (!parts.isEmpty()) {
-				LabelComponent breakdown = wrapped("§8" + String.join(" · ", parts));
-				breakdown.margins(Insets.of(0, 3, 4, 0));
-				odds.child(breakdown);
-			}
+			row.tooltip(tooltip);
+			odds.child(row);
 		}
 		columns.child(scrollColumn(Sizing.fill(30), odds));
 		content.child(columns);
@@ -731,11 +740,15 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private static String exit(String exit) {
 		return switch (exit) {
-			case "BYE" -> "left via the exit";
-			case "WARP" -> "warped out";
-			case "DEATH" -> "froze";
-			default -> "left";
+			case "BYE" -> "Took the exit";
+			case "WARP" -> "Warped out";
+			case "DEATH" -> "Froze";
+			default -> "Unknown";
 		};
+	}
+
+	private static String capitalized(String text) {
+		return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
 	}
 
 	private static String spawn(Long millis) {

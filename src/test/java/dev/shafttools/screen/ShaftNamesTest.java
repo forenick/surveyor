@@ -11,5 +11,7 @@ class ShaftNamesTest {
 		assertEquals("Jasper", names.name("JASP"));
 		assertEquals("Vanguard", names.name("FAIR"));
 		assertEquals("ABCD", names.name("ABCD"));
+		assertEquals(0xE0303A, names.rgb("RUBY"));
+		assertEquals(ShaftNames.DEFAULT_RGB, names.rgb("ABCD"));
 	}
 }

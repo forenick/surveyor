@@ -1,20 +1,22 @@
-# Shaft type codes (the 4 letters before "_" in the shaft ID) and the names the journal shows.
-# Source: Docs/research/01-shaft-mechanics.md. "seen" = confirmed in Nick's recordings;
-# the others come from the wiki/SkyHanni and are unconfirmed. Unknown codes show as the code itself.
-AMET = Amethyst      # seen
-AQUA = Aquamarine    # seen
-JADE = Jade          # seen
-JASP = Jasper        # seen
-LITT = Littlefoot    # seen (LITT_L, Littlefoot's Den)
-ONYX = Onyx          # seen
-OPAL = Opal          # seen
-PERI = Peridot       # seen
-RUBY = Ruby          # seen
-SAPP = Sapphire      # seen
-TITA = Titanium      # seen
-TOPA = Topaz         # seen
-AMBE = Amber         # unconfirmed
-CITR = Citrine       # unconfirmed
-TUNG = Tungsten      # unconfirmed
-UMBE = Umber         # unconfirmed
-FAIR = Vanguard      # unconfirmed (the Fairy shaft, FAIR_1)
+# Shaft type codes (the 4 letters before "_" in the shaft ID), the name the journal shows, and the
+# bar color on the Stats tab. Format: CODE = Name, #RRGGBB
+# Names: Docs/research/01-shaft-mechanics.md. "seen" = confirmed in Nick's recordings; the others come
+# from the wiki/SkyHanni and are unconfirmed. Colors are a display choice made to look like the gem or
+# material, not game data; change them freely. Unknown codes show as the code itself, in aqua.
+AMET = Amethyst, #9B4DCA      # seen
+AQUA = Aquamarine, #3FC1C9    # seen
+JADE = Jade, #4CC552          # seen
+JASP = Jasper, #E05AA8        # seen
+LITT = Littlefoot, #7CB342    # seen (LITT_L, Littlefoot's Den)
+ONYX = Onyx, #6B6B6B          # seen
+OPAL = Opal, #F0F0F0          # seen
+PERI = Peridot, #8DB600       # seen
+RUBY = Ruby, #E0303A          # seen
+SAPP = Sapphire, #3A6FE0      # seen
+TITA = Titanium, #C8CCD2      # seen
+TOPA = Topaz, #F2D33A         # seen
+AMBE = Amber, #F28C28         # unconfirmed
+CITR = Citrine, #D9822B       # unconfirmed
+TUNG = Tungsten, #8A93A6      # unconfirmed
+UMBE = Umber, #8B5A2B         # unconfirmed
+FAIR = Vanguard, #55FFFF      # unconfirmed (the Fairy shaft, FAIR_1)

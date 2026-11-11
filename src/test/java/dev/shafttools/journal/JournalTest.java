@@ -167,7 +167,7 @@ class JournalTest {
 
 		String text = String.join("\n", SummaryText.lines(aqua, null));
 		assertTrue(text.contains("§b§lAQUA_C  §7inside §f14s"), text);
-		assertTrue(text.contains("§9Lapis 2/2 §8· §fTungsten 0/1"), text);
+		assertTrue(text.contains("§9Lapis 2/2§7, §fTungsten 0/1"), text);
 		assertTrue(text.contains("§7Powder §f+12,060 §8(corpses 10,550, exit 1,510)"), text);
 	}
 
