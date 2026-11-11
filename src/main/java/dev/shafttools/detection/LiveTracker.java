@@ -1,5 +1,9 @@
 package dev.shafttools.detection;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,14 +18,25 @@ import net.minecraft.network.chat.Component;
 /**
  * Feeds the live game into a {@link ShaftTracker}: the only class in this package that touches
  * Minecraft. It reads the same data at the same rate as the recorder, so replaying a recording
- * behaves like playing. For now events only go to the log; nothing is shown in game yet.
+ * behaves like playing. Events go to the log and to the listeners.
  */
 public final class LiveTracker {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftTools Detection");
 
 	private final ShaftTracker tracker = new ShaftTracker(TextPatterns.defaults(), this::onEvent);
+	private final List<Consumer<ShaftEvent>> listeners = new ArrayList<>();
 	private ClientLevel lastLevel;
 	private int tick;
+
+	/** Also gets every event, right after it is logged. */
+	public void addListener(Consumer<ShaftEvent> listener) {
+		listeners.add(listener);
+	}
+
+	/** See {@link ShaftTracker#inMiningArea()}. */
+	public boolean inMiningArea() {
+		return tracker.inMiningArea();
+	}
 
 	/** Called for every chat and action-bar message, before other mods can hide or change it. */
 	public void onGameMessage(Component message, boolean overlay) {
@@ -47,6 +62,7 @@ public final class LiveTracker {
 			case ShaftLeft left -> LOGGER.info("Left shaft {}", summary(left.shaft()));
 			default -> LOGGER.debug("{}", event);
 		}
+		listeners.forEach(listener -> listener.accept(event));
 	}
 
 	private static String summary(Shaft shaft) {

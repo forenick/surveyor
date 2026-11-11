@@ -22,6 +22,7 @@ import dev.shafttools.util.TextUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -50,6 +51,7 @@ public final class ShaftRecorder {
 	private static final List<String> PRIVATE_PREFIXES = List.of("From ", "To ", "Guild > ", "Officer > ");
 
 	private RecordingWriter writer;
+	private long lastBlockHit = Long.MIN_VALUE;
 	private long startMillis;
 	private int tick;
 
@@ -87,6 +89,20 @@ public final class ShaftRecorder {
 		writer.close();
 		writer = null;
 		return file;
+	}
+
+	/**
+	 * Called while the player hits a block (every tick while holding the button). Only a new block
+	 * position is written, so a recording shows when mining started and how fast blocks broke.
+	 */
+	public void onBlockHit(BlockPos pos) {
+		if (writer == null || pos.asLong() == lastBlockHit) return;
+		lastBlockHit = pos.asLong();
+		JsonObject event = event("block_hit");
+		event.addProperty("x", pos.getX());
+		event.addProperty("y", pos.getY());
+		event.addProperty("z", pos.getZ());
+		writer.write(event);
 	}
 
 	public void mark(String note) {

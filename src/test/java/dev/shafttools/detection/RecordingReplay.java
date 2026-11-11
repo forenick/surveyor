@@ -14,15 +14,15 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 /** Feeds a recorder {@code .jsonl} file through a tracker, the same way the live hooks do. */
-final class RecordingReplay {
+public final class RecordingReplay {
 	/** Recordings stay out of git (they contain player names), so tests skip when they're missing. */
-	static final Path RECORDINGS = Path.of("..", "Recordings");
+	public static final Path RECORDINGS = Path.of("..", "Recordings");
 
 	private RecordingReplay() {
 	}
 
 	/** Replays the file and returns every event the tracker reported, in order. */
-	static List<ShaftEvent> replay(Path file) throws IOException {
+	public static List<ShaftEvent> replay(Path file) throws IOException {
 		List<ShaftEvent> events = new ArrayList<>();
 		ShaftTracker tracker = new ShaftTracker(TextPatterns.defaults(), events::add);
 		try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {

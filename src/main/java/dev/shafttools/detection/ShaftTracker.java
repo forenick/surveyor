@@ -25,12 +25,18 @@ public final class ShaftTracker {
 	private Shaft shaft;
 	private Integer cold;
 	private List<Corpse> corpses = List.of();
+	private boolean inMiningArea;
 
 	public ShaftTracker(TextPatterns patterns, Consumer<ShaftEvent> listener) {
 		this.chat = new ChatParser(patterns);
 		this.scoreboard = new ScoreboardParser(patterns);
 		this.tabList = new TabListParser(patterns);
 		this.listener = listener;
+	}
+
+	/** True while the tab list says the player is in the Dwarven Mines; false right after a world change. */
+	public boolean inMiningArea() {
+		return inMiningArea;
 	}
 
 	/** The shaft the player is in, or null. */
@@ -46,6 +52,7 @@ public final class ShaftTracker {
 		shaft = new Shaft(now);
 		cold = null;
 		corpses = List.of();
+		inMiningArea = false;
 	}
 
 	public void onChat(long now, String legacy, List<String> hovers) {
@@ -76,6 +83,8 @@ public final class ShaftTracker {
 
 	public void onTabList(long now, List<String> lines) {
 		if (tabList.inMineshaft(lines)) candidate(now).confirmed = true;
+		// An empty tab list (e.g. while loading) says nothing about where we are.
+		if (!lines.isEmpty()) inMiningArea = tabList.inMiningArea(lines);
 		// The widget is missing for the first seconds in a shaft; an empty list means "not shown".
 		List<Corpse> newCorpses = tabList.corpses(lines);
 		if (!newCorpses.isEmpty() && !newCorpses.equals(corpses)) {

@@ -16,6 +16,11 @@ public final class TabListParser {
 		return lines.stream().anyMatch(line -> patterns.matches("tab.mineshaft_area", TextPatterns.clean(line)));
 	}
 
+	/** In the Dwarven Mines (which include the Glacite Tunnels), where shafts spawn. */
+	public boolean inMiningArea(List<String> lines) {
+		return lines.stream().anyMatch(line -> patterns.matches("tab.mining_area", TextPatterns.clean(line)));
+	}
+
 	/** The "Frozen Corpses:" widget, or an empty list when it isn't shown. */
 	public List<Corpse> corpses(List<String> lines) {
 		List<Corpse> corpses = new ArrayList<>();

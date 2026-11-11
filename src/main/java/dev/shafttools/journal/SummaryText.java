@@ -1,0 +1,83 @@
+package dev.shafttools.journal;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import dev.shafttools.detection.Corpse;
+
+/** The chat summary shown after leaving a shaft, as "§"-coded lines. */
+public final class SummaryText {
+	private static final String RULE = "§8§m                                                  ";
+
+	private SummaryText() {
+	}
+
+	/** {@code session} already includes {@code entry}; null to leave the session line out. */
+	public static List<String> lines(JournalEntry entry, Journal.Session session) {
+		List<String> lines = new ArrayList<>();
+		lines.add(RULE);
+		lines.add(" §b§l" + (entry.shaftId() == null ? "Mineshaft" : entry.shaftId())
+				+ "  §7inside §f" + duration(entry.durationMillis()) + exit(entry.exit()));
+		lines.add(" §7Spawned in " + (entry.searchMillis() == null ? "§8not timed" : "§f" + duration(entry.searchMillis())));
+
+		if (!entry.corpses().isEmpty()) lines.add(" §7Corpses " + corpses(entry.corpses()));
+		if (entry.gems() != null) {
+			lines.add(" §7Gems §f≈" + String.format(Locale.ROOT, "%.1f", entry.gems().fineEquivalent())
+					+ " Fine " + entry.gems().gem() + " §8(" + number(entry.pristineProcs()) + " pristine procs)");
+		}
+		long corpsePowder = entry.corpsePowder();
+		long powder = corpsePowder + entry.exitPowder();
+		if (powder > 0) {
+			String parts = corpsePowder > 0 && entry.exitPowder() > 0
+					? " §8(corpses " + number(corpsePowder) + ", exit " + number(entry.exitPowder()) + ")"
+					: "";
+			lines.add(" §7Powder §f+" + number(powder) + parts);
+		}
+		if (!entry.campfiresAt().isEmpty()) lines.add(" §7Campfires §f" + entry.campfiresAt().size());
+
+		if (session != null) {
+			String line = " §7Session §f" + session.shafts() + (session.shafts() == 1 ? " shaft" : " shafts");
+			Long average = session.averageSearchMillis();
+			if (average != null) line += " §8· §7avg spawn §f" + duration(average);
+			lines.add(line);
+		}
+		lines.add(RULE);
+		return lines;
+	}
+
+	/** E.g. "Lapis 2/2 · Tungsten 0/1": looted out of total, per type, in tab list order. */
+	static String corpses(List<Corpse> corpses) {
+		Map<String, int[]> byType = new LinkedHashMap<>();
+		for (Corpse corpse : corpses) {
+			int[] counts = byType.computeIfAbsent(corpse.type(), type -> new int[2]);
+			if (corpse.looted()) counts[0]++;
+			counts[1]++;
+		}
+		List<String> parts = new ArrayList<>();
+		byType.forEach((type, counts) -> parts.add((type.equals("Lapis") ? "§9" : "§f") + type + " " + counts[0] + "/" + counts[1]));
+		return String.join(" §8· ", parts);
+	}
+
+	private static String exit(String exit) {
+		return switch (exit) {
+			case "DEATH" -> " §8(froze)";
+			case "WARP" -> " §8(warped out)";
+			default -> "";
+		};
+	}
+
+	/** E.g. "45s", "12m 27s", "1h 03m". */
+	static String duration(long millis) {
+		long seconds = Math.max(0, millis) / 1000;
+		if (seconds < 60) return seconds + "s";
+		if (seconds < 3600) return seconds / 60 + "m " + seconds % 60 + "s";
+		return String.format(Locale.ROOT, "%dh %02dm", seconds / 3600, seconds % 3600 / 60);
+	}
+
+	private static String number(long value) {
+		return String.format(Locale.ROOT, "%,d", value);
+	}
+}

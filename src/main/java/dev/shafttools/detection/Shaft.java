@@ -16,6 +16,7 @@ import dev.shafttools.detection.ShaftEvent.MayhemBuff;
 import dev.shafttools.detection.ShaftEvent.Pristine;
 import dev.shafttools.detection.ShaftEvent.SacksChanged;
 import dev.shafttools.detection.ShaftEvent.ScrapFound;
+import dev.shafttools.detection.ShaftEvent.Supercraft;
 import dev.shafttools.detection.ShaftEvent.Warping;
 
 /**
@@ -52,6 +53,10 @@ public final class Shaft {
 	private final Map<String, Long> sacksAdded = new LinkedHashMap<>();
 	private final Map<String, Long> sacksRemoved = new LinkedHashMap<>();
 	private long lastSacksAt = -1;
+	private final Map<String, Long> pristineSinceSacks = new LinkedHashMap<>();
+	// Corpse loot and Supercraft output also land in the sacks; pending until a Sacks message reports them.
+	private final Map<String, Long> notMinedPending = new LinkedHashMap<>();
+	private final Map<String, Long> notMinedInSacks = new LinkedHashMap<>();
 
 	Shaft(long enteredAt) {
 		this.enteredAt = enteredAt;
@@ -68,17 +73,25 @@ public final class Shaft {
 			case MayhemBuff mayhem -> mayhemBuffs.add(mayhem.buff());
 			case ExtraCorpses extra -> extraCorpses += extra.count();
 			case CaveIn caveIn -> caveInAt = now;
-			case CorpseLooted looted -> loots.add(looted.loot());
+			case CorpseLooted looted -> {
+				loots.add(looted.loot());
+				looted.loot().items().forEach(item -> add(notMinedPending, item));
+			}
+			case Supercraft craft -> add(notMinedPending, craft.result());
 			case CampfirePlaced placed -> campfiresPlaced.add(now);
 			case ScrapFound scrap -> scrapFound++;
 			case Pristine pristine -> {
 				pristineProcs++;
 				add(pristineItems, pristine.gems());
+				add(pristineSinceSacks, pristine.gems());
 			}
 			case SacksChanged sacks -> {
 				sacks.added().forEach(item -> add(sacksAdded, item));
 				sacks.removed().forEach(item -> add(sacksRemoved, item));
 				lastSacksAt = now;
+				pristineSinceSacks.clear();
+				notMinedPending.forEach((item, count) -> notMinedInSacks.merge(item, count, Long::sum));
+				notMinedPending.clear();
 			}
 			default -> {
 			}
@@ -177,6 +190,22 @@ public final class Shaft {
 
 	public Map<String, Long> sacksRemoved() {
 		return Collections.unmodifiableMap(sacksRemoved);
+	}
+
+	/**
+	 * Items from "PRISTINE!" messages after the last "[Sacks]" message: the start of the unreported
+	 * tail. Everything when there was no Sacks message.
+	 */
+	public Map<String, Long> pristineSinceSacks() {
+		return Collections.unmodifiableMap(pristineSinceSacks);
+	}
+
+	/**
+	 * Corpse loot and Supercraft output that a "[Sacks]" message has already reported, so it is
+	 * part of {@link #sacksAdded()} but wasn't mined.
+	 */
+	public Map<String, Long> notMinedInSacks() {
+		return Collections.unmodifiableMap(notMinedInSacks);
 	}
 
 	/** Time of the last "[Sacks]" message inside, or -1. */

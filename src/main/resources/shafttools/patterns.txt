@@ -17,6 +17,8 @@ spawn.nearby           ^MINESHAFT! A Mineshaft portal spawned nearby!$
 # Entering: the scoreboard date/server line ends with the shaft ID, e.g. "11/08/26 m113BD PERI_2".
 scoreboard.shaft_id    ^\d+/\d+/\d+ \S+ (?<id>(?<type>[A-Z]{4})_(?<variant>\w))$
 tab.mineshaft_area     ^Area: Mineshaft$
+# Where shafts spawn (Glacite Tunnels and the rest of the Dwarven Mines). The spawn timer only runs here.
+tab.mining_area        ^Area: Dwarven Mines$
 
 # Leaving. Only BYE! pays exit powder; warping and dying pay none.
 exit.bye               ^BYE! You got a \+(?<powder>[\d,]+) Glacite Powder bonus for leaving a Mineshaft before you died!$
@@ -53,6 +55,9 @@ campfire.used          ^You've warmed your feet by your campfire\. Your ❄ Cold
 pristine               ^PRISTINE! You found (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
 scrap                  ^EXCAVATOR! You found a Suspicious Scrap!$
 supercraft             ^You Supercrafted (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
+
+# Item name of a gemstone, e.g. "Flawed Jade Gemstone" (icon already removed).
+gem.item               ^(?<quality>Rough|Flawed|Fine) (?<gem>\w+) Gemstone$
 
 # [Sacks] messages. The visible line only has totals; the per-item lines are in its hover texts.
 sacks                  ^\[Sacks\] .*\(Last (?<seconds>\d+)s\.\)$

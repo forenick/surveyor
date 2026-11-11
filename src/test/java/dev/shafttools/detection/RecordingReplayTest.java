@@ -62,6 +62,35 @@ class RecordingReplayTest {
 		assertEquals(614, jade.pristineProcs());
 	}
 
+	/** Recording 3 (2026-11-11): two quick skips, checked against the live log from the same session. */
+	@Test
+	void recording3() throws IOException {
+		List<Shaft> shafts = shafts("2026-11-11_14-13-53.jsonl");
+		assertEquals(List.of("AQUA_C", "OPAL_1"), ids(shafts));
+
+		Shaft aqua = shafts.get(0);
+		assertEquals(ExitReason.BYE, aqua.exitReason());
+		assertEquals(1510, aqua.exitPowder());
+		assertEquals(14, aqua.durationMillis() / 1000);
+		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Lapis", true), new Corpse("Tungsten", false)),
+				aqua.corpses());
+		assertEquals(List.of("Pickaxe Ability cooldown"), aqua.mayhemBuffs());
+		assertEquals(new CorpseLoot("Lapis", true, List.of(new ItemCount("Goblin Egg", 1),
+				new ItemCount("Flawed Onyx Gemstone", 20), new ItemCount("Bejeweled Handle", 4),
+				new ItemCount("Flawed Citrine Gemstone", 40)), 5759), aqua.loots().get(0));
+		assertEquals(2, aqua.loots().size());
+
+		Shaft opal = shafts.get(1);
+		assertEquals(ExitReason.BYE, opal.exitReason());
+		assertEquals(1260, opal.exitPowder());
+		assertEquals(13, opal.durationMillis() / 1000);
+		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Umber", false), new Corpse("Tungsten", false)),
+				opal.corpses());
+		assertEquals(List.of("Cold Resistance"), opal.mayhemBuffs());
+		assertEquals(1, opal.loots().size());
+		assertEquals(5958, opal.loots().get(0).powder());
+	}
+
 	private static List<Shaft> shafts(String recording) throws IOException {
 		Path file = RecordingReplay.RECORDINGS.resolve(recording);
 		assumeTrue(Files.exists(file), "Recording not available: " + file);
