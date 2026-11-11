@@ -18,7 +18,10 @@ dependencies {
 	// owo bundles its own libraries (jar-in-jar), so its Maven dependencies are not needed.
 	implementation("io.wispforest:owo-lib:${project.owo_version}") { transitive = false }
 
-	// owo injects its endec interfaces into Minecraft classes, so tests that touch them need endec.
+	// owo injects its endec interfaces into Minecraft classes (e.g. CompoundTag), so code that calls
+	// those classes needs endec to compile, and tests that touch them need it at runtime. In game,
+	// owo ships endec itself.
+	compileOnly "io.wispforest:endec:0.1.12"
 	testRuntimeOnly "io.wispforest:endec:0.1.12"
 
 	testImplementation platform("org.junit:junit-bom:5.13.4")

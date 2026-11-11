@@ -1,0 +1,15 @@
+# Vanilla stand-in icons for SkyBlock items on the journal screen, shown when neither Hypixel's
+# resource pack nor a texture-pack mod has the item (see skyblock_items.txt). Tooltips show the real name.
+# Format: <item name> = <minecraft item id>. * matches any text.
+# The first matching line wins; anything unmatched uses "default". A # after a space starts a comment.
+Flawless * Gemstone      = minecraft:emerald
+Perfect * Gemstone       = minecraft:diamond
+* Gemstone               = minecraft:amethyst_shard
+*Goblin Egg              = minecraft:egg
+Enchanted Umber          = minecraft:brown_terracotta
+Enchanted Tungsten       = minecraft:clay_ball
+Enchanted Glacite        = minecraft:packed_ice
+Suspicious Scrap         = minecraft:iron_nugget
+Bejeweled Handle         = minecraft:stick
+Dead Man's Chestplate    = minecraft:chainmail_chestplate
+default                  = minecraft:paper

@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.4.0 (2026-11-11)
+- Renamed from ShaftTools to ShaftJournal. The journal is becoming the mod's main menu.
+- `/shaftjournal` or the short `/sj` opens the journal. Every subcommand works under both names,
+  e.g. `/sj record start` and `/sj session new`. `/shafttools` is gone.
+- The data folder is now `.minecraft/shaftjournal`. On first start the old `.minecraft/shafttools`
+  folder (journal and recordings) is moved there, unless the new folder already exists.
+- The journal hotkey has a new internal name, so a key bound to it before needs binding again.
+- Corpse loot icons are the real SkyBlock items: each icon carries the item's SkyBlock ID, so
+  texture packs through Firmament or Catharsis show their texture, and while Hypixel's resource
+  pack is loaded it uses Hypixel's own model. Without either, the vanilla stand-ins show as before.
+  Enchanted items and keys glint. IDs and models come from the NEU item repo
+  (`shaftjournal/skyblock_items.txt`).
+- The merged gemstone slot shows the most common gem in it instead of an amethyst shard.
+
 ## 0.3.6 (2026-11-11)
 - The "Shafts / h" personal best only counts sessions with at least 5 shafts, so a short lucky
   session can't hold it.

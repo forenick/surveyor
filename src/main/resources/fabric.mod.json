@@ -1,22 +1,22 @@
 {
 	"schemaVersion": 1,
-	"id": "shafttools",
+	"id": "shaftjournal",
 	"version": "${version}",
-	"name": "ShaftTools",
+	"name": "ShaftJournal",
 	"description": "Information-only tools for Glacite Mineshaft grinding on Hypixel SkyBlock.",
 	"authors": [
 		"Nick"
 	],
 	"license": "All-Rights-Reserved",
-	"icon": "assets/shafttools/icon.png",
+	"icon": "assets/shaftjournal/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"dev.shafttools.ShaftTools"
+			"dev.shaftjournal.ShaftJournal"
 		]
 	},
 	"mixins": [
-		"shafttools.mixins.json"
+		"shaftjournal.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.20.1",
