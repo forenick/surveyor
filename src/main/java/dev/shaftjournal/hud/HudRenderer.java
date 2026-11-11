@@ -11,8 +11,8 @@ import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 public final class HudRenderer {
 	/** Space between the text and the box edge, before scaling. */
 	static final int PADDING = 3;
-	/** Boxes never touch the screen edge. */
-	static final int MARGIN = 2;
+	/** Space between a box and the screen edge; also the gap between snapped boxes. Nick's choice (2026-11-11). */
+	static final int MARGIN = 4;
 	private static final int LINE_GAP = 1;
 	private static final int DARK = 0x80000000;
 

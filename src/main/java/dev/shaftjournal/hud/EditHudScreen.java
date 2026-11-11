@@ -1,5 +1,6 @@
 package dev.shaftjournal.hud;
 
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int OUTLINE = 0x70FFFFFF;
 	private static final int OUTLINE_SELECTED = 0xFFFFFF55;
 	private static final int HIDDEN_SHADE = 0xC8000000;
+	/** Snap guides: Minecraft's light purple, so they don't look like the yellow selection. */
+	private static final int GUIDE = 0xFFFF55FF;
 	private static final String CODES = "0123456789abcdef";
 	/** How much one scroll notch over the selected box changes its size; the Size slider's step. */
 	private static final float SCALE_STEP = 0.1f;
@@ -78,6 +81,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private Box dragging;
 	private double grabX;
 	private double grabY;
+	/** What the dragged box snapped to, drawn while dragging. */
+	private List<HudSnap.Guide> guides = List.of();
 
 	/** @param parent the screen to go back to, or null */
 	public EditHudScreen(Screen parent, LiveHud hud) {
@@ -133,10 +138,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			graphics.outline(bounds.x() - 1, bounds.y() - 1, bounds.width() + 2, bounds.height() + 2,
 					box == selected ? OUTLINE_SELECTED : OUTLINE);
 		}
+		for (HudSnap.Guide guide : guides) {
+			graphics.fill(guide.x(), guide.y(), guide.x() + guide.width(), guide.y() + guide.height(), GUIDE);
+			if (guide.label() != null) {
+				graphics.text(font, guide.label(), guide.x() + guide.width() + 2, guide.y() + guide.height() / 2 - 4, GUIDE, true);
+			}
+		}
 		if (selected == null) {
 			// Two lines, so it fits at 1080p's auto GUI scale (480 wide) and smaller.
-			String[] hint = {"§7Drag a box to move it · click it to edit · Esc to close",
-					"§7Scroll on the selected box to resize it · arrow keys nudge it"};
+			String[] hint = {"§7Drag a box to move it · hold Ctrl to place it freely · click it to edit",
+					"§7Scroll on the selected box to resize it · arrow keys nudge it · Esc to close"};
 			for (int i = 0; i < hint.length; i++) {
 				graphics.text(font, hint[i], (width - font.width(hint[i])) / 2, height - 64 + i * 11, 0xFFFFFFFF, true);
 			}
@@ -165,8 +176,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			dragging = hit;
 			grabX = click.x() - bounds.x();
 			grabY = click.y() - bounds.y();
+			// Hidden while dragging, so it can't cover the box; it comes back on release.
+			removePanel();
+		} else {
+			rebuildPanel();
 		}
-		rebuildPanel();
 		return true;
 	}
 
@@ -174,10 +188,28 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	public boolean mouseDragged(MouseButtonEvent drag, double dx, double dy) {
 		if (dragging == null) return super.mouseDragged(drag, dx, dy);
 		HudRenderer.Bounds bounds = drawn.get(dragging);
-		if (bounds != null) {
-			dragging.x = HudRenderer.fractionX((int) Math.round(drag.x() - grabX), bounds.width(), width);
-			dragging.y = HudRenderer.fractionY((int) Math.round(drag.y() - grabY), bounds.height(), height);
+		if (bounds == null) return true;
+		int x = (int) Math.round(drag.x() - grabX);
+		int y = (int) Math.round(drag.y() - grabY);
+		Float fractionX = null;
+		Float fractionY = null;
+		guides = List.of();
+		if (!minecraft.hasControlDown()) {
+			List<HudSnap.Rect> others = new ArrayList<>();
+			drawn.forEach((box, b) -> {
+				if (box != dragging) others.add(new HudSnap.Rect(b.x(), b.y(), b.width(), b.height()));
+			});
+			HudSnap.Result snap = HudSnap.snap(new HudSnap.Rect(x, y, bounds.width(), bounds.height()), others, width,
+					height, HudRenderer.MARGIN);
+			x = (int) Math.round(snap.x());
+			y = (int) Math.round(snap.y());
+			// A screen snap is saved as the edge or middle itself, so it holds at any window size.
+			fractionX = snap.fractionX();
+			fractionY = snap.fractionY();
+			guides = snap.guides();
 		}
+		dragging.x = fractionX != null ? fractionX : HudRenderer.fractionX(x, bounds.width(), width);
+		dragging.y = fractionY != null ? fractionY : HudRenderer.fractionY(y, bounds.height(), height);
 		return true;
 	}
 
@@ -216,6 +248,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	public boolean mouseReleased(MouseButtonEvent release) {
 		if (dragging == null) return super.mouseReleased(release);
 		dragging = null;
+		guides = List.of();
 		// The panel moves to the other side if the box crossed the middle.
 		rebuildPanel();
 		return true;
@@ -300,10 +333,14 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	// ---- side panel ----
 
-	private void rebuildPanel() {
+	private void removePanel() {
 		if (panel != null) root.removeChild(panel);
 		panel = null;
 		scaleSlider = null;
+	}
+
+	private void rebuildPanel() {
+		removePanel();
 		if (selected == null) return;
 		Box box = selected;
 		panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.content());

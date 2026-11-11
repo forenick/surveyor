@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.6.0 (2026-11-11)
+Snapping in Edit HUD (mockup `Docs/mockups/hud-snapping.html`, approved by Nick).
+- While you drag, a box snaps when an edge or its middle comes within 4 pixels of:
+  - the screen margin on any side, or the middle of the screen (e.g. right under the crosshair)
+  - another box's left, right, top, bottom or middle (lined up)
+  - the spot right next to or under another box, with a 4 pixel gap (stacked)
+- Pink guide lines show what it lined up with; stacked boxes show the gap as a small "4".
+- Hold Ctrl while dragging to place a box freely.
+- A box snapped to the screen edge or middle stays there at any window size or GUI scale.
+- Boxes now keep 4 pixels from the screen edge (was 2), the same as the gap between boxes.
+- The side panel hides while you drag, so it can't cover the box you're moving.
+
 ## 0.5.3 (2026-11-11)
 Edit HUD tweaks.
 - The toolbar moves out of the way: when a box or the side panel is under it, it goes to the bottom
