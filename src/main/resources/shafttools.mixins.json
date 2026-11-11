@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "dev.shafttools.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"ClientPacketListenerMixin",
+		"PlayerTabOverlayAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
