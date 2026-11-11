@@ -39,29 +39,43 @@ public final class HudData {
 	}
 
 	/**
-	 * @param sessionEntries the finished shafts of the current session, in order
-	 * @param spawnTimer     the running or last timed spawn, in milliseconds; null when none
-	 * @param shaft          the shaft the player is in, or null
-	 * @param now            the same clock as the shaft's times
+	 * A session's totals. They only change when a shaft is saved, so the HUD keeps them between
+	 * refreshes instead of adding up every shaft again.
+	 *
+	 * @param summary null before the first shaft
 	 */
-	public static HudData live(List<JournalEntry> sessionEntries, Long spawnTimer, Shaft shaft, long now,
-			TextPatterns patterns, ShaftNames names) {
+	public record SessionTotals(long shafts, long powder, double fine, Long averageSpawn, SessionSummary summary) {
+		public static final SessionTotals NONE = new SessionTotals(0, 0, 0, null, null);
+
+		/** @param entries the finished shafts of one session, in order */
+		public static SessionTotals of(List<JournalEntry> entries, TextPatterns patterns) {
+			if (entries.isEmpty()) return NONE;
+			long powder = 0;
+			double fine = 0;
+			for (JournalEntry entry : entries) {
+				powder += JournalStats.powder(entry);
+				LootSummary loot = LootSummary.of(entry.loots(), patterns);
+				if (loot.gems() != null) fine += loot.gems().fine();
+			}
+			SessionSummary summary = new SessionSummary(entries.getFirst().sessionId(), entries);
+			return new SessionTotals(entries.size(), powder, fine, summary.averageSearchMillis(), summary);
+		}
+	}
+
+	/**
+	 * @param session    the current session's totals
+	 * @param spawnTimer the running or last timed spawn, in milliseconds; null when none
+	 * @param shaft      the shaft the player is in, or null
+	 * @param now        the same clock as the shaft's times
+	 */
+	public static HudData live(SessionTotals session, Long spawnTimer, Shaft shaft, long now, ShaftNames names) {
 		HudData data = new HudData();
-		data.put(HudValue.SESSION_SHAFTS, (long) sessionEntries.size());
-		long powder = 0;
-		double fine = 0;
-		for (JournalEntry entry : sessionEntries) {
-			powder += JournalStats.powder(entry);
-			LootSummary loot = LootSummary.of(entry.loots(), patterns);
-			if (loot.gems() != null) fine += loot.gems().fine();
-		}
-		data.put(HudValue.SESSION_POWDER, powder);
-		data.put(HudValue.SESSION_CORPSE_FINE, fine);
-		if (!sessionEntries.isEmpty()) {
-			SessionSummary session = new SessionSummary(sessionEntries.getFirst().sessionId(), sessionEntries);
-			data.put(HudValue.SHAFTS_PER_HOUR, session.shaftsPerHour());
-			data.put(HudValue.AVERAGE_SPAWN, session.averageSearchMillis());
-		}
+		data.put(HudValue.SESSION_SHAFTS, session.shafts());
+		data.put(HudValue.SESSION_POWDER, session.powder());
+		data.put(HudValue.SESSION_CORPSE_FINE, session.fine());
+		data.put(HudValue.AVERAGE_SPAWN, session.averageSpawn());
+		// Counted up to now, so the rate drops while a search drags on.
+		if (session.summary() != null) data.put(HudValue.SHAFTS_PER_HOUR, session.summary().shaftsPerHour(now));
 		data.put(HudValue.SPAWN_TIMER, spawnTimer);
 		if (shaft != null) {
 			if (shaft.id() != null) data.put(HudValue.SHAFT_TYPE, names.name(shaft.id().type()));

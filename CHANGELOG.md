@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.5.1 (2026-11-11)
+Code review fixes for the HUD.
+- A portal you found but didn't enter within 40 s no longer gives its spawn time to the next
+  shaft (HUD and journal).
+- The Session box no longer shows an old session after a break of over 15 minutes or a restart.
+- Shafts per hour now counts the time since the last shaft too, so it drops during a long search.
+- A `hud.json` that can't be read is kept as `hud.json.bad` instead of being overwritten by the
+  defaults.
+- Changes made in the editor right after startup are no longer replaced by the saved layout loading late.
+- The Current shaft box is titled "Shaft" instead of "- Shaft" until the shaft type is known.
+- The short number format shows 1.0M instead of 1000.0k from 999,950 up.
+- A number format out of range in `hud.json` is reset to the first one.
+- The HUD adds up the session only when a shaft is saved, and builds its text only when the values
+  refresh instead of every frame.
+
 ## 0.5.0 (2026-11-11)
 HUD, slice 1 of the design in `Docs/hud-design.md` (mockup `Docs/mockups/hud-v1.html`).
 - Three HUD boxes:

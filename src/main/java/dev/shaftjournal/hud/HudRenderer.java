@@ -45,7 +45,14 @@ public final class HudRenderer {
 	}
 
 	public static void draw(GuiGraphicsExtractor graphics, Font font, Box box, List<String> lines, Bounds bounds) {
-		int width = innerWidth(font, lines);
+		// Each line is measured once per frame.
+		int[] lineWidths = new int[lines.size()];
+		int widest = 0;
+		for (int i = 0; i < lineWidths.length; i++) {
+			lineWidths[i] = font.width(lines.get(i));
+			widest = Math.max(widest, lineWidths[i]);
+		}
+		int width = widest + 2 * PADDING;
 		int height = innerHeight(font, lines);
 		graphics.pose().pushMatrix();
 		graphics.pose().translate(bounds.x(), bounds.y());
@@ -60,8 +67,9 @@ public final class HudRenderer {
 		}
 		int textWidth = width - 2 * PADDING;
 		int y = PADDING;
-		for (String line : lines) {
-			int lineWidth = font.width(line);
+		for (int i = 0; i < lineWidths.length; i++) {
+			String line = lines.get(i);
+			int lineWidth = lineWidths[i];
 			int x = PADDING + switch (box.align) {
 				case LEFT -> 0;
 				case CENTER -> (textWidth - lineWidth) / 2;

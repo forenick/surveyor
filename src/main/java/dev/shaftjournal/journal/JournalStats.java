@@ -71,7 +71,12 @@ public final class JournalStats {
 
 		/** Null for sessions shorter than {@link #MIN_RATE_MILLIS}. */
 		public Double shaftsPerHour() {
-			long length = lengthMillis();
+			return shaftsPerHour(end());
+		}
+
+		/** Like {@link #shaftsPerHour()}, but also counting the time since the last shaft up to {@code now}. */
+		public Double shaftsPerHour(long now) {
+			long length = Math.max(end(), now) - start();
 			return length < MIN_RATE_MILLIS ? null : shafts() * 3_600_000.0 / length;
 		}
 

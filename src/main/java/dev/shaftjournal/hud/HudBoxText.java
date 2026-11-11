@@ -33,12 +33,14 @@ public final class HudBoxText {
 		return lines;
 	}
 
-	/** Replaces every {value_id} with that value in its first format. */
+	/** Replaces every {value_id} with that value in its first format, or nothing while it's missing. */
 	static String tags(String text, HudData data, boolean example) {
 		if (text.indexOf('{') < 0) return text;
 		for (HudValue value : HudValue.values()) {
 			String tag = "{" + value.id() + "}";
-			if (text.contains(tag)) text = text.replace(tag, text(value, 0, data, example));
+			if (!text.contains(tag)) continue;
+			Object v = example ? data.getOrExample(value) : data.get(value);
+			text = text.replace(tag, v == null ? "" : HudFormat.format(value.kind(), 0, v));
 		}
 		return text;
 	}

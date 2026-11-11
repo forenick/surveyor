@@ -72,6 +72,14 @@ public final class Journal {
 	}
 
 	/**
+	 * The current session, or null when there is none or it has run out: the session only ends at
+	 * the next activity, but after {@link #SESSION_GAP_MILLIS} it is already over for display.
+	 */
+	public Session activeSession(long now) {
+		return session == null || now - lastActivity > SESSION_GAP_MILLIS ? null : session;
+	}
+
+	/**
 	 * Continues the last saved session after a restart, as if the game had stayed open. Entries
 	 * are in file order. Does nothing once a session is running.
 	 */
@@ -150,6 +158,8 @@ public final class Journal {
 		} else {
 			searching = true;
 			searchMillis = 0;
+			// A portal found earlier and not entered in time doesn't belong to the next shaft.
+			timedSearch = null;
 		}
 		lastMiningAt = now;
 	}

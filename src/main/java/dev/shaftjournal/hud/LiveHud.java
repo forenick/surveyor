@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -16,7 +17,9 @@ import com.google.gson.JsonParseException;
 import dev.shaftjournal.detection.LiveTracker;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
+import dev.shaftjournal.hud.HudData.SessionTotals;
 import dev.shaftjournal.hud.HudLayout.Box;
+import dev.shaftjournal.journal.Journal;
 import dev.shaftjournal.journal.LiveJournal;
 import dev.shaftjournal.screen.ShaftNames;
 import dev.shaftjournal.util.DataFolder;
@@ -37,11 +40,23 @@ public final class LiveHud {
 	private final LiveTracker tracker;
 	private final LiveJournal journal;
 	private HudLayout layout = HudLayout.defaults();
-	private HudData data = HudData.live(List.of(), null, null, 0, TextPatterns.defaults(), ShaftNames.defaults());
+	private HudData data = HudData.live(SessionTotals.NONE, null, null, 0, ShaftNames.defaults());
+	/** The session {@link #totals} were added up for; a new object whenever a shaft is saved. */
+	private Journal.Session totalsSession;
+	private SessionTotals totals = SessionTotals.NONE;
+	/** The visible boxes, ready to draw at {@link #preparedWidth} × {@link #preparedHeight}; null when stale. */
+	private List<Prepared> prepared;
+	private int preparedWidth;
+	private int preparedHeight;
+	/** Set once the layout was saved, so a late-loading file doesn't replace newer changes. */
+	private boolean saved;
 	private boolean inMines;
 	private boolean inShaft;
 	private Path file;
 	private int tick;
+
+	private record Prepared(Box box, List<String> lines, HudRenderer.Bounds bounds) {
+	}
 
 	public LiveHud(LiveTracker tracker, LiveJournal journal) {
 		this.tracker = tracker;
@@ -52,7 +67,16 @@ public final class LiveHud {
 	public void start(Minecraft client) {
 		file = DataFolder.in(client.gameDirectory.toPath()).resolve("hud.json");
 		CompletableFuture.supplyAsync(this::read, Util.ioPool()).thenAccept(read -> {
-			if (read != null) client.execute(() -> layout = read);
+			if (read == null) return;
+			client.execute(() -> {
+				// Too late: the editor already works on (or saved) the layout in memory.
+				if (saved || client.gui.screen() instanceof EditHudScreen) {
+					LOGGER.warn("Loaded {} after the HUD editor was opened; keeping the editor's layout", file);
+					return;
+				}
+				layout = read;
+				prepared = null;
+			});
 		});
 	}
 
@@ -61,13 +85,22 @@ public final class LiveHud {
 		try {
 			return HudLayout.fromJson(Files.readString(file, StandardCharsets.UTF_8));
 		} catch (IOException | JsonParseException e) {
-			LOGGER.warn("Could not read {}, using the default HUD until it is saved again", file, e);
+			// Keep the broken file, or the next save would replace a hand edit with the defaults.
+			Path backup = file.resolveSibling("hud.json.bad");
+			try {
+				Files.move(file, backup, StandardCopyOption.REPLACE_EXISTING);
+				LOGGER.warn("Could not read {}, moved it to {} and using the default HUD", file, backup, e);
+			} catch (IOException moveFailed) {
+				LOGGER.warn("Could not read {} or move it to {}, using the default HUD", file, backup, e);
+			}
 			return null;
 		}
 	}
 
 	/** Writes the layout off the render thread. Call on the client thread after changing it. */
 	public void save() {
+		saved = true;
+		prepared = null;
 		if (file == null) return;
 		String json = layout.toJson();
 		Path target = file;
@@ -90,6 +123,7 @@ public final class LiveHud {
 
 	public void resetLayout() {
 		layout = HudLayout.defaults();
+		prepared = null;
 	}
 
 	public HudData data() {
@@ -106,20 +140,38 @@ public final class LiveHud {
 		Shaft shaft = tracker.currentShaft();
 		inShaft = shaft != null;
 		inMines = tracker.inMiningArea();
-		data = HudData.live(journal.sessionEntries(), journal.spawnTimerMillis(now), shaft, now,
-				TextPatterns.defaults(), ShaftNames.defaults());
+		Journal.Session session = journal.activeSession(now);
+		if (session != totalsSession) {
+			totalsSession = session;
+			totals = SessionTotals.of(journal.sessionEntries(session), TextPatterns.defaults());
+		}
+		data = HudData.live(totals, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults());
+		prepared = null;
 	}
 
 	public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
 		Minecraft client = Minecraft.getInstance();
 		// F1 hides the HUD; the editor draws the boxes itself.
 		if (client.gui.hud.isHidden() || client.gui.screen() instanceof EditHudScreen) return;
+		int width = graphics.guiWidth();
+		int height = graphics.guiHeight();
+		// The text only changes when the values refresh, so it's built then, not every frame.
+		if (prepared == null || width != preparedWidth || height != preparedHeight) {
+			prepared = prepare(client, width, height);
+			preparedWidth = width;
+			preparedHeight = height;
+		}
+		for (Prepared box : prepared) HudRenderer.draw(graphics, client.font, box.box(), box.lines(), box.bounds());
+	}
+
+	private List<Prepared> prepare(Minecraft client, int width, int height) {
+		List<Prepared> result = new ArrayList<>();
 		for (Box box : layout.boxes) {
 			if (!visible(box)) continue;
 			List<String> lines = HudBoxText.lines(box, data, false);
 			if (lines.isEmpty()) continue;
-			HudRenderer.draw(graphics, client.font, box, lines,
-					HudRenderer.bounds(client.font, box, lines, graphics.guiWidth(), graphics.guiHeight()));
+			result.add(new Prepared(box, lines, HudRenderer.bounds(client.font, box, lines, width, height)));
 		}
+		return result;
 	}
 }

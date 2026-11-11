@@ -75,6 +75,25 @@ class JournalTest {
 	}
 
 	@Test
+	void aPortalLeftUnenteredIsNotTimedForTheNextShaft() {
+		at(0).hit(true);
+		at(20_000).chat(WOW);
+		at(70_000).hit(true); // over 40 s later: a new search, the found portal is abandoned
+		assertEquals(0, journal.spawnTimerMillis(70_000));
+		visitShaft(80_000, "JADE_1"); // someone else's portal, no WOW
+		assertNull(entries.get(0).searchMillis());
+	}
+
+	@Test
+	void sessionRunsOutForDisplayBeforeTheNextActivity() {
+		at(0).hit(true);
+		assertEquals(0, journal.activeSession(Journal.SESSION_GAP_MILLIS).id());
+		assertNull(journal.activeSession(Journal.SESSION_GAP_MILLIS + 1));
+		assertNull(new Journal(TextPatterns.defaults(), () -> true, e -> {
+		}).activeSession(0), "no session before any activity");
+	}
+
+	@Test
 	void pickobulusCountsAsMining() {
 		at(0).hit(true);
 		at(35_000).chat("§aYou used your §6Pickobulus §aPickaxe Ability!");

@@ -15,11 +15,13 @@ import com.google.gson.JsonParseException;
 
 import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.TextPatterns;
+import dev.shaftjournal.hud.HudData.SessionTotals;
 import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.hud.HudLayout.Visibility;
 import dev.shaftjournal.hud.HudValue.Kind;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalFile;
+import dev.shaftjournal.journal.JournalStats;
 import dev.shaftjournal.screen.ShaftNames;
 
 class HudTest {
@@ -33,6 +35,8 @@ class HudTest {
 		assertEquals("43.4k", HudFormat.format(Kind.INTEGER, 1, 43_436L));
 		assertEquals("1.2M", HudFormat.format(Kind.INTEGER, 1, 1_204_310L));
 		assertEquals("999", HudFormat.format(Kind.INTEGER, 1, 999L));
+		assertEquals("999.9k", HudFormat.format(Kind.INTEGER, 1, 999_949L));
+		assertEquals("1.0M", HudFormat.format(Kind.INTEGER, 1, 999_950L), "not 1000.0k");
 		assertEquals("43436", HudFormat.format(Kind.INTEGER, 2, 43_436L));
 		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, 19.42));
 		assertEquals("19", HudFormat.format(Kind.DECIMAL, 1, 19.42));
@@ -55,9 +59,10 @@ class HudTest {
 	@Test
 	void missingValuesShowADashOrTheExample() {
 		Box spawn = HudLayout.defaults().boxes.get(1);
-		HudData empty = HudData.live(List.of(), null, null, 0, TextPatterns.defaults(), ShaftNames.defaults());
+		HudData empty = HudData.live(SessionTotals.NONE, null, null, 0, ShaftNames.defaults());
 		assertEquals(List.of("§7Spawn: §f§l-", "§7Avg: §f§l-"), HudBoxText.lines(spawn, empty, false));
 		assertEquals(List.of("§7Spawn: §f§l1:42", "§7Avg: §f§l1:25"), HudBoxText.lines(spawn, empty, true));
+		assertEquals("Shaft", HudBoxText.tags("{shaft_type} Shaft", empty, false).strip(), "a missing tag is left out");
 	}
 
 	@Test
@@ -73,7 +78,7 @@ class HudTest {
 	void repairsAHandEditedFile() {
 		HudLayout read = HudLayout.fromJson("""
 				{"boxes": [{"id": "mine", "labelColor": "z", "scale": 9, "x": -1,
-				  "lines": [{"value": "nope"}, {"value": "spawn_timer"}]}, null]}""");
+				  "lines": [{"value": "nope"}, {"value": "spawn_timer", "format": -5}]}, null]}""");
 		Box box = read.boxes.getFirst();
 		assertEquals(1, read.boxes.size());
 		assertEquals("7", box.labelColor);
@@ -82,6 +87,7 @@ class HudTest {
 		assertEquals(Visibility.MINES, box.visibility);
 		assertEquals(1, box.lines.size());
 		assertEquals("Spawn: ", box.lines.getFirst().prefix);
+		assertEquals(0, box.lines.getFirst().format);
 		assertTrue(HudLayout.fromJson("{}").boxes.isEmpty(), "deleting every box is allowed");
 		assertThrows(JsonParseException.class, () -> HudLayout.fromJson("[]"));
 		assertThrows(JsonParseException.class, () -> HudLayout.fromJson("{\"boxes\": null}"));
@@ -112,12 +118,18 @@ class HudTest {
 		JournalFile file = new JournalFile(path);
 		List<JournalEntry> entries = file.load().join();
 		file.close();
-		HudData data = HudData.live(entries, null, null, 0, TextPatterns.defaults(), ShaftNames.defaults());
+		HudData data = HudData.live(SessionTotals.of(entries, TextPatterns.defaults()), null, null, 0, ShaftNames.defaults());
 		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS));
 		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER));
 		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, data.get(HudValue.SHAFTS_PER_HOUR)));
 		// (8,889 + 55,940 + 38,186 + 193,848 + 283,594 + 185,948) / 6 ms
 		assertEquals("2:07", HudFormat.format(Kind.TIME, 0, data.get(HudValue.AVERAGE_SPAWN)));
 		assertNull(data.get(HudValue.SHAFT_TIME));
+		// The rate counts the time since the last shaft too: the same 6 shafts over twice the time.
+		long start = entries.getFirst().sessionId();
+		long length = new JournalStats.SessionSummary(start, entries).lengthMillis();
+		HudData later = HudData.live(SessionTotals.of(entries, TextPatterns.defaults()), null, null, start + 2 * length,
+				ShaftNames.defaults());
+		assertEquals("9.7", HudFormat.format(Kind.DECIMAL, 0, later.get(HudValue.SHAFTS_PER_HOUR)));
 	}
 }

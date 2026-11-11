@@ -62,15 +62,17 @@ public final class LiveJournal {
 		return List.copyOf(entries);
 	}
 
-	/** The finished shafts of the current session, in order; empty before the first one. */
-	public List<JournalEntry> sessionEntries() {
-		Journal.Session session = journal.session();
+	/** See {@link Journal#activeSession}. A new object whenever the session or its totals change. */
+	public Journal.Session activeSession(long now) {
+		return journal.activeSession(now);
+	}
+
+	/** The finished shafts of this session, in order; empty for null or before the first one. */
+	public List<JournalEntry> sessionEntries(Journal.Session session) {
 		if (session == null) return List.of();
-		List<JournalEntry> result = new ArrayList<>();
-		for (int i = entries.size() - 1; i >= 0 && entries.get(i).sessionId() == session.id(); i--) {
-			result.addFirst(entries.get(i));
-		}
-		return result;
+		int first = entries.size();
+		while (first > 0 && entries.get(first - 1).sessionId() == session.id()) first--;
+		return List.copyOf(entries.subList(first, entries.size()));
 	}
 
 	/** See {@link Journal#spawnTimerMillis}. */

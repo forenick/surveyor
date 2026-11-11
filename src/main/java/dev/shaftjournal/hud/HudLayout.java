@@ -169,6 +169,8 @@ public final class HudLayout {
 		box.lines.removeIf(line -> line == null || line.hudValue() == null);
 		for (Line line : box.lines) {
 			if (line.prefix == null) line.prefix = line.hudValue().defaultPrefix();
+			int formats = HudFormat.options(line.hudValue().kind()).size();
+			if (line.format < 0 || line.format >= formats) line.format = 0;
 		}
 	}
 

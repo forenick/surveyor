@@ -50,7 +50,8 @@ public final class HudFormat {
 
 	private static String integer(long value, int format) {
 		return switch (format) {
-			case 1 -> Math.abs(value) >= 1_000_000 ? one(value / 1e6) + "M"
+			// 999,950 and up round to 1.0M, not 1000.0k.
+			case 1 -> Math.abs(value) >= 999_950 ? one(value / 1e6) + "M"
 					: Math.abs(value) >= 1_000 ? one(value / 1e3) + "k" : Long.toString(value);
 			case 2 -> Long.toString(value);
 			default -> String.format(Locale.ROOT, "%,d", value);
