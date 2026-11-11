@@ -5,8 +5,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 
 import dev.shafttools.detection.Corpse;
+import dev.shafttools.detection.TextPatterns;
 
 /**
  * Session summaries and all-time stats for the journal screen, computed from saved entries.
@@ -125,36 +127,42 @@ public final class JournalStats {
 		return entry.corpsePowder() + entry.exitPowder();
 	}
 
-	/** Looted and seen corpses per type, in {@link #CORPSE_ORDER}. */
-	public static Map<String, CorpseCount> corpses(JournalEntry entry) {
+	/** Looted and seen corpses per type, in the order the types first appear (tab list order). */
+	public static Map<String, CorpseCount> corpseCounts(List<Corpse> corpses) {
 		Map<String, int[]> counts = new LinkedHashMap<>();
-		for (Corpse corpse : entry.corpses()) {
+		for (Corpse corpse : corpses) {
 			int[] count = counts.computeIfAbsent(corpse.type(), t -> new int[2]);
 			if (corpse.looted()) count[0]++;
 			count[1]++;
 		}
+		Map<String, CorpseCount> result = new LinkedHashMap<>();
+		counts.forEach((type, count) -> result.put(type, new CorpseCount(count[0], count[1])));
+		return result;
+	}
+
+	/** Looted and seen corpses per type, in {@link #CORPSE_ORDER}. */
+	public static Map<String, CorpseCount> corpses(JournalEntry entry) {
+		Map<String, CorpseCount> counts = corpseCounts(entry.corpses());
 		Map<String, CorpseCount> ordered = new LinkedHashMap<>();
-		for (String type : ordered(counts.keySet())) {
-			int[] count = counts.get(type);
-			ordered.put(type, new CorpseCount(count[0], count[1]));
-		}
+		for (String type : ordered(counts.keySet())) ordered.put(type, counts.get(type));
 		return ordered;
 	}
 
-	/** The 4-letter type before the underscore, e.g. "JASP"; null without a shaft ID. */
+	/** The 4-letter type, e.g. "JASP"; null without a shaft ID. */
 	public static String type(JournalEntry entry) {
-		String id = entry.shaftId();
-		if (id == null) return null;
-		int underscore = id.lastIndexOf('_');
-		return underscore < 0 ? null : id.substring(0, underscore);
+		return idPart(entry, "type");
 	}
 
-	/** The variant after the underscore, e.g. "1", "2" or "C"; null without a shaft ID. */
+	/** The variant, e.g. "1", "2" or "C"; null without a shaft ID. */
 	public static String variant(JournalEntry entry) {
-		String id = entry.shaftId();
-		if (id == null) return null;
-		int underscore = id.lastIndexOf('_');
-		return underscore < 0 ? null : id.substring(underscore + 1);
+		return idPart(entry, "variant");
+	}
+
+	/** A named group of the {@code shaft.id} pattern, the same ID shape the scoreboard parser reads. */
+	private static String idPart(JournalEntry entry, String group) {
+		if (entry.shaftId() == null) return null;
+		Matcher m = TextPatterns.defaults().match("shaft.id", entry.shaftId());
+		return m == null ? null : m.group(group);
 	}
 
 	public static AllTime allTime(List<JournalEntry> entries) {
@@ -169,6 +177,7 @@ public final class JournalStats {
 		JournalEntry fastest = null;
 		Best mostPowder = null;
 		Best mostLapis = null;
+		JournalEntry mostGems = null;
 		long powder = 0;
 		for (JournalEntry entry : entries) {
 			powder += powder(entry);
@@ -190,22 +199,29 @@ public final class JournalStats {
 			if (mostPowder == null || shaftPowder > mostPowder.value()) mostPowder = new Best(entry, shaftPowder);
 			long lapis = SessionSummary.looted(entry, "Lapis");
 			if (lapis > 0 && (mostLapis == null || lapis > mostLapis.value())) mostLapis = new Best(entry, lapis);
+			if (entry.gems() != null && entry.gems().fineEquivalent() > 0
+					&& (mostGems == null || entry.gems().fineEquivalent() > mostGems.gems().fineEquivalent())) mostGems = entry;
 		}
 
 		SessionSummary bestRate = null;
+		double bestRateValue = 0;
 		SessionSummary fastestSession = null;
+		long fastestAverage = 0;
 		SessionSummary mostShafts = null;
 		for (SessionSummary session : sessions) {
 			Double rate = session.shaftsPerHour();
-			if (rate != null && (bestRate == null || rate > bestRate.shaftsPerHour())) bestRate = session;
-			if (session.timedSpawns() >= MIN_TIMED_FOR_RECORD && (fastestSession == null
-					|| session.averageSearchMillis() < fastestSession.averageSearchMillis())) fastestSession = session;
+			if (rate != null && (bestRate == null || rate > bestRateValue)) {
+				bestRate = session;
+				bestRateValue = rate;
+			}
+			if (session.timedSpawns() >= MIN_TIMED_FOR_RECORD) {
+				long average = session.averageSearchMillis();
+				if (fastestSession == null || average < fastestAverage) {
+					fastestSession = session;
+					fastestAverage = average;
+				}
+			}
 			if (mostShafts == null || session.shafts() > mostShafts.shafts()) mostShafts = session;
-		}
-		JournalEntry mostGems = null;
-		for (JournalEntry entry : entries) {
-			if (entry.gems() != null && entry.gems().fineEquivalent() > 0
-					&& (mostGems == null || entry.gems().fineEquivalent() > mostGems.gems().fineEquivalent())) mostGems = entry;
 		}
 
 		return new AllTime(entries.size(), sessions.size(),

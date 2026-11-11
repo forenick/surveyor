@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.5 (2026-11-11)
+Fixes from a code review of 0.3.0 to 0.3.4.
+- The journal screen re-lays itself out when the window is resized or the GUI scale changes,
+  instead of keeping the old sizes until a tab is clicked.
+- Session tab tiles show their values in bold, as in the mockup.
+- Personal-best arrows of a shaft without an ID say "Open shaft" instead of "Open null".
+- The slowest bar in the spawn chart no longer reaches past the top line.
+- Tiny gem amounts show as "<0.1" instead of "0.0"; 9.95 and up show as "10" in the slot.
+- "Last 5 sessions" says "same" when it is within a second of the all-time average.
+- `shaft_types.txt` and `item_icons.txt` both allow a trailing "# comment"; a bad color falls back
+  to aqua instead of crashing when the journal opens.
+- Both files are read once instead of every time the journal opens.
 ## 0.3.4 (2026-11-11)
 - Personal bests use short labels: "Shafts / h", "Shafts / session", "Lapis / shaft", "Powder / shaft",
   "Gems / shaft", "Coins / shaft", "Coins / h".

@@ -1,17 +1,13 @@
 package dev.shafttools.detection;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import dev.shafttools.util.Resources;
 
 /**
  * The game-text patterns from {@code shafttools/patterns.txt}, the single place where Hypixel's
@@ -33,12 +29,9 @@ public final class TextPatterns {
 	/** The patterns bundled with the mod. */
 	public static synchronized TextPatterns defaults() {
 		if (defaults == null) {
-			try (InputStream in = TextPatterns.class.getResourceAsStream(RESOURCE)) {
-				if (in == null) throw new IllegalStateException("Missing " + RESOURCE);
-				defaults = parse(new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)).lines().toList());
-			} catch (IOException e) {
-				throw new UncheckedIOException(e);
-			}
+			List<String> lines = Resources.lines(RESOURCE);
+			if (lines == null) throw new IllegalStateException("Missing " + RESOURCE);
+			defaults = parse(lines);
 		}
 		return defaults;
 	}

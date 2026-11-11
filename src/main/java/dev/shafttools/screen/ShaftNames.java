@@ -1,19 +1,22 @@
 package dev.shafttools.screen;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import dev.shafttools.util.Resources;
 
 /** Display names and bar colors for shaft type codes, from {@code shafttools/shaft_types.txt}. Plain Java. */
 public final class ShaftNames {
 	/** Color for codes without one: Minecraft aqua. */
 	public static final int DEFAULT_RGB = 0x55FFFF;
+
+	/** The color after the comma: '#' and six hex digits. Anything else keeps the default color. */
+	private static final Pattern COLOR = Pattern.compile("\\s*#([0-9A-Fa-f]{6})(?![0-9A-Za-z])");
+
+	private static ShaftNames defaults;
 
 	private record Type(String name, int rgb) {
 	}
@@ -25,27 +28,27 @@ public final class ShaftNames {
 			int eq = line.indexOf('=');
 			if (eq < 0 || line.strip().startsWith("#")) continue;
 			String value = line.substring(eq + 1);
-			// The color itself starts with '#', so the comment starts at the second '#' after '='.
-			int color = value.indexOf('#');
-			int comment = color < 0 ? -1 : value.indexOf('#', color + 1);
-			if (comment >= 0) value = value.substring(0, comment);
-			String[] parts = value.split(",");
+			int comma = value.indexOf(',');
+			String name = comma < 0 ? value : value.substring(0, comma);
+			// Without a color, a '#' in the name part starts a comment.
+			int comment = name.indexOf('#');
+			if (comment >= 0) name = name.substring(0, comment);
 			int rgb = DEFAULT_RGB;
-			if (parts.length > 1) {
-				String hex = parts[1].strip();
-				if (hex.startsWith("#")) rgb = Integer.parseInt(hex.substring(1), 16);
+			if (comma >= 0) {
+				Matcher color = COLOR.matcher(value.substring(comma + 1));
+				if (color.lookingAt()) rgb = Integer.parseInt(color.group(1), 16);
 			}
-			types.put(line.substring(0, eq).strip(), new Type(parts[0].strip(), rgb));
+			types.put(line.substring(0, eq).strip(), new Type(name.strip(), rgb));
 		}
 	}
 
-	public static ShaftNames load() {
-		try (InputStream in = ShaftNames.class.getResourceAsStream("/shafttools/shaft_types.txt")) {
-			if (in == null) return new ShaftNames(List.of());
-			return new ShaftNames(new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)).lines().toList());
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
+	/** The names bundled with the mod, read once. */
+	public static synchronized ShaftNames defaults() {
+		if (defaults == null) {
+			List<String> lines = Resources.lines("/shafttools/shaft_types.txt");
+			defaults = new ShaftNames(lines == null ? List.of() : lines);
 		}
+		return defaults;
 	}
 
 	/** The name for a code like "JASP", or the code itself when it isn't listed. */

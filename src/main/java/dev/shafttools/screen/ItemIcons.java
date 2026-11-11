@@ -11,11 +11,12 @@ import net.minecraft.world.item.Items;
 
 /** Item stacks for the journal's loot icons. Only used while a screen is open, never at class load. */
 final class ItemIcons {
-	private final IconRules rules = IconRules.load();
-	private final Map<String, Item> cache = new HashMap<>();
+	/** Shared by every journal screen; only filled on the client thread. */
+	private static final Map<String, Item> CACHE = new HashMap<>();
+	private final IconRules rules = IconRules.defaults();
 
 	ItemStack stack(String name) {
-		return new ItemStack(cache.computeIfAbsent(name, this::lookup));
+		return new ItemStack(CACHE.computeIfAbsent(name, this::lookup));
 	}
 
 	private Item lookup(String name) {

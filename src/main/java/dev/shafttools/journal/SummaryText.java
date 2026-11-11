@@ -1,10 +1,8 @@
 package dev.shafttools.journal;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import dev.shafttools.detection.Corpse;
 
@@ -25,7 +23,7 @@ public final class SummaryText {
 
 		if (!entry.corpses().isEmpty()) lines.add(" §7Corpses " + corpses(entry.corpses()));
 		if (entry.gems() != null) {
-			lines.add(" §7Gems §f≈" + String.format(Locale.ROOT, "%.1f", entry.gems().fineEquivalent())
+			lines.add(" §7Gems §f≈" + decimal(entry.gems().fineEquivalent())
 					+ " Fine " + entry.gems().gem() + " §8(" + number(entry.pristineProcs()) + " pristine procs)");
 		}
 		long corpsePowder = entry.corpsePowder();
@@ -50,22 +48,26 @@ public final class SummaryText {
 
 	/** E.g. "Lapis 2/2, Tungsten 0/1": looted out of total, per type, in tab list order. */
 	static String corpses(List<Corpse> corpses) {
-		Map<String, int[]> byType = new LinkedHashMap<>();
-		for (Corpse corpse : corpses) {
-			int[] counts = byType.computeIfAbsent(corpse.type(), type -> new int[2]);
-			if (corpse.looted()) counts[0]++;
-			counts[1]++;
-		}
 		List<String> parts = new ArrayList<>();
-		byType.forEach((type, counts) -> parts.add((type.equals("Lapis") ? "§9" : "§f") + type + " " + counts[0] + "/" + counts[1]));
+		JournalStats.corpseCounts(corpses).forEach((type, count) ->
+				parts.add((type.equals("Lapis") ? "§9" : "§f") + type + " " + count.looted() + "/" + count.total()));
 		return String.join("§7, ", parts);
 	}
 
 	private static String exit(String exit) {
 		return switch (exit) {
-			case "DEATH" -> " §8(froze)";
-			case "WARP" -> " §8(warped out)";
+			case "DEATH", "WARP" -> " §8(" + exitName(exit).toLowerCase(Locale.ROOT) + ")";
 			default -> "";
+		};
+	}
+
+	/** How the shaft was left, for display: "Took the exit", "Warped out", "Froze" or "Unknown". */
+	public static String exitName(String exit) {
+		return switch (exit) {
+			case "BYE" -> "Took the exit";
+			case "WARP" -> "Warped out";
+			case "DEATH" -> "Froze";
+			default -> "Unknown";
 		};
 	}
 
@@ -77,7 +79,13 @@ public final class SummaryText {
 		return String.format(Locale.ROOT, "%dh %02dm", seconds / 3600, seconds % 3600 / 60);
 	}
 
-	private static String number(long value) {
+	/** E.g. "12,060". */
+	public static String number(long value) {
 		return String.format(Locale.ROOT, "%,d", value);
+	}
+
+	/** One decimal, e.g. "19.4". */
+	public static String decimal(double value) {
+		return String.format(Locale.ROOT, "%.1f", value);
 	}
 }

@@ -1,7 +1,7 @@
 # Vanilla stand-in icons for SkyBlock items on the journal screen. Purely visual: the real
 # textures need SkyBlock item data, which comes later (with prices). Tooltips show the real name.
 # Format: <item name> = <minecraft item id>. * matches any text.
-# The first matching line wins; anything unmatched uses "default".
+# The first matching line wins; anything unmatched uses "default". A # after a space starts a comment.
 @gemstones               = minecraft:amethyst_shard
 Flawless * Gemstone      = minecraft:emerald
 Perfect * Gemstone       = minecraft:diamond

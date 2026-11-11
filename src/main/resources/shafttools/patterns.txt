@@ -16,6 +16,8 @@ spawn.nearby           ^MINESHAFT! A Mineshaft portal spawned nearby!$
 
 # Entering: the scoreboard date/server line ends with the shaft ID, e.g. "11/08/26 m113BD PERI_2".
 scoreboard.shaft_id    ^\d+/\d+/\d+ \S+ (?<id>(?<type>[A-Z]{4})_(?<variant>\w))$
+# A saved shaft ID on its own, split the same way as the scoreboard one above (keep the two in step).
+shaft.id               ^(?<type>[A-Z]{4})_(?<variant>\w)$
 tab.mineshaft_area     ^Area: Mineshaft$
 # Where shafts spawn (Glacite Tunnels and the rest of the Dwarven Mines). The spawn timer only runs here.
 tab.mining_area        ^Area: Dwarven Mines$

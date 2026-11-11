@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 class IconRulesTest {
-	private final IconRules rules = IconRules.load();
+	private final IconRules rules = IconRules.defaults();
 
 	@Test
 	void picksTheFirstMatchingRule() {
@@ -14,6 +14,12 @@ class IconRulesTest {
 		assertEquals("minecraft:egg", rules.itemId("Red Goblin Egg"));
 		assertEquals("minecraft:egg", rules.itemId("Goblin Egg"));
 		assertEquals("minecraft:clay_ball", rules.itemId("Enchanted Tungsten"));
+	}
+
+	@Test
+	void ignoresTrailingComments() {
+		IconRules rules = new IconRules(java.util.List.of("Enchanted Umber = minecraft:brown_terracotta  # stand-in"));
+		assertEquals("minecraft:brown_terracotta", rules.itemId("Enchanted Umber"));
 	}
 
 	@Test

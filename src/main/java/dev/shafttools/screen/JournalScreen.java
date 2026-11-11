@@ -63,6 +63,17 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Color GREEN = Color.ofArgb(0xCC55FF55);
 	private static final int ROW_HEIGHT = 12;
 	private static final int SPAWN_BAR = 26;
+	/** Padding around the whole screen. */
+	private static final int PADDING = 8;
+	/** Space between panels. */
+	private static final int GAP = 5;
+	/** Padding inside the detail panel and the Stats columns. */
+	private static final int COLUMN_PADDING = 6;
+	/** Widths of the Stats tab's left and right columns, in percent; the middle one takes the rest. */
+	private static final int STATS_LEFT = 32;
+	private static final int STATS_RIGHT = 27;
+	/** Space between the chart's axis and its plot. */
+	private static final int AXIS_GAP = 3;
 
 	private static final List<Column> SHAFT_COLUMNS = List.of(
 			new Column("number", "#", 14, false, 4), new Column("shaft", "Shaft", 44, false, 0),
@@ -78,11 +89,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private final List<JournalEntry> entries;
 	private final List<SessionSummary> sessions;
 	private final ItemIcons icons = new ItemIcons();
-	private final ShaftNames shaftNames = ShaftNames.load();
+	private final ShaftNames shaftNames = ShaftNames.defaults();
 	private Tab tab = Tab.SESSION;
 	private int sessionIndex;
 	private int selected;
 	private FlowLayout root;
+	/** The screen size the layout was built for; pixel sizes are computed from it. */
+	private int builtWidth;
+	private int builtHeight;
 	private FlowLayout detail;
 	private final List<FlowLayout> shaftRows = new ArrayList<>();
 
@@ -108,18 +122,27 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	protected void build(FlowLayout root) {
 		this.root = root;
 		root.surface(Surface.VANILLA_TRANSLUCENT);
-		root.padding(Insets.of(8));
-		root.gap(5);
+		root.padding(Insets.of(PADDING));
+		root.gap(GAP);
 		rebuild();
 	}
 
+	/** owo only calls build() once, so rebuild when the window or GUI scale changes. */
+	@Override
+	protected void init() {
+		super.init();
+		if (root != null && (width != builtWidth || height != builtHeight)) rebuild();
+	}
+
 	private void rebuild() {
+		builtWidth = width;
+		builtHeight = height;
 		root.clearChildren();
 		shaftRows.clear();
 		detail = null;
 		root.child(topBar());
 		FlowLayout content = UIContainers.verticalFlow(Sizing.fill(100), Sizing.expand());
-		content.gap(5);
+		content.gap(GAP);
 		if (entries.isEmpty()) {
 			content.child(panelWith(label("§7No shafts yet. Each shaft shows up here after you leave it."),
 					Sizing.fill(100), Sizing.content()));
@@ -228,8 +251,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		SessionSummary session = sessions.get(sessionIndex);
 		Double rate = session.shaftsPerHour();
 		FlowLayout tiles = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
-		tiles.gap(5);
-		int tileWidth = (width - 16 - 4 * 5) / 5;
+		tiles.gap(GAP);
+		int tileWidth = (width - 2 * PADDING - 4 * GAP) / 5;
 		tiles.child(tile(tileWidth, "Shafts", "§f" + session.shafts()));
 		tiles.child(tile(tileWidth, "Avg spawn", spawn(session.averageSearchMillis())));
 		tiles.child(tile(tileWidth, "Per hour", rate == null ? "§8-" : "§f" + decimal(rate)));
@@ -238,12 +261,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		content.child(tiles);
 
 		FlowLayout main = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.expand());
-		main.gap(5);
+		main.gap(GAP);
 
 		long slowest = session.entries().stream().filter(e -> e.searchMillis() != null)
 				.mapToLong(JournalEntry::searchMillis).max().orElse(1);
 		int detailWidth = Math.clamp(width * 30 / 100, 140, 230);
-		List<Column> columns = fit(SHAFT_COLUMNS, width - 16 - 5 - detailWidth - TABLE_CHROME);
+		List<Column> columns = fit(SHAFT_COLUMNS, width - 2 * PADDING - GAP - detailWidth - TABLE_CHROME);
 		FlowLayout rows = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		for (int i = 0; i < session.entries().size(); i++) {
 			JournalEntry entry = session.entries().get(i);
@@ -274,7 +297,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		detail.gap(2);
 		ScrollContainer<FlowLayout> detailScroll = UIContainers.verticalScroll(Sizing.fixed(detailWidth), Sizing.fill(100), detail);
 		detailScroll.surface(PANEL);
-		detailScroll.padding(Insets.of(6));
+		detailScroll.padding(Insets.of(COLUMN_PADDING));
 		main.child(detailScroll);
 		content.child(main);
 		fillDetail();
@@ -297,7 +320,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? "  §dCrystal" : "")));
 		detail.child(spacer(4));
 		detail.child(keyValue("Entered", "§f" + time(entry.enteredAt())));
-		detail.child(keyValue("Exit", "§f" + exit(entry.exit())));
+		detail.child(keyValue("Exit", "§f" + SummaryText.exitName(entry.exit())));
 		detail.child(keyValue("Spawned in", entry.searchMillis() == null ? "§8not timed" : spawn(entry.searchMillis())));
 		detail.child(keyValue("Inside", "§f" + SummaryText.duration(entry.durationMillis())));
 		if (!entry.mayhemBuffs().isEmpty()) detail.child(keyValue("Mayhem", "§e" + String.join(", ", entry.mayhemBuffs())));
@@ -318,7 +341,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			grid.gap(2);
 			if (loot.gems() != null) {
 				List<Component> tooltip = new ArrayList<>();
-				tooltip.add(Component.literal("§fGemstones §7≈ " + decimal(loot.gems().fine()) + " Fine"));
+				tooltip.add(Component.literal("§fGemstones §7≈ " + fine(loot.gems().fine()) + " Fine"));
 				for (ItemCount part : loot.gems().parts()) tooltip.add(Component.literal("§7" + number(part.count()) + " " + part.item()));
 				grid.child(slot(IconRules.GEMSTONES, compact(loot.gems().fine()), tooltip));
 			}
@@ -368,7 +391,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private void buildSessionsTab(FlowLayout content) {
 		long slowest = sessions.stream().map(SessionSummary::averageSearchMillis).filter(a -> a != null)
 				.mapToLong(Long::longValue).max().orElse(1);
-		List<Column> columns = fit(SESSION_COLUMNS, width - 16 - TABLE_CHROME);
+		List<Column> columns = fit(SESSION_COLUMNS, width - 2 * PADDING - TABLE_CHROME);
 		FlowLayout rows = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		for (int i = 0; i < sessions.size(); i++) {
 			SessionSummary session = sessions.get(i);
@@ -401,7 +424,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private void buildStatsTab(FlowLayout content) {
 		AllTime stats = JournalStats.allTime(entries);
 		FlowLayout columns = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100));
-		columns.gap(5);
+		columns.gap(GAP);
 
 		FlowLayout totals = column();
 		totals.child(header("All time"));
@@ -411,7 +434,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
 		totals.child(keyValue("Coins", SOON));
 		totals.child(section("Corpses looted"));
-		for (String type : corpseTypes(stats.corpsesSeen())) {
+		for (String type : stats.corpsesSeen().keySet()) {
 			// Coin value of the loot comes with prices.
 			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0) + " §e(soon)"));
 		}
@@ -439,7 +462,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 				gems == null ? null : () -> openShaft(gems), gems == null ? null : gems.shaftId()));
 		totals.child(record("Coins / shaft", SOON, null, null));
 		totals.child(record("Coins / h", SOON, null, null));
-		columns.child(scrollColumn(Sizing.fill(32), totals));
+		columns.child(scrollColumn(Sizing.fill(STATS_LEFT), totals));
 
 		FlowLayout spawn = column();
 		spawn.child(header("Spawn time"));
@@ -448,14 +471,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
 		if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
 			long difference = recent - stats.averageSearchMillis();
-			String change = difference <= 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
+			// Durations show whole seconds, so a gap under a second is "same", not "0s faster/slower".
+			String change = Math.abs(difference) < 1000 ? " §7(same)"
+					: difference < 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
 					: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
 			spawn.child(keyValue("Last " + RECENT_SESSIONS + " sessions", "§f" + SummaryText.duration(recent) + change));
 		}
 		spawn.child(section("Avg spawn per session"));
 		spawn.child(chart(stats.oldestFirst(), stats.averageSearchMillis()));
 		spawn.child(section("Corpse % per shaft"));
-		for (String type : corpseTypes(stats.corpsesSeen())) {
+		for (String type : stats.corpsesSeen().keySet()) {
 			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
 			FlowLayout row = barRow(corpseColor(type) + type, with / (double) stats.shafts(),
 					Math.round(100.0 * with / stats.shafts()) + "%", corpseArgb(type));
@@ -483,7 +508,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			row.tooltip(tooltip);
 			odds.child(row);
 		}
-		columns.child(scrollColumn(Sizing.fill(27), odds));
+		columns.child(scrollColumn(Sizing.fill(STATS_RIGHT), odds));
 		content.child(columns);
 	}
 
@@ -511,7 +536,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			arrow.margins(Insets.top(-1));
 			arrow.child(UIComponents.texture(OPEN_ARROW, 0, 0, 3, 5, 3, 5).blend(true));
 			arrow.cursorStyle(CursorStyle.HAND);
-			arrow.tooltip(Component.literal("§7Open " + target));
+			arrow.tooltip(Component.literal("§7Open " + (target == null ? "shaft" : target)));
 			arrow.mouseDown().subscribe((event, doubleClick) -> {
 				open.run();
 				return true;
@@ -536,7 +561,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			return wrapper;
 		}
 		int chartHeight = Math.clamp(height / 3, 50, 110);
-		long slowestSeconds = Math.max(1, timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) / 1000);
+		// Rounded up, so the slowest bar never reaches past the top line.
+		long slowestSeconds = Math.max(1, (timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) + 999) / 1000);
 		long step = AXIS_STEPS[AXIS_STEPS.length - 1];
 		for (long candidate : AXIS_STEPS) {
 			if ((slowestSeconds + candidate - 1) / candidate <= 4) {
@@ -552,7 +578,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		axisWidth += 2;
 
 		// The middle column's width, minus the axis; older sessions drop off the left when they don't fit.
-		int plotWidth = Math.max(60, width - 16 - 10 - width * 32 / 100 - width * 27 / 100 - 12 - axisWidth - 3);
+		int plotWidth = Math.max(60, width - 2 * PADDING - 2 * GAP - width * STATS_LEFT / 100 - width * STATS_RIGHT / 100
+				- 2 * COLUMN_PADDING - axisWidth - AXIS_GAP);
 		int barWidth = Math.clamp((plotWidth - 2) / timed.size() - 2, 3, 12);
 		int maxBars = Math.max(1, (plotWidth - 2) / (barWidth + 2));
 		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
@@ -561,7 +588,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		int base = chartHeight - 5;
 		int plotHeight = base - top;
 		FlowLayout chart = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(chartHeight));
-		chart.gap(3);
+		chart.gap(AXIS_GAP);
 		StackLayout axis = UIContainers.stack(Sizing.fixed(axisWidth), Sizing.fixed(chartHeight));
 		StackLayout plot = UIContainers.stack(Sizing.expand(), Sizing.fixed(chartHeight));
 		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
@@ -605,12 +632,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		// Dates under the first and last bar.
 		StackLayout dates = UIContainers.stack(Sizing.fill(100), Sizing.fixed(10));
 		LabelComponent first = label("§8" + day(timed.getFirst().start()));
-		first.positioning(Positioning.absolute(axisWidth + 3 + 2, 1));
+		first.positioning(Positioning.absolute(axisWidth + AXIS_GAP + 2, 1));
 		dates.child(first);
 		if (timed.size() > 1) {
 			String lastText = "§8" + day(timed.getLast().start());
-			int lastX = axisWidth + 3 + 2 + (timed.size() - 1) * (barWidth + 2) + barWidth - font.width(lastText);
-			int firstEnd = axisWidth + 5 + font.width("§8" + day(timed.getFirst().start()));
+			int lastX = axisWidth + AXIS_GAP + 2 + (timed.size() - 1) * (barWidth + 2) + barWidth - font.width(lastText);
+			int firstEnd = axisWidth + AXIS_GAP + 2 + font.width("§8" + day(timed.getFirst().start()));
 			if (lastX > firstEnd + 6) {
 				LabelComponent last = label(lastText);
 				last.positioning(Positioning.absolute(lastX, 1));
@@ -745,8 +772,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		tile.padding(Insets.of(5));
 		tile.gap(3);
 		tile.child(label("§7" + key));
-		tile.child(label("§l" + value));
+		tile.child(label(bold(value)));
 		return tile;
+	}
+
+	/** Bold has to come after the color code: a color code turns bold off again. */
+	private static String bold(String value) {
+		return value.startsWith("§") && value.length() >= 2 ? value.substring(0, 2) + "§l" + value.substring(2) : "§l" + value;
 	}
 
 	private static FlowLayout column() {
@@ -758,7 +790,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static ScrollContainer<FlowLayout> scrollColumn(Sizing width, FlowLayout column) {
 		ScrollContainer<FlowLayout> scroll = UIContainers.verticalScroll(width, Sizing.fill(100), column);
 		scroll.surface(PANEL);
-		scroll.padding(Insets.of(6));
+		scroll.padding(Insets.of(COLUMN_PADDING));
 		scroll.scrollbarThiccness(3);
 		return scroll;
 	}
@@ -823,12 +855,6 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return parts.isEmpty() ? "§8-" : String.join(" ", parts);
 	}
 
-	private static List<String> corpseTypes(Map<String, Integer> seen) {
-		List<String> types = new ArrayList<>(seen.keySet());
-		types.sort(Comparator.comparingInt(t -> JournalStats.CORPSE_ORDER.contains(t) ? JournalStats.CORPSE_ORDER.indexOf(t) : 99));
-		return types;
-	}
-
 	private static String corpseColor(String type) {
 		return switch (type) {
 			case "Lapis" -> "§9";
@@ -855,15 +881,6 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			case "2" -> "type 2";
 			case "C" -> "crystal";
 			default -> "_" + variant;
-		};
-	}
-
-	private static String exit(String exit) {
-		return switch (exit) {
-			case "BYE" -> "Took the exit";
-			case "WARP" -> "Warped out";
-			case "DEATH" -> "Froze";
-			default -> "Unknown";
 		};
 	}
 
@@ -902,16 +919,21 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static String number(long value) {
-		return String.format(Locale.ROOT, "%,d", value);
+		return SummaryText.number(value);
 	}
 
 	private static String decimal(double value) {
-		return String.format(Locale.ROOT, "%.1f", value);
+		return SummaryText.decimal(value);
 	}
 
-	/** Slot counts: whole numbers as is, small fractions with one decimal. */
+	/** Fine counts: one decimal, or "<0.1" for amounts one decimal would show as 0.0. */
+	private static String fine(double value) {
+		return value > 0 && value < 0.05 ? "<0.1" : decimal(value);
+	}
+
+	/** Slot counts: whole numbers as is, small fractions with one decimal (9.95 and up round to 10). */
 	private static String compact(double value) {
-		if (value >= 10 || value == Math.rint(value)) return number(Math.round(value));
-		return decimal(value);
+		if (value >= 9.95 || value == Math.rint(value)) return number(Math.round(value));
+		return fine(value);
 	}
 }

@@ -1,14 +1,10 @@
 package dev.shafttools.screen;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+
+import dev.shafttools.util.Resources;
 
 /**
  * Picks a vanilla stand-in icon for a SkyBlock item name, from {@code shafttools/item_icons.txt}.
@@ -17,6 +13,11 @@ import java.util.regex.Pattern;
 public final class IconRules {
 	/** The key for the merged Rough/Flawed/Fine gem slot. */
 	public static final String GEMSTONES = "@gemstones";
+
+	/** A comment: '#' after whitespace, to the end of the line. */
+	private static final Pattern COMMENT = Pattern.compile("\\s#.*$");
+
+	private static IconRules defaults;
 
 	private record Rule(Pattern pattern, String item) {
 		/** {@code *} matches any text; everything else matches literally. */
@@ -36,7 +37,7 @@ public final class IconRules {
 		List<Rule> parsed = new ArrayList<>();
 		String defaultItem = "minecraft:paper";
 		for (String line : lines) {
-			line = line.strip();
+			line = COMMENT.matcher(line).replaceFirst("").strip();
 			if (line.isEmpty() || line.startsWith("#")) continue;
 			int eq = line.lastIndexOf('=');
 			if (eq < 0) continue;
@@ -49,13 +50,13 @@ public final class IconRules {
 		fallback = defaultItem;
 	}
 
-	public static IconRules load() {
-		try (InputStream in = IconRules.class.getResourceAsStream("/shafttools/item_icons.txt")) {
-			if (in == null) return new IconRules(List.of());
-			return new IconRules(new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)).lines().toList());
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
+	/** The rules bundled with the mod, read once. */
+	public static synchronized IconRules defaults() {
+		if (defaults == null) {
+			List<String> lines = Resources.lines("/shafttools/item_icons.txt");
+			defaults = new IconRules(lines == null ? List.of() : lines);
 		}
+		return defaults;
 	}
 
 	/** The Minecraft item ID to draw for this item name. */
