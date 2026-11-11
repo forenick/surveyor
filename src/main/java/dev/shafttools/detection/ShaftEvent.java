@@ -68,6 +68,10 @@ public sealed interface ShaftEvent {
 			long otherAdded, long otherRemoved) implements ShaftEvent {
 	}
 
+	/** "You used your Pickobulus Pickaxe Ability!": mining, even without a block hit. */
+	record PickaxeAbility(String ability) implements ShaftEvent {
+	}
+
 	record ScrapFound() implements ShaftEvent {
 	}
 

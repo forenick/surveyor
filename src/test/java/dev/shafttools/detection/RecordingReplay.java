@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -24,23 +25,34 @@ public final class RecordingReplay {
 	/** Replays the file and returns every event the tracker reported, in order. */
 	public static List<ShaftEvent> replay(Path file) throws IOException {
 		List<ShaftEvent> events = new ArrayList<>();
-		ShaftTracker tracker = new ShaftTracker(TextPatterns.defaults(), events::add);
+		replay(file, new ShaftTracker(TextPatterns.defaults(), events::add), t -> {
+		}, t -> {
+		});
+		return events;
+	}
+
+	/**
+	 * Feeds the file into {@code tracker}. {@code clock} gets each record's time before it is fed,
+	 * and {@code onBlockHit} gets the time of each {@code block_hit} record.
+	 */
+	public static void replay(Path file, ShaftTracker tracker, LongConsumer clock, LongConsumer onBlockHit) throws IOException {
 		try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			String line;
 			while ((line = reader.readLine()) != null) {
 				JsonObject event = JsonParser.parseString(line).getAsJsonObject();
 				long t = event.get("t").getAsLong();
+				clock.accept(t);
 				switch (event.get("type").getAsString()) {
 					case "world_change" -> tracker.onWorldChange(t);
 					case "chat" -> tracker.onChat(t, event.get("legacy").getAsString(), strings(event.getAsJsonArray("hover")));
 					case "scoreboard" -> tracker.onScoreboard(t, strings(event.getAsJsonArray("lines")));
 					case "tablist" -> tracker.onTabList(t, strings(event.getAsJsonArray("lines")));
+					case "block_hit" -> onBlockHit.accept(t);
 					default -> {
 					}
 				}
 			}
 		}
-		return events;
 	}
 
 	private static List<String> strings(JsonArray array) {

@@ -25,7 +25,8 @@ class JournalTest {
 	private static final String NEARBY = "§b§lMINESHAFT! §7A Mineshaft portal spawned nearby!";
 
 	private final List<JournalEntry> entries = new ArrayList<>();
-	private final Journal journal = new Journal(TextPatterns.defaults(), entries::add);
+	private boolean inMines = true;
+	private final Journal journal = new Journal(TextPatterns.defaults(), () -> inMines, entries::add);
 	private long now;
 	private final ShaftTracker tracker = new ShaftTracker(TextPatterns.defaults(), event -> journal.onEvent(event, now));
 
@@ -43,10 +44,47 @@ class JournalTest {
 
 		// The timer restarts at the first hit after the shaft, not when leaving it.
 		at(2 * MINUTE).hit(true);
-		at(3 * MINUTE + 30_000).chat(WOW);
-		visitShaft(3 * MINUTE + 33_000, "AMET_1");
-		assertEquals(90_000, entries.get(1).searchMillis());
-		assertEquals(75_000, journal.session().averageSearchMillis());
+		at(2 * MINUTE + 20_000).hit(true);
+		at(2 * MINUTE + 40_000).chat(WOW);
+		visitShaft(2 * MINUTE + 43_000, "AMET_1");
+		assertEquals(40_000, entries.get(1).searchMillis());
+		assertEquals(50_000, journal.session().averageSearchMillis());
+	}
+
+	@Test
+	void gapsOverFortySecondsOnlyCountFortySeconds() {
+		at(0).hit(true);
+		at(10_000).hit(true);
+		at(110_000).hit(true); // 100 s break: only 40 s count
+		at(120_000).chat(WOW);
+		visitShaft(123_000, "JADE_1");
+		assertEquals(60_000, entries.get(0).searchMillis());
+	}
+
+	@Test
+	void pickobulusCountsAsMining() {
+		at(0).hit(true);
+		at(35_000).chat("§aYou used your §6Pickobulus §aPickaxe Ability!");
+		at(70_000).chat("§aYou used your §6Pickobulus §aPickaxe Ability!");
+		at(71_000).chat(WOW);
+		visitShaft(74_000, "JADE_1");
+		assertEquals(71_000, entries.get(0).searchMillis());
+	}
+
+	@Test
+	void miningBetweenWowAndEnteringDoesNotStartATimer() {
+		at(0).hit(true);
+		at(10_000).chat(WOW);
+		at(12_000).hit(true);
+		assertTrue(!journal.searchRunning());
+		visitShaft(15_000, "JADE_1");
+		assertEquals(10_000, entries.get(0).searchMillis());
+
+		// A portal that isn't entered within 40 s counts as skipped.
+		at(MINUTE).hit(true);
+		at(MINUTE + 5_000).chat(WOW);
+		at(MINUTE + 50_000).hit(true);
+		assertTrue(journal.searchRunning());
 	}
 
 	@Test
@@ -71,7 +109,7 @@ class JournalTest {
 		visitShaft(17 * MINUTE + 3_000, "JADE_1");
 
 		assertEquals(16 * MINUTE, entries.get(0).sessionId());
-		assertEquals(MINUTE, entries.get(0).searchMillis());
+		assertEquals(40_000, entries.get(0).searchMillis());
 	}
 
 	@Test
@@ -80,13 +118,13 @@ class JournalTest {
 		at(MINUTE).chat(WOW);
 		visitShaft(MINUTE + 3_000, "JADE_1");
 
-		Journal restarted = new Journal(TextPatterns.defaults(), entry -> {
+		Journal restarted = new Journal(TextPatterns.defaults(), () -> true, entry -> {
 		});
 		restarted.resume(entries);
 		assertEquals(journal.session(), restarted.session());
-		restarted.onBlockHit(MINUTE + 5 * MINUTE, true);
+		restarted.onBlockHit(MINUTE + 5 * MINUTE);
 		assertEquals(0, restarted.session().id());
-		restarted.onBlockHit(MINUTE + 30 * MINUTE, true);
+		restarted.onBlockHit(MINUTE + 30 * MINUTE);
 		assertEquals(MINUTE + 30 * MINUTE, restarted.session().id());
 	}
 
@@ -133,6 +171,24 @@ class JournalTest {
 		assertTrue(text.contains("§7Powder §f+12,060 §8(corpses 10,550, exit 1,510)"), text);
 	}
 
+	/** Recording 4 (Docs/research/08): spawn times with the 40 s pause rule, checked by hand. */
+	@Test
+	void recording4SpawnTimes() throws IOException {
+		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-11_17-16-21.jsonl");
+		assumeTrue(Files.exists(recording), "Recording not available: " + recording);
+		ShaftTracker replayTracker = new ShaftTracker(TextPatterns.defaults(), event -> journal.onEvent(event, now));
+		inMines = false;
+		RecordingReplay.replay(recording, replayTracker, t -> {
+			now = t;
+			inMines = replayTracker.inMiningArea();
+		}, journal::onBlockHit);
+
+		assertEquals(List.of("PERI_1", "JADE_1", "AMET_1", "TITA_1", "AQUA_C", "ONYX_1"),
+				entries.stream().map(JournalEntry::shaftId).toList());
+		List<Long> seconds = entries.stream().map(entry -> Math.round(entry.searchMillis() / 1000.0)).toList();
+		assertEquals(List.of(10L, 56L, 38L, 157L, 84L, 164L), seconds);
+	}
+
 	@Test
 	void durations() {
 		assertEquals("45s", SummaryText.duration(45_999));
@@ -157,7 +213,8 @@ class JournalTest {
 	}
 
 	private JournalTest hit(boolean inMiningArea) {
-		journal.onBlockHit(now, inMiningArea);
+		inMines = inMiningArea;
+		journal.onBlockHit(now);
 		return this;
 	}
 

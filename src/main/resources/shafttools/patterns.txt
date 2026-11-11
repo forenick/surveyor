@@ -53,6 +53,8 @@ campfire.used          ^You've warmed your feet by your campfire\. Your ❄ Cold
 
 # Mining output.
 pristine               ^PRISTINE! You found (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
+# Pickaxe abilities. Pickobulus breaks ~180 blocks without a block hit and can spawn a shaft (Docs/research/08).
+ability.used           ^You used your (?<ability>.+) Pickaxe Ability!$
 scrap                  ^EXCAVATOR! You found a Suspicious Scrap!$
 supercraft             ^You Supercrafted (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
 

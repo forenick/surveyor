@@ -18,12 +18,11 @@ import net.minecraft.network.chat.Component;
 public final class LiveJournal {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftTools Journal");
 
-	private final Journal journal = new Journal(TextPatterns.defaults(), this::onEntry);
-	private final BooleanSupplier inMiningArea;
+	private final Journal journal;
 	private JournalFile file;
 
 	public LiveJournal(BooleanSupplier inMiningArea) {
-		this.inMiningArea = inMiningArea;
+		journal = new Journal(TextPatterns.defaults(), inMiningArea, this::onEntry);
 	}
 
 	/** Opens the journal file and continues the last session if it is recent enough. */
@@ -36,13 +35,19 @@ public final class LiveJournal {
 	}
 
 	public void onEvent(ShaftEvent event) {
+		boolean wasRunning = journal.searchRunning();
 		journal.onEvent(event, System.currentTimeMillis());
+		logTimerStart(wasRunning);
 	}
 
 	/** The player started or kept hitting a block. */
 	public void onBlockHit() {
 		boolean wasRunning = journal.searchRunning();
-		journal.onBlockHit(System.currentTimeMillis(), inMiningArea.getAsBoolean());
+		journal.onBlockHit(System.currentTimeMillis());
+		logTimerStart(wasRunning);
+	}
+
+	private void logTimerStart(boolean wasRunning) {
 		if (!wasRunning && journal.searchRunning()) LOGGER.info("Spawn timer started");
 	}
 

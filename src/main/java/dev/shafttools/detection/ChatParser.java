@@ -16,6 +16,7 @@ import dev.shafttools.detection.ShaftEvent.MayhemBuff;
 import dev.shafttools.detection.ShaftEvent.PortalSpawned;
 import dev.shafttools.detection.ShaftEvent.Pristine;
 import dev.shafttools.detection.ShaftEvent.SacksChanged;
+import dev.shafttools.detection.ShaftEvent.PickaxeAbility;
 import dev.shafttools.detection.ShaftEvent.ScrapFound;
 import dev.shafttools.detection.ShaftEvent.Supercraft;
 import dev.shafttools.detection.ShaftEvent.Warping;
@@ -88,6 +89,7 @@ public final class ChatParser {
 		if (patterns.matches("campfire.placed", text)) return new CampfirePlaced();
 		if ((m = patterns.match("campfire.used", text)) != null) return new CampfireUsed(Integer.parseInt(m.group("amount")));
 		if (patterns.matches("scrap", text)) return new ScrapFound();
+		if ((m = patterns.match("ability.used", text)) != null) return new PickaxeAbility(m.group("ability"));
 		if ((m = patterns.match("supercraft", text)) != null) {
 			return new Supercraft(new ItemCount(m.group("item"), TextPatterns.number(m.group("count"))));
 		}

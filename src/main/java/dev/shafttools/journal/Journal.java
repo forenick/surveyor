@@ -1,9 +1,11 @@
 package dev.shafttools.journal;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import dev.shafttools.detection.ShaftEvent;
+import dev.shafttools.detection.ShaftEvent.PickaxeAbility;
 import dev.shafttools.detection.ShaftEvent.PortalSpawned;
 import dev.shafttools.detection.ShaftEvent.ShaftEntered;
 import dev.shafttools.detection.ShaftEvent.ShaftLeft;
@@ -12,18 +14,26 @@ import dev.shafttools.detection.TextPatterns;
 /**
  * Turns finished shafts into {@link JournalEntry}s, and keeps the session and the spawn timer.
  *
- * <p>Spawn timer: starts at the first block hit in the mining area after the previous shaft (or
- * at the session start), stops at "WOW! You found a Glacite Mineshaft portal!". Only the finder
- * gets "WOW!", so other players' portals ("MINESHAFT! ... spawned nearby" alone) aren't timed.
- * The time is stored on the shaft entered next.
+ * <p>Spawn timer: counts mining time in the mining area, from the first mining after the previous
+ * shaft (or the session start) to "WOW! You found a Glacite Mineshaft portal!". Mining is a block
+ * hit or a pickaxe ability such as Pickobulus. A gap longer than {@link #PAUSE_MILLIS} without
+ * mining only counts for its first {@code PAUSE_MILLIS}, so breaks don't inflate the time. Only
+ * the finder gets "WOW!", so other players' portals ("MINESHAFT! ... spawned nearby" alone) aren't
+ * timed. The time is stored on the shaft entered next.
  *
- * <p>Session: ends after {@link #SESSION_GAP_MILLIS} without block hits or shaft activity, or
- * on {@link #newSession}. A timer running across a session break is dropped, so going AFK
- * doesn't spoil the average.
+ * <p>Session: ends after {@link #SESSION_GAP_MILLIS} without mining or shaft activity, or on
+ * {@link #newSession}. A timer running across a session break is dropped.
  */
 public final class Journal {
 	/** No activity for this long ends the session. A usability default, not a game number. */
 	public static final long SESSION_GAP_MILLIS = 15 * 60_000L;
+
+	/**
+	 * Longer gaps without mining are a break for the spawn timer. Nick's choice (2026-11-11): just
+	 * above his 32 s Pickobulus cooldown, so a Pickobulus-only rhythm still counts (Docs/research/08).
+	 * Also how long a found portal may go unentered before the next mining starts a new timer.
+	 */
+	public static final long PAUSE_MILLIS = 40_000L;
 
 	/** Totals for one session. */
 	public record Session(long id, int shafts, int timedSpawns, long searchMillis) {
@@ -40,14 +50,19 @@ public final class Journal {
 	}
 
 	private final TextPatterns patterns;
+	private final BooleanSupplier inMiningArea;
 	private final Consumer<JournalEntry> listener;
 	private Session session;
 	private long lastActivity;
-	private long searchStartedAt = -1;
+	private boolean searching;
+	private long searchMillis;
+	private long lastMiningAt;
+	private long portalFoundAt = -1;
 	private Long timedSearch;
 
-	public Journal(TextPatterns patterns, Consumer<JournalEntry> listener) {
+	public Journal(TextPatterns patterns, BooleanSupplier inMiningArea, Consumer<JournalEntry> listener) {
 		this.patterns = patterns;
+		this.inMiningArea = inMiningArea;
 		this.listener = listener;
 	}
 
@@ -73,25 +88,27 @@ public final class Journal {
 
 	/** True while the spawn timer is running. */
 	public boolean searchRunning() {
-		return searchStartedAt >= 0;
+		return searching;
 	}
 
 	/** The player started or kept hitting a block. */
-	public void onBlockHit(long now, boolean inMiningArea) {
-		touch(now);
-		if (inMiningArea && searchStartedAt < 0) searchStartedAt = now;
+	public void onBlockHit(long now) {
+		mining(now);
 	}
 
 	public void onEvent(ShaftEvent event, long now) {
 		switch (event) {
+			case PickaxeAbility ability -> mining(now);
 			case PortalSpawned spawned when spawned.foundByYou() -> {
 				touch(now);
-				timedSearch = searchStartedAt < 0 ? null : now - searchStartedAt;
-				searchStartedAt = -1;
+				timedSearch = searching ? searchMillis + Math.min(now - lastMiningAt, PAUSE_MILLIS) : null;
+				searching = false;
+				portalFoundAt = now;
 			}
 			case ShaftEntered entered -> {
 				touch(now);
-				searchStartedAt = -1;
+				searching = false;
+				portalFoundAt = -1;
 			}
 			case ShaftLeft left -> {
 				touch(now);
@@ -108,8 +125,23 @@ public final class Journal {
 	public void newSession(long now) {
 		session = new Session(now, 0, 0, 0);
 		lastActivity = now;
-		searchStartedAt = -1;
+		searching = false;
+		portalFoundAt = -1;
 		timedSearch = null;
+	}
+
+	private void mining(long now) {
+		touch(now);
+		if (!inMiningArea.getAsBoolean()) return;
+		// Mining between finding a portal and entering it belongs to neither search.
+		if (portalFoundAt >= 0 && now - portalFoundAt <= PAUSE_MILLIS) return;
+		if (searching) {
+			searchMillis += Math.min(now - lastMiningAt, PAUSE_MILLIS);
+		} else {
+			searching = true;
+			searchMillis = 0;
+		}
+		lastMiningAt = now;
 	}
 
 	private void touch(long now) {
