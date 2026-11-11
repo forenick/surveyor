@@ -18,7 +18,6 @@ import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.hud.HudData.SessionTotals;
 import dev.shaftjournal.hud.HudLayout.Anchor;
 import dev.shaftjournal.hud.HudLayout.Box;
-import dev.shaftjournal.hud.HudLayout.Visibility;
 import dev.shaftjournal.hud.HudValue.Kind;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalFile;
@@ -89,7 +88,7 @@ class HudTest {
 		assertEquals("7", box.labelColor);
 		assertEquals(2, box.scale);
 		assertEquals(Anchor.START, box.anchorX, "an unknown anchor becomes the default");
-		assertEquals(Visibility.MINES, box.visibility);
+		assertTrue(box.showInShaft && box.showInMines && !box.showElsewhere, "shown in the mines and shafts by default");
 		assertEquals(1, box.lines.size());
 		assertEquals("Spawn: ", box.lines.getFirst().prefix);
 		assertEquals(0, box.lines.getFirst().format);
@@ -141,13 +140,64 @@ class HudTest {
 
 	@Test
 	void visibility() {
-		assertTrue(Visibility.MINES.visible(true, false));
-		assertTrue(Visibility.MINES.visible(false, true));
-		assertFalse(Visibility.MINES.visible(false, false));
-		assertFalse(Visibility.IN_SHAFT.visible(true, false));
-		assertFalse(Visibility.OUTSIDE_SHAFT.visible(true, true));
-		assertTrue(Visibility.OUTSIDE_SHAFT.visible(true, false));
-		assertTrue(Visibility.ALWAYS.visible(false, false));
+		Box box = new Box();
+		assertTrue(box.visible(true, false));
+		assertTrue(box.visible(false, true));
+		assertFalse(box.visible(false, false));
+		box.showInMines = false;
+		assertFalse(box.visible(true, false));
+		assertTrue(box.visible(true, true), "a shaft counts as a shaft, not as the mines");
+		box.showElsewhere = true;
+		assertTrue(box.visible(false, false));
+	}
+
+	@Test
+	void convertsVersion2Visibility() {
+		HudLayout read = HudLayout.fromJson("""
+				{"version": 2, "boxes": [{"id": "a", "visibility": "ALWAYS"}, {"id": "b", "visibility": "MINES"},
+				  {"id": "c", "visibility": "IN_SHAFT"}, {"id": "d", "visibility": "OUTSIDE_SHAFT"}]}""");
+		List<List<Boolean>> places = read.boxes.stream()
+				.map(b -> List.of(b.showInShaft, b.showInMines, b.showElsewhere)).toList();
+		assertEquals(List.of(List.of(true, true, true), List.of(true, true, false), List.of(true, false, false),
+				List.of(false, true, false)), places);
+		assertFalse(read.toJson().contains("visibility"), "the old field isn't written back");
+	}
+
+	@Test
+	void movesLinesToAGap() {
+		Box box = HudLayout.defaults().boxes.get(2);
+		List<String> start = box.lines.stream().map(l -> l.value).toList();
+		box.moveLine(0, 2);
+		assertEquals(List.of(start.get(1), start.get(0), start.get(2), start.get(3)), box.lines.stream().map(l -> l.value).toList());
+		box.moveLine(3, 0);
+		assertEquals(List.of(start.get(3), start.get(1), start.get(0), start.get(2)), box.lines.stream().map(l -> l.value).toList());
+		box.moveLine(1, 4);
+		assertEquals(start.get(1), box.lines.getLast().value, "the gap below the last line");
+		List<String> before = box.lines.stream().map(l -> l.value).toList();
+		box.moveLine(1, 1);
+		box.moveLine(1, 2);
+		box.moveLine(0, 9);
+		assertEquals(before, box.lines.stream().map(l -> l.value).toList(), "dropping on itself or out of range does nothing");
+	}
+
+	@Test
+	void undoAndRedo() {
+		HudHistory history = new HudHistory("a");
+		assertFalse(history.canUndo());
+		assertFalse(history.record("a"), "no change, no step");
+		assertTrue(history.record("b"));
+		history.record("c");
+		assertEquals("b", history.undo());
+		assertEquals("a", history.undo());
+		assertNull(history.undo());
+		assertEquals("b", history.redo());
+		history.record("d");
+		assertFalse(history.canRedo(), "a new change clears redo");
+		assertEquals("b", history.undo());
+		for (int i = 0; i < HudHistory.LIMIT + 10; i++) history.record("x" + i);
+		int steps = 0;
+		while (history.undo() != null) steps++;
+		assertEquals(HudHistory.LIMIT, steps);
 	}
 
 	@Test

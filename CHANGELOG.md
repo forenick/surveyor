@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.7.0 (2026-11-12)
+Edit HUD: Nick's fixes and wishes after trying 0.6.1.
+- **Titles now save with Caxton.** The Caxton font mod cancels the text field's "changed" call, so a
+  typed box title never reached the box and was lost on close. The editor now reads the field itself.
+- **First letter of the title:** the title field scrolls back to its start once the panel is laid
+  out, so the first letter can't stay hidden (seen with Caxton).
+- **Changes save by themselves** a moment after each change, not only when the editor closes. The
+  hint and the Done button's tooltip say so.
+- **Drag lines to reorder them:** grab a line by the dots on its left (or its name); a yellow bar
+  shows where it drops. The ▲/▼ buttons are gone.
+- **"Show in" checkboxes** replace the Visible button: Shafts, Mines (Dwarven Mines outside a shaft)
+  and Elsewhere, in any combination. `hud.json` moves to version 3; old choices convert on load.
+- **Undo and redo:** arrow buttons in the toolbar, or Ctrl+Z and Ctrl+Shift+Z (also while typing a
+  title). Every change can be undone, Reset included; a drag, a slider move or a burst of scrolling
+  is one step. The history lasts until the editor closes.
+- Bold: the toggle works, but with the metropolis font pack regular and bold text use the same
+  (bold) font file, so it can't look different. Turn the pack off to see it.
+
 ## 0.6.1 (2026-11-11)
 Code review fixes for the HUD and the editor.
 - Boxes are now placed from an edge or the middle of the screen (the "anchor"), plus a distance in

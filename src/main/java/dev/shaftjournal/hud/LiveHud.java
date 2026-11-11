@@ -180,8 +180,9 @@ public final class LiveHud {
 		return layout;
 	}
 
-	public void resetLayout() {
-		layout = HudLayout.defaults();
+	/** Swaps in another layout, e.g. an undo step. Client thread only; call {@link #save()} after. */
+	public void setLayout(HudLayout layout) {
+		this.layout = layout;
 		prepared = null;
 	}
 
@@ -190,7 +191,7 @@ public final class LiveHud {
 	}
 
 	public boolean visible(Box box) {
-		return box.visibility.visible(inMines, inShaft);
+		return box.visible(inMines, inShaft);
 	}
 
 	public void onTick(Minecraft client) {

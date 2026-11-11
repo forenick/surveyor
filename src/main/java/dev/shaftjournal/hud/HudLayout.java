@@ -14,8 +14,11 @@ import com.google.gson.JsonParseException;
  * it in place; only touched on the client thread, except for {@link #toJson()} copies. Plain Java.
  */
 public final class HudLayout {
-	/** 2: positions are an anchor plus an offset in GUI pixels (1 had fractions of the free space). */
-	public static final int VERSION = 2;
+	/**
+	 * 3: where a box shows is three checkboxes (2 had one {@link Visibility} choice).
+	 * 2: positions are an anchor plus an offset in GUI pixels (1 had fractions of the free space).
+	 */
+	public static final int VERSION = 3;
 	/** Space between a box and the screen edge; also the gap between snapped boxes. Nick's choice (2026-11-11). */
 	public static final int MARGIN = 4;
 	/** The smallest and largest box size. */
@@ -23,27 +26,9 @@ public final class HudLayout {
 	public static final float MAX_SCALE = 2;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-	public enum Visibility {
-		ALWAYS("Always"),
-		MINES("Mines + shafts"),
-		IN_SHAFT("Only in a shaft"),
-		OUTSIDE_SHAFT("Mines, not in a shaft");
-
-		/** The editor's name; "Mines" is wherever the tab list says Dwarven Mines. */
-		public final String label;
-
-		Visibility(String label) {
-			this.label = label;
-		}
-
-		public boolean visible(boolean inMines, boolean inShaft) {
-			return switch (this) {
-				case ALWAYS -> true;
-				case MINES -> inMines || inShaft;
-				case IN_SHAFT -> inShaft;
-				case OUTSIDE_SHAFT -> inMines && !inShaft;
-			};
-		}
+	/** Version 2's single choice of where a box shows. Only read to convert old files. */
+	enum Visibility {
+		ALWAYS, MINES, IN_SHAFT, OUTSIDE_SHAFT
 	}
 
 	/**
@@ -131,7 +116,10 @@ public final class HudLayout {
 		/** May contain value tags like {shaft_type}. */
 		public String title = "";
 		public boolean showTitle;
-		public Visibility visibility = Visibility.MINES;
+		/** Where the box shows: in a shaft, in the Dwarven Mines outside a shaft, and anywhere else. */
+		public boolean showInShaft = true;
+		public boolean showInMines = true;
+		public boolean showElsewhere;
 		public Background background = Background.DARK;
 		public float scale = 1;
 		public Align align = Align.LEFT;
@@ -149,6 +137,23 @@ public final class HudLayout {
 		/** Version 1 position, a fraction of the free space. Only read to convert old files; never written. */
 		Float x;
 		Float y;
+		/** Version 2's visibility. Only read to convert old files; never written. */
+		Visibility visibility;
+
+		/** Whether the box shows here; a shaft counts as a shaft even though it's also in the mines. */
+		public boolean visible(boolean inMines, boolean inShaft) {
+			return inShaft ? showInShaft : inMines ? showInMines : showElsewhere;
+		}
+
+		/**
+		 * Moves a line to a gap between lines: gap 0 is above the first line, gap {@code lines.size()}
+		 * below the last. Dropping a line right above or below itself changes nothing.
+		 */
+		public void moveLine(int from, int gap) {
+			if (from < 0 || from >= lines.size() || gap < 0 || gap > lines.size()) return;
+			Line line = lines.remove(from);
+			lines.add(gap > from ? gap - 1 : gap, line);
+		}
 	}
 
 	public int version = VERSION;
@@ -158,7 +163,7 @@ public final class HudLayout {
 	public static HudLayout defaults() {
 		HudLayout layout = new HudLayout();
 
-		Box session = box("session", "Session", true, Visibility.MINES, Background.DARK, Align.LEFT, Anchor.START, 0, Anchor.START, 0);
+		Box session = box("session", "Session", true, true, Background.DARK, Align.LEFT, Anchor.START, 0, Anchor.START, 0);
 		session.lines.add(new Line(HudValue.SESSION_SHAFTS, null, true, 0));
 		session.lines.add(new Line(HudValue.SHAFTS_PER_HOUR, null, true, 0));
 		session.lines.add(new Line(HudValue.AVERAGE_SPAWN, null, false, 1));
@@ -167,13 +172,13 @@ public final class HudLayout {
 		layout.boxes.add(session);
 
 		// Just under the crosshair: the same place as version 1's 58% at 1080p.
-		Box spawn = box("spawn", "Spawn", false, Visibility.MINES, Background.NONE, Align.CENTER, Anchor.MIDDLE, 0, Anchor.MIDDLE, 18);
+		Box spawn = box("spawn", "Spawn", false, true, Background.NONE, Align.CENTER, Anchor.MIDDLE, 0, Anchor.MIDDLE, 18);
 		spawn.valueBold = true;
 		spawn.lines.add(new Line(HudValue.SPAWN_TIMER, null, true, 0));
 		spawn.lines.add(new Line(HudValue.AVERAGE_SPAWN, "Avg: ", true, 0));
 		layout.boxes.add(spawn);
 
-		Box shaft = box("shaft", "{shaft_type} Shaft", true, Visibility.IN_SHAFT, Background.FRAME, Align.LEFT, Anchor.END, 0, Anchor.START, 0);
+		Box shaft = box("shaft", "{shaft_type} Shaft", true, false, Background.FRAME, Align.LEFT, Anchor.END, 0, Anchor.START, 0);
 		shaft.lines.add(new Line(HudValue.SHAFT_TIME, null, true, 0));
 		shaft.lines.add(new Line(HudValue.SHAFT_CORPSES, null, true, 0));
 		shaft.lines.add(new Line(HudValue.SHAFT_COLD, null, true, 0));
@@ -182,13 +187,14 @@ public final class HudLayout {
 		return layout;
 	}
 
-	private static Box box(String id, String title, boolean showTitle, Visibility visibility, Background background,
+	/** @param inMines also shown in the Dwarven Mines outside a shaft; every default box shows in a shaft */
+	private static Box box(String id, String title, boolean showTitle, boolean inMines, Background background,
 			Align align, Anchor anchorX, int offsetX, Anchor anchorY, int offsetY) {
 		Box box = new Box();
 		box.id = id;
 		box.title = title;
 		box.showTitle = showTitle;
-		box.visibility = visibility;
+		box.showInMines = inMines;
 		box.background = background;
 		box.align = align;
 		box.anchorX = anchorX;
@@ -228,7 +234,7 @@ public final class HudLayout {
 
 	private static void repair(Box box) {
 		if (box.title == null) box.title = "";
-		if (box.visibility == null) box.visibility = Visibility.MINES;
+		if (box.visibility != null) convertVersion2(box);
 		if (box.background == null) box.background = Background.DARK;
 		if (box.align == null) box.align = Align.LEFT;
 		if (!isColor(box.labelColor)) box.labelColor = "7";
@@ -244,6 +250,15 @@ public final class HudLayout {
 			int formats = HudFormat.options(line.hudValue().kind()).size();
 			if (line.format < 0 || line.format >= formats) line.format = 0;
 		}
+	}
+
+	/** Turns version 2's single visibility choice into the three checkboxes. */
+	private static void convertVersion2(Box box) {
+		Visibility old = box.visibility;
+		box.showInShaft = old != Visibility.OUTSIDE_SHAFT;
+		box.showInMines = old != Visibility.IN_SHAFT;
+		box.showElsewhere = old == Visibility.ALWAYS;
+		box.visibility = null;
 	}
 
 	/**
