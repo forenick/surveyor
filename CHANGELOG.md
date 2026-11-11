@@ -4,6 +4,10 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.6 (2026-11-11)
+- The "Shafts / h" personal best only counts sessions with at least 5 shafts, so a short lucky
+  session can't hold it.
+
 ## 0.3.5 (2026-11-11)
 Fixes from a code review of 0.3.0 to 0.3.4.
 - The journal screen re-lays itself out when the window is resized or the GUI scale changes,

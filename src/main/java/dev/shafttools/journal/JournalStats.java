@@ -24,6 +24,12 @@ public final class JournalStats {
 	 */
 	public static final int MIN_TIMED_FOR_RECORD = 3;
 
+	/**
+	 * A session needs this many shafts to count for "Shafts / h", so a short lucky session isn't a
+	 * record. Nick's choice (2026-11-11), a display choice, not a game number.
+	 */
+	public static final int MIN_SHAFTS_FOR_RATE_RECORD = 5;
+
 	/** Corpse types in the order the screen lists them. Unknown types follow, alphabetically. */
 	public static final List<String> CORPSE_ORDER = List.of("Lapis", "Umber", "Tungsten", "Vanguard");
 
@@ -210,7 +216,7 @@ public final class JournalStats {
 		SessionSummary mostShafts = null;
 		for (SessionSummary session : sessions) {
 			Double rate = session.shaftsPerHour();
-			if (rate != null && (bestRate == null || rate > bestRateValue)) {
+			if (rate != null && session.shafts() >= MIN_SHAFTS_FOR_RATE_RECORD && (bestRate == null || rate > bestRateValue)) {
 				bestRate = session;
 				bestRateValue = rate;
 			}

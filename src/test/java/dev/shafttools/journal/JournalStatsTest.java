@@ -115,6 +115,19 @@ class JournalStatsTest {
 		assertEquals(realJournal().getFirst().sessionId(), stats.oldestFirst().getFirst().id());
 	}
 
+	@Test
+	void shortLuckySessionsDontHoldTheRateRecord() throws Exception {
+		List<JournalEntry> entries = new ArrayList<>(realJournal());
+		long later = 1_794_500_000_000L;
+		// Four shafts in 6 minutes is 40/h, faster than the real session's 19.4/h, but too few shafts.
+		for (int i = 0; i < 4; i++) {
+			entries.add(entry(later, later + 60_000 + i * 90_000L, "JADE_1", 30_000L, 1_000, List.of()));
+		}
+		assertEquals(realJournal().getFirst().sessionId(), JournalStats.allTime(entries).bestRate().id());
+		entries.add(entry(later, later + 340_000, "JADE_1", 30_000L, 1_000, List.of()));
+		assertEquals(later, JournalStats.allTime(entries).bestRate().id());
+	}
+
 	private static JournalEntry entry(long session, long entered, String id, Long search, long exitPowder, List<Corpse> corpses) {
 		return new JournalEntry(JournalEntry.VERSION, session, id, entered, 20_000, "BYE", exitPowder, search,
 				corpses, 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null);
