@@ -1,21 +1,45 @@
 package dev.shaftjournal.hud;
 
+import java.util.List;
+
 /**
  * Every value a HUD line can show. The ID is what the config file and (later) text tags use, so
  * never rename one. Plain Java.
  */
 public enum HudValue {
-	SESSION_SHAFTS("session_shafts", "Shafts", Kind.INTEGER, "Shafts: "),
+	SESSION_SHAFTS("session_shafts", "Shafts", Kind.INTEGER, "Shafts: ", Range.SESSION, Range.ALL_TIME),
 	SHAFTS_PER_HOUR("shafts_per_hour", "Shafts per hour", Kind.DECIMAL, "Shafts/h: "),
 	AVERAGE_SPAWN("average_spawn", "Average spawn", Kind.TIME, "Avg spawn: "),
-	SESSION_POWDER("session_powder", "Powder", Kind.INTEGER, "Powder: "),
-	SESSION_CORPSE_FINE("session_corpse_fine", "Fine from corpses", Kind.DECIMAL, "Fine: "),
+	SESSION_POWDER("session_powder", "Powder", Kind.INTEGER, "Powder: ", Range.values()),
+	SESSION_CORPSE_FINE("session_corpse_fine", "Fine from corpses", Kind.DECIMAL, "Fine: ", Range.values()),
 	SPAWN_TIMER("spawn_timer", "Spawn timer", Kind.TIME, "Spawn: "),
 	SHAFT_TYPE("shaft_type", "Shaft type", Kind.TEXT, "Shaft: "),
 	SHAFT_TIME("shaft_time", "Time inside", Kind.TIME, "Inside: "),
 	SHAFT_CORPSES("shaft_corpses", "Corpses", Kind.TEXT, "Corpses: "),
 	SHAFT_COLD("shaft_cold", "Cold", Kind.TEXT, "Cold: "),
 	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Kind.INTEGER, "Campfires: ");
+
+	/**
+	 * Which shafts a countable value adds up. The config file stores the name, so never rename one.
+	 */
+	public enum Range {
+		/** The shaft the player is in, or the last one after leaving it. */
+		SHAFT("Shaft"),
+		SESSION("Session"),
+		/** The session's amount per hour of session, counted up to now. */
+		PER_HOUR("Per hour"),
+		ALL_TIME("All-time");
+
+		private final String displayName;
+
+		Range(String displayName) {
+			this.displayName = displayName;
+		}
+
+		public String displayName() {
+			return displayName;
+		}
+	}
 
 	/** How a value is stored and which number formats it offers. */
 	public enum Kind {
@@ -33,12 +57,15 @@ public enum HudValue {
 	private final String displayName;
 	private final Kind kind;
 	private final String defaultPrefix;
+	private final List<Range> ranges;
 
-	HudValue(String id, String displayName, Kind kind, String defaultPrefix) {
+	/** @param ranges the time ranges a line can pick; none for values that aren't counted over shafts */
+	HudValue(String id, String displayName, Kind kind, String defaultPrefix, Range... ranges) {
 		this.id = id;
 		this.displayName = displayName;
 		this.kind = kind;
 		this.defaultPrefix = defaultPrefix;
+		this.ranges = List.of(ranges);
 	}
 
 	public String id() {
@@ -56,6 +83,24 @@ public enum HudValue {
 
 	public String defaultPrefix() {
 		return defaultPrefix;
+	}
+
+	/** The ranges a line can pick, in {@link Range} order; empty when the value has none. */
+	public List<Range> ranges() {
+		return ranges;
+	}
+
+	/** Whether a line can pick this range; false for null. */
+	public boolean hasRange(Range range) {
+		return range != null && ranges.contains(range);
+	}
+
+	/**
+	 * The range a new line and a {value_id} tag use: Session, as these values were session-only
+	 * before ranges, so old lines and tags keep showing the same. Null when the value has none.
+	 */
+	public Range defaultRange() {
+		return hasRange(Range.SESSION) ? Range.SESSION : ranges.isEmpty() ? null : ranges.getFirst();
 	}
 
 	/** The value with this ID, or null. */

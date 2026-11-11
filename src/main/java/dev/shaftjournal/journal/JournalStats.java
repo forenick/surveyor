@@ -76,8 +76,13 @@ public final class JournalStats {
 
 		/** Like {@link #shaftsPerHour()}, but also counting the time since the last shaft up to {@code now}. */
 		public Double shaftsPerHour(long now) {
+			return perHour(shafts(), now);
+		}
+
+		/** Any amount per hour of session, counted up to {@code now}; null like {@link #shaftsPerHour(long)}. */
+		public Double perHour(double amount, long now) {
 			long length = Math.max(end(), now) - start();
-			return length < MIN_RATE_MILLIS ? null : shafts() * 3_600_000.0 / length;
+			return length < MIN_RATE_MILLIS ? null : amount * 3_600_000.0 / length;
 		}
 
 		public long powder() {

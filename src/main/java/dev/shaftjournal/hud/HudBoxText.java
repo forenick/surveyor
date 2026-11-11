@@ -5,6 +5,7 @@ import java.util.List;
 
 import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.hud.HudLayout.Line;
+import dev.shaftjournal.hud.HudValue.Range;
 
 /** Turns a box and the current values into §-coded text lines, title first. Plain Java. */
 public final class HudBoxText {
@@ -28,24 +29,27 @@ public final class HudBoxText {
 		for (Line line : box.lines) {
 			HudValue hudValue = line.hudValue();
 			if (!line.shown || hudValue == null) continue;
-			lines.add(label + line.prefix + value + text(hudValue, line.format, data, example));
+			lines.add(label + line.prefix + value + text(hudValue, line.range, line.format, data, example));
 		}
 		return lines;
 	}
 
-	/** Replaces every {value_id} with that value in its first format, or nothing while it's missing. */
+	/** Replaces every {value_id} with that value in its first format and default range, or nothing while it's missing. */
 	static String tags(String text, HudData data, boolean example) {
 		if (text.indexOf('{') < 0) return text;
 		for (HudValue value : HudValue.values()) {
 			String tag = "{" + value.id() + "}";
 			if (!text.contains(tag)) continue;
-			Object v = example ? data.getOrExample(value) : data.get(value);
+			Object v = example ? data.getOrExample(value, value.defaultRange()) : data.get(value);
 			text = text.replace(tag, v == null ? "" : HudFormat.format(value.kind(), 0, v));
 		}
 		return text;
 	}
 
-	private static String text(HudValue value, int format, HudData data, boolean example) {
-		return HudFormat.format(value.kind(), format, example ? data.getOrExample(value) : data.get(value));
+	/** The value as a line shows it; a rate gets "/h", but not the dash for a missing one. */
+	static String text(HudValue value, Range range, int format, HudData data, boolean example) {
+		Object v = example ? data.getOrExample(value, range) : data.get(value, range);
+		String text = HudFormat.format(value.kind(), format, v);
+		return v != null && range == Range.PER_HOUR ? text + "/h" : text;
 	}
 }

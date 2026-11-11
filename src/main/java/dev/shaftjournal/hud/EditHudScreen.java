@@ -21,7 +21,9 @@ import io.wispforest.owo.ui.component.SmallCheckboxComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
 import io.wispforest.owo.ui.container.UIContainers;
+import io.wispforest.owo.ui.core.Color;
 import io.wispforest.owo.ui.core.CursorStyle;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
@@ -88,6 +90,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int PADDING = 4;
 	/** Where the toolbar may sit, as relative positions in order of preference: top middle, bottom middle, corners. */
 	private static final int[][] TOOLBAR_SPOTS = {{50, 0}, {50, 100}, {0, 0}, {100, 0}, {0, 100}, {100, 100}};
+	/** Where a new box may go, in order of preference: [x anchor, y anchor]. The first spot clear of other boxes wins. */
+	private static final Anchor[][] NEW_BOX_SPOTS = {{Anchor.START, Anchor.MIDDLE}, {Anchor.END, Anchor.MIDDLE},
+			{Anchor.START, Anchor.END}, {Anchor.END, Anchor.END}, {Anchor.MIDDLE, Anchor.END}, {Anchor.MIDDLE, Anchor.MIDDLE}};
+
 	/** The 16 Minecraft text colours, in code order. */
 	private static final int[] COLORS = {0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
 			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
@@ -100,7 +106,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private final Map<Box, HudRenderer.Bounds> drawn = new IdentityHashMap<>();
 	private FlowLayout root;
 	private FlowLayout toolbar;
+	/** The side panel's content, inside {@link #panelScroll}, which has the background and scrolls when it's too tall. */
 	private FlowLayout panel;
+	private PanelScroll panelScroll;
+	/** The panel's height last frame; a rebuilt panel starts at it, so it doesn't flicker while it's measured. */
+	private int panelHeight = 200;
+	/** Whether the panel was built as the value list, so the scroll position only stays within one kind. */
+	private boolean panelPicker;
 	/** The selected box's Size slider, kept in step when scrolling. */
 	private DiscreteSliderComponent scaleSlider;
 	private ButtonComponent resetButton;
@@ -125,6 +137,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private long unsettledSince;
 	/** Reset was clicked once; the next click resets, any other click cancels. */
 	private boolean resetArmed;
+	/** The same for the selected box's Delete button, which sits in {@link #deleteRow}. */
+	private boolean deleteArmed;
+	private ButtonComponent deleteButton;
+	private FlowLayout deleteRow;
+	/** The box whose panel shows the value list for adding a line, or null. */
+	private Box pickerBox;
 	private int toolbarSpot = -1;
 	private Box selected;
 	private Box dragging;
@@ -175,6 +193,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		redoButton = iconButton(true, b -> undo(true));
 		redoButton.tooltip(Component.literal("Redo (Ctrl+Shift+Z)"));
 		toolbar.child(redoButton);
+		ButtonComponent newBox = button("+ New box", b -> newBox());
+		newBox.tooltip(Component.literal("Add an empty box, then add lines to it"));
+		toolbar.child(newBox);
 		ButtonComponent done = button("Done", b -> onClose());
 		done.tooltip(Component.literal("Changes save by themselves"));
 		toolbar.child(done);
@@ -239,6 +260,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		// Everything after this draws on top, so the panel covers the boxes, text included.
 		graphics.nextStratum();
 		super.extractRenderState(graphics, mouseX, mouseY, delta);
+		fitPanel();
 		if (lineDrag >= 0) {
 			graphics.nextStratum();
 			drawLineDrag(graphics);
@@ -264,6 +286,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		recordChanges(true);
 		mouseHeld = true;
 		if (resetArmed && !resetButton.isInBoundingBox(click.x(), click.y())) armReset(false);
+		if (deleteArmed && !deleteButton.isInBoundingBox(click.x(), click.y())) armDelete(false);
 		int handle = click.button() == 0 ? lineHandleAt(click.x(), click.y()) : -1;
 		if (handle >= 0) {
 			root.focusHandler().focus(null, null);
@@ -434,6 +457,53 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		toolbar.child(resetButton);
 	}
 
+	/** Adds an empty box in a free spot and selects it. */
+	private void newBox() {
+		Box box = new Box();
+		box.id = newBoxId();
+		box.title = "New box";
+		box.showTitle = true;
+		for (Anchor[] spot : NEW_BOX_SPOTS) {
+			box.anchorX = spot[0];
+			box.anchorY = spot[1];
+			HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height).grown(HudLayout.MARGIN);
+			if (drawn.values().stream().noneMatch(b -> bounds.overlapArea(b) > 0)) break;
+		}
+		hud.layout().boxes.add(box);
+		selected = box;
+		scrollLeft = 0;
+		rebuildPanel();
+	}
+
+	/** "box1", "box2"...: the first not taken. */
+	private String newBoxId() {
+		for (int n = 1;; n++) {
+			String id = "box" + n;
+			if (hud.layout().boxes.stream().noneMatch(b -> id.equals(b.id))) return id;
+		}
+	}
+
+	/** Swaps in the selected box's Delete button for this state, as {@link #armReset} does. */
+	private void armDelete(boolean armed) {
+		deleteArmed = armed;
+		if (deleteRow == null) return;
+		if (deleteButton != null) deleteRow.removeChild(deleteButton);
+		Box box = panelBox;
+		deleteButton = button(armed ? "§cReally delete?" : "Delete box", b -> {
+			if (!deleteArmed) {
+				armDelete(true);
+				return;
+			}
+			deleteArmed = false;
+			hud.layout().boxes.remove(box);
+			selected = null;
+			rebuildPanel();
+		});
+		deleteButton.tooltip(Component.literal(armed ? "Click again to delete this box. Ctrl+Z brings it back."
+				: "Delete this box. Ctrl+Z brings it back."));
+		deleteRow.child(deleteButton);
+	}
+
 	/**
 	 * Copies the title field into the box. Polled, not an owo change event: Caxton (a font mod)
 	 * cancels the text field's change call, so with it installed typed titles never arrived.
@@ -544,44 +614,94 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			cost += covered;
 			if (covered == (long) outlined.width() * outlined.height()) cost += 1_000_000;
 		}
-		if (panel != null && area.overlapArea(new HudRenderer.Bounds(panel.x(), panel.y(), panel.width(), panel.height())) > 0) {
+		if (panelScroll != null && area.overlapArea(
+				new HudRenderer.Bounds(panelScroll.x(), panelScroll.y(), panelScroll.width(), panelScroll.height())) > 0) {
 			cost += 100_000_000;
 		}
 		return cost;
 	}
 
 	private boolean overPanel(double x, double y) {
-		return toolbar.isInBoundingBox(x, y) || (panel != null && panel.isInBoundingBox(x, y));
+		return toolbar.isInBoundingBox(x, y) || (panelScroll != null && panelScroll.isInBoundingBox(x, y));
+	}
+
+	/**
+	 * Gives the panel its content's height, or the screen's when that's less (then it scrolls). owo
+	 * can't size a scroll area by its content, so the content is measured after each layout.
+	 */
+	private void fitPanel() {
+		if (panelScroll == null || panel.height() <= 0) return;
+		int fit = Math.min(panel.height(), height - 2 * PADDING);
+		if (fit == panelHeight && panelScroll.height() == fit) return;
+		panelHeight = fit;
+		panelScroll.verticalSizing(Sizing.fixed(fit));
+	}
+
+	/** A vertical scroll area that can hand its position over to the next one, as the panel is rebuilt on every change. */
+	private static final class PanelScroll extends ScrollContainer<FlowLayout> {
+		PanelScroll(int height, FlowLayout content) {
+			super(ScrollDirection.VERTICAL, Sizing.content(), Sizing.fixed(height), content);
+		}
+
+		double offset() {
+			return scrollOffset;
+		}
+
+		/** Jumps there without the scroll animation; layout keeps it in range. */
+		void offset(double offset) {
+			scrollOffset = offset;
+			currentScrollPosition = offset;
+		}
 	}
 
 	// ---- side panel ----
 
 	private void removePanel() {
 		syncTitle();
-		if (panel != null) root.removeChild(panel);
+		if (panelScroll != null) root.removeChild(panelScroll);
+		panelScroll = null;
 		panel = null;
 		panelBox = null;
 		scaleSlider = null;
 		titleField = null;
 		lineRows.clear();
 		lineHandles.clear();
+		deleteButton = null;
+		deleteRow = null;
+		deleteArmed = false;
 	}
 
 	private void rebuildPanel() {
+		boolean picker = selected != null && pickerBox == selected;
+		// Same box, same kind of panel: stay where it was scrolled to, e.g. after changing a line near the bottom.
+		double offset = panelScroll != null && panelBox == selected && panelPicker == picker ? panelScroll.offset() : 0;
 		removePanel();
-		if (selected == null) return;
+		if (selected == null) {
+			pickerBox = null;
+			return;
+		}
 		Box box = selected;
 		panelBox = box;
+		panelPicker = picker;
 		panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.content());
-		panel.surface(PANEL);
 		panel.padding(Insets.of(5));
 		panel.gap(1);
+		panelScroll = new PanelScroll(panelHeight, panel);
+		panelScroll.surface(PANEL);
+		panelScroll.scrollbar(ScrollContainer.Scrollbar.flat(Color.ofArgb(0x80FFFFFF)));
+		panelScroll.scrollbarThiccness(2);
+		panelScroll.offset(offset);
 		// Bottom corner on the side away from the box, so the box stays visible.
 		// Measured now: after an undo the box is a new object that hasn't been drawn yet.
 		HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height);
 		boolean boxOnRight = bounds.x() + bounds.width() / 2 > width / 2;
-		panel.positioning(Positioning.relative(boxOnRight ? 0 : 100, 100));
-
+		panelScroll.positioning(Positioning.relative(boxOnRight ? 0 : 100, 100));
+		root.child(panelScroll);
+		if (picker) {
+			buildPicker(box);
+			return;
+		}
+		pickerBox = null;
 		SmallCheckboxComponent showTitle = UIComponents.smallCheckbox(Component.empty());
 		showTitle.checked(box.showTitle);
 		showTitle.onChanged().subscribe(checked -> box.showTitle = checked);
@@ -642,9 +762,50 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 		panel.child(section("Lines"));
 		for (int i = 0; i < box.lines.size(); i++) panel.child(lineRow(box, i));
-		root.child(panel);
+		deleteRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		deleteRow.gap(2);
+		deleteRow.margins(Insets.top(3));
+		ButtonComponent addLine = button("+ Add line", b -> {
+			pickerBox = box;
+			rebuildPanel();
+		});
+		addLine.tooltip(Component.literal("Add any value to this box"));
+		deleteRow.child(addLine);
+		FlowLayout spacer = UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1));
+		deleteRow.child(spacer);
+		panel.child(deleteRow);
+		armDelete(false);
 	}
 
+	/** The panel while adding a line: every value, one click adds it to the box. */
+	private void buildPicker(Box box) {
+		panel.child(label("§fAdd a line"));
+		for (HudValue value : HudValue.values()) {
+			LabelComponent name = label("§f" + value.displayName());
+			name.horizontalSizing(Sizing.expand());
+			ButtonComponent add = button("Add", b -> {
+				box.lines.add(new Line(value));
+				pickerBox = null;
+				rebuildPanel();
+			});
+			add.tooltip(Component.literal("Shows as: " + value.defaultPrefix()
+					+ HudBoxText.text(value, value.defaultRange(), 0, hud.data(), true)));
+			FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+			row.gap(2);
+			row.verticalAlignment(VerticalAlignment.CENTER);
+			row.child(name);
+			row.child(add);
+			panel.child(row);
+		}
+		ButtonComponent cancel = button("Cancel", b -> {
+			pickerBox = null;
+			rebuildPanel();
+		});
+		cancel.margins(Insets.top(3));
+		panel.child(cancel);
+	}
+
+	/** A line's row: grip, checkbox, name, number format and remove; a value with time ranges gets a second row for the range. */
 	private FlowLayout lineRow(Box box, int index) {
 		Line line = box.lines.get(index);
 		HudValue value = line.hudValue();
@@ -665,17 +826,42 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		name.horizontalSizing(Sizing.expand());
 		name.cursorStyle(CursorStyle.MOVE);
 		row.child(name);
-		lineRows.add(row);
-		lineHandles.add(List.of(grip, name));
 		List<String> formats = HudFormat.options(value.kind());
 		if (formats.size() > 1) {
-			Object current = hud.data().getOrExample(value);
+			Object current = hud.data().getOrExample(value, line.range);
 			row.child(button(HudFormat.format(value.kind(), line.format, current), b -> {
 				line.format = (line.format + 1) % formats.size();
 				rebuildPanel();
 			}).tooltip(Component.literal("Number format, click to change")));
 		}
-		return row;
+		ButtonComponent remove = button("§c×", b -> {
+			box.lines.remove(line);
+			rebuildPanel();
+		});
+		remove.tooltip(Component.literal("Remove this line"));
+		row.child(remove);
+
+		FlowLayout whole = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		whole.gap(1);
+		whole.child(row);
+		List<HudValue.Range> ranges = value.ranges();
+		if (ranges.size() > 1) {
+			FlowLayout rangeRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+			rangeRow.gap(2);
+			rangeRow.verticalAlignment(VerticalAlignment.CENTER);
+			// Lined up with the name above.
+			rangeRow.margins(Insets.left(7 + 2 + CONTROL - 1 + 2));
+			rangeRow.child(label("§7Range"));
+			rangeRow.child(button(line.range.displayName(), b -> {
+				line.range = ranges.get((ranges.indexOf(line.range) + 1) % ranges.size());
+				rebuildPanel();
+			}).tooltip(Component.literal("Time range, click to change. Shaft: the one you're in, or the last one. "
+					+ "Per hour: per hour of this session.")));
+			whole.child(rangeRow);
+		}
+		lineRows.add(whole);
+		lineHandles.add(List.of(grip, name));
+		return whole;
 	}
 
 	/** The line whose grip or name is at this point, or -1. */

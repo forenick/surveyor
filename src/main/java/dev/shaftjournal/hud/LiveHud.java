@@ -24,8 +24,10 @@ import dev.shaftjournal.detection.LiveTracker;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.hud.HudData.SessionTotals;
+import dev.shaftjournal.hud.HudData.Totals;
 import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.journal.Journal;
+import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.LiveJournal;
 import dev.shaftjournal.screen.ShaftNames;
 import dev.shaftjournal.util.DataFolder;
@@ -47,10 +49,15 @@ public final class LiveHud {
 	private final LiveTracker tracker;
 	private final LiveJournal journal;
 	private HudLayout layout = HudLayout.defaults();
-	private HudData data = HudData.live(SessionTotals.NONE, null, null, 0, ShaftNames.defaults());
+	private HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
 	/** The session {@link #totals} were added up for; a new object whenever a shaft is saved. */
 	private Journal.Session totalsSession;
 	private SessionTotals totals = SessionTotals.NONE;
+	/** How many saved shafts {@link #allTime} and {@link #lastShaft} were added up from. */
+	private int totalsEntries;
+	private Totals allTime = Totals.NONE;
+	/** The last saved shaft, or null before the first. */
+	private Totals lastShaft;
 	/** The visible boxes, ready to draw at {@link #preparedWidth} × {@link #preparedHeight}; null when stale. */
 	private List<Prepared> prepared;
 	private int preparedWidth;
@@ -201,11 +208,20 @@ public final class LiveHud {
 		inShaft = shaft != null;
 		inMines = tracker.inMiningArea();
 		Journal.Session session = journal.activeSession(now);
+		TextPatterns patterns = TextPatterns.defaults();
 		if (session != totalsSession) {
 			totalsSession = session;
-			totals = SessionTotals.of(journal.sessionEntries(session), TextPatterns.defaults());
+			totals = SessionTotals.of(journal.sessionEntries(session), patterns);
 		}
-		data = HudData.live(totals, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults());
+		if (journal.entryCount() != totalsEntries) {
+			List<JournalEntry> entries = journal.entries();
+			totalsEntries = entries.size();
+			allTime = Totals.of(entries, patterns);
+			lastShaft = entries.isEmpty() ? null : Totals.of(List.of(entries.getLast()), patterns);
+		}
+		// This shaft: the one the player is in, else the last one, so it can be read while searching.
+		Totals thisShaft = shaft != null ? Totals.of(shaft, patterns) : lastShaft;
+		data = HudData.live(totals, allTime, thisShaft, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults());
 		prepared = null;
 	}
 

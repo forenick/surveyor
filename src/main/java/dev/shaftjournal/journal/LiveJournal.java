@@ -57,6 +57,11 @@ public final class LiveJournal {
 		if (!wasRunning && journal.searchRunning()) LOGGER.info("Spawn timer started");
 	}
 
+	/** How many entries are saved; it only grows, so a change means new entries. Call on the client thread. */
+	public int entryCount() {
+		return entries.size();
+	}
+
 	/** A copy of every saved entry, in file order. Call on the client thread. */
 	public List<JournalEntry> entries() {
 		return List.copyOf(entries);

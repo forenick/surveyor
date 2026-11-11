@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.8.0 (2026-11-12)
+HUD slice 2: your own boxes, any value in any box, and time ranges.
+- **+ New box** in the Edit HUD toolbar adds an empty box in a free spot and selects it. **Delete box** at the
+  bottom of the side panel removes the selected one (it asks first, and Ctrl+Z brings it back).
+- **+ Add line** lists every value; one click adds it to the box. The same value can be in several boxes, or
+  twice in one box with different ranges. The **×** at the end of a line removes it.
+- **Time ranges:** Powder and Fine from corpses can show this shaft, the session, per hour or all-time;
+  Shafts can show the session or all-time. The Range button sits under the line's name; click to change it.
+  - **Shaft** is the shaft you're in, or the last one after you leave, so you can read it while searching.
+  - **Per hour** is per hour of the session, counted up to now like Shafts/h, and shows "/h".
+  - Lines from older `hud.json` files keep showing the session, as before.
+- The side panel scrolls when it's taller than the screen (a box with many lines, or a small window).
+
 ## 0.7.0 (2026-11-12)
 Edit HUD: Nick's fixes and wishes after trying 0.6.1.
 - **Titles now save with Caxton.** The Caxton font mod cancels the text field's "changed" call, so a

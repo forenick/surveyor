@@ -16,9 +16,12 @@ import com.google.gson.JsonParseException;
 import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.hud.HudData.SessionTotals;
+import dev.shaftjournal.hud.HudData.Totals;
 import dev.shaftjournal.hud.HudLayout.Anchor;
 import dev.shaftjournal.hud.HudLayout.Box;
+import dev.shaftjournal.hud.HudLayout.Line;
 import dev.shaftjournal.hud.HudValue.Kind;
+import dev.shaftjournal.hud.HudValue.Range;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalFile;
 import dev.shaftjournal.journal.JournalStats;
@@ -59,7 +62,7 @@ class HudTest {
 	@Test
 	void missingValuesShowADashOrTheExample() {
 		Box spawn = HudLayout.defaults().boxes.get(1);
-		HudData empty = HudData.live(SessionTotals.NONE, null, null, 0, ShaftNames.defaults());
+		HudData empty = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
 		assertEquals(List.of("§7Spawn: §f§l-", "§7Avg: §f§l-"), HudBoxText.lines(spawn, empty, false));
 		assertEquals(List.of("§7Spawn: §f§l1:42", "§7Avg: §f§l1:25"), HudBoxText.lines(spawn, empty, true));
 		assertEquals("Shaft", HudBoxText.tags("{shaft_type} Shaft", empty, false).strip(), "a missing tag is left out");
@@ -210,11 +213,8 @@ class HudTest {
 	/** Nick's real session from 2026-11-11, the same numbers the journal screen shows. */
 	@Test
 	void sessionValuesFromTheRealJournal() throws Exception {
-		Path path = Path.of(HudTest.class.getResource("/journal-2026-11-11.jsonl").toURI());
-		JournalFile file = new JournalFile(path);
-		List<JournalEntry> entries = file.load().join();
-		file.close();
-		HudData data = HudData.live(SessionTotals.of(entries, TextPatterns.defaults()), null, null, 0, ShaftNames.defaults());
+		List<JournalEntry> entries = realJournal();
+		HudData data = live(entries, 0);
 		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS));
 		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER));
 		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, data.get(HudValue.SHAFTS_PER_HOUR)));
@@ -224,8 +224,68 @@ class HudTest {
 		// The rate counts the time since the last shaft too: the same 6 shafts over twice the time.
 		long start = entries.getFirst().sessionId();
 		long length = new JournalStats.SessionSummary(start, entries).lengthMillis();
-		HudData later = HudData.live(SessionTotals.of(entries, TextPatterns.defaults()), null, null, start + 2 * length,
-				ShaftNames.defaults());
+		HudData later = live(entries, start + 2 * length);
 		assertEquals("9.7", HudFormat.format(Kind.DECIMAL, 0, later.get(HudValue.SHAFTS_PER_HOUR)));
+	}
+
+	@Test
+	void timeRanges() throws Exception {
+		List<JournalEntry> entries = realJournal();
+		long start = entries.getFirst().sessionId();
+		long end = new JournalStats.SessionSummary(start, entries).end();
+		HudData data = live(entries, end);
+		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS, Range.ALL_TIME));
+		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER, Range.ALL_TIME));
+		JournalEntry last = entries.getLast();
+		assertEquals(JournalStats.powder(last), data.get(HudValue.SESSION_POWDER, Range.SHAFT), "the last shaft outside one");
+		// The same session length as shafts per hour: 6 shafts at 19.4/h.
+		double hours = 6 / (Double) data.get(HudValue.SHAFTS_PER_HOUR);
+		assertEquals(Math.round(43_436 / hours), data.get(HudValue.SESSION_POWDER, Range.PER_HOUR));
+		assertEquals((Double) data.get(HudValue.SESSION_CORPSE_FINE) / hours,
+				(Double) data.get(HudValue.SESSION_CORPSE_FINE, Range.PER_HOUR), 1e-9);
+		assertEquals(data.get(HudValue.SESSION_SHAFTS), data.get(HudValue.SESSION_SHAFTS, Range.PER_HOUR),
+				"shafts have no per hour range (shafts per hour is its own value), so the default shows");
+
+		Box box = new Box();
+		Line perHour = new Line(HudValue.SESSION_POWDER);
+		perHour.range = Range.PER_HOUR;
+		perHour.format = 1;
+		box.lines.add(perHour);
+		Line campfires = new Line(HudValue.SHAFT_CAMPFIRES);
+		box.lines.add(campfires);
+		assertNull(campfires.range, "values that aren't counted over shafts have no range");
+		assertEquals(List.of("§7Powder: §f137.2k/h", "§7Campfires: §f1"), HudBoxText.lines(box, HudData.EXAMPLE, false));
+		HudData empty = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
+		assertEquals(List.of("§7Powder: §f-", "§7Campfires: §f-"), HudBoxText.lines(box, empty, false), "no /h after the dash");
+		perHour.range = Range.ALL_TIME;
+		assertEquals("§7Powder: §f0", HudBoxText.lines(box, empty, false).getFirst(), "the HUD shows the real zero");
+		assertEquals("§7Powder: §f1.2M", HudBoxText.lines(box, empty, true).getFirst(), "the editor shows the example");
+	}
+
+	@Test
+	void linesGetARangeWhenRead() {
+		HudLayout read = HudLayout.fromJson("""
+				{"version": 3, "boxes": [{"id": "a", "lines": [{"value": "session_powder"},
+				  {"value": "session_shafts", "range": "SHAFT"}, {"value": "session_corpse_fine", "range": "ALL_TIME"},
+				  {"value": "spawn_timer", "range": "SESSION"}, {"value": "session_powder", "range": "SOMETIME"}]}]}""");
+		List<Range> ranges = read.boxes.getFirst().lines.stream().map(l -> l.range).toList();
+		assertEquals(java.util.Arrays.asList(Range.SESSION, Range.SESSION, Range.ALL_TIME, null, Range.SESSION), ranges,
+				"old lines were session values; a range the value doesn't have, or none at all, falls back");
+		assertEquals(read.toJson(), HudLayout.fromJson(read.toJson()).toJson());
+	}
+
+	private static List<JournalEntry> realJournal() throws Exception {
+		Path path = Path.of(HudTest.class.getResource("/journal-2026-11-11.jsonl").toURI());
+		JournalFile file = new JournalFile(path);
+		List<JournalEntry> entries = file.load().join();
+		file.close();
+		return entries;
+	}
+
+	/** Values for these entries as one session that is also all of the journal, outside a shaft. */
+	private static HudData live(List<JournalEntry> entries, long now) {
+		TextPatterns patterns = TextPatterns.defaults();
+		return HudData.live(SessionTotals.of(entries, patterns), Totals.of(entries, patterns),
+				Totals.of(List.of(entries.getLast()), patterns), null, null, now, ShaftNames.defaults());
 	}
 }

@@ -9,6 +9,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 
+import dev.shaftjournal.hud.HudValue.Range;
+
 /**
  * Every HUD box and its settings: what {@code hud.json} holds. Mutable, because the editor changes
  * it in place; only touched on the client thread, except for {@link #toJson()} copies. Plain Java.
@@ -94,8 +96,15 @@ public final class HudLayout {
 		public boolean shown = true;
 		/** Index into {@link HudFormat#options}. */
 		public int format;
+		/** Which shafts the value adds up; null for values without ranges. */
+		public Range range;
 
 		public Line() {
+		}
+
+		/** A new line as the editor adds it: shown, with the value's default prefix, format and range. */
+		public Line(HudValue value) {
+			this(value, null, true, 0);
 		}
 
 		Line(HudValue value, String prefix, boolean shown, int format) {
@@ -103,6 +112,7 @@ public final class HudLayout {
 			this.prefix = prefix == null ? value.defaultPrefix() : prefix;
 			this.shown = shown;
 			this.format = format;
+			this.range = value.defaultRange();
 		}
 
 		/** Null when the file names a value this version doesn't know. */
@@ -246,9 +256,12 @@ public final class HudLayout {
 		if (box.lines == null) box.lines = new ArrayList<>();
 		box.lines.removeIf(line -> line == null || line.hudValue() == null);
 		for (Line line : box.lines) {
-			if (line.prefix == null) line.prefix = line.hudValue().defaultPrefix();
-			int formats = HudFormat.options(line.hudValue().kind()).size();
+			HudValue value = line.hudValue();
+			if (line.prefix == null) line.prefix = value.defaultPrefix();
+			int formats = HudFormat.options(value.kind()).size();
 			if (line.format < 0 || line.format >= formats) line.format = 0;
+			// Files from before ranges have none: those values were all session values.
+			if (!value.hasRange(line.range)) line.range = value.defaultRange();
 		}
 	}
 
