@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.5.2 (2026-11-11)
+Edit HUD tweaks.
+- Scroll on the selected box to change its size, in steps of 0.1 from 0.5× to 2×. The Size slider
+  follows, and scrolling on the slider itself now also moves exactly one step per notch.
+- Reset asks first: the first click turns the button into "Really reset?", the second resets, and
+  clicking anywhere else cancels.
+- The hint at the bottom mentions scrolling.
+
 ## 0.5.1 (2026-11-11)
 Code review fixes for the HUD.
 - A portal you found but didn't enter within 40 s no longer gives its spawn time to the next

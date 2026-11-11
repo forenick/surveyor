@@ -47,6 +47,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int OUTLINE_SELECTED = 0xFFFFFF55;
 	private static final int HIDDEN_SHADE = 0xC8000000;
 	private static final String CODES = "0123456789abcdef";
+	/** How much one scroll notch over the selected box changes its size; the Size slider's step. */
+	private static final float SCALE_STEP = 0.1f;
 	/** The 16 Minecraft text colours, in code order. */
 	private static final int[] COLORS = {0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
 			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
@@ -60,6 +62,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private FlowLayout root;
 	private FlowLayout toolbar;
 	private FlowLayout panel;
+	/** The selected box's Size slider, kept in step when scrolling. */
+	private DiscreteSliderComponent scaleSlider;
+	private ButtonComponent resetButton;
+	/** Reset was clicked once; the next click resets, any other click cancels. */
+	private boolean resetArmed;
 	private Box selected;
 	private Box dragging;
 	private double grabX;
@@ -96,11 +103,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		title.margins(Insets.of(0, 0, 2, 6));
 		toolbar.child(title);
 		toolbar.child(button("Done", b -> onClose()));
-		toolbar.child(button("Reset", b -> {
-			hud.resetLayout();
-			selected = null;
-			rebuildPanel();
-		}).tooltip(Component.literal("Back to the three default boxes")));
+		armReset(false);
 		root.child(toolbar);
 		rebuildPanel();
 	}
@@ -124,7 +127,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 					box == selected ? OUTLINE_SELECTED : OUTLINE);
 		}
 		if (selected == null) {
-			String hint = "§7Drag a box to move it · click it to edit · Esc to close";
+			String hint = "§7Drag a box to move it · click it to edit · scroll on it to resize · Esc to close";
 			graphics.text(font, hint, (width - font.width(hint)) / 2, height - 60, 0xFFFFFFFF, true);
 		}
 		// Everything after this draws on top, so the panel covers the boxes, text included.
@@ -134,6 +137,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+		if (resetArmed && !resetButton.isInBoundingBox(click.x(), click.y())) armReset(false);
 		if (overPanel(click.x(), click.y())) return super.mouseClicked(click, doubled);
 		if (click.button() != 0) return false;
 		root.focusHandler().focus(null, null);
@@ -166,6 +170,19 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+		HudRenderer.Bounds bounds = selected == null ? null : drawn.get(selected);
+		if (vertical == 0 || bounds == null || overPanel(mouseX, mouseY) || !bounds.contains(mouseX, mouseY)) {
+			return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
+		}
+		// Rounded to the slider's one decimal, so scrolling and the slider land on the same sizes.
+		float scale = Math.round((selected.scale + Math.signum((float) vertical) * SCALE_STEP) * 10) / 10f;
+		selected.scale = Math.max(HudLayout.MIN_SCALE, Math.min(HudLayout.MAX_SCALE, scale));
+		if (scaleSlider != null) scaleSlider.setFromDiscreteValue(selected.scale);
+		return true;
+	}
+
+	@Override
 	public boolean mouseReleased(MouseButtonEvent release) {
 		if (dragging == null) return super.mouseReleased(release);
 		dragging = null;
@@ -185,6 +202,25 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		hud.save();
 	}
 
+	/** Swaps in the Reset button for this state; a new button, because owo doesn't re-measure a changed label. */
+	private void armReset(boolean armed) {
+		resetArmed = armed;
+		if (resetButton != null) toolbar.removeChild(resetButton);
+		resetButton = button(armed ? "§cReally reset?" : "Reset", b -> {
+			if (!resetArmed) {
+				armReset(true);
+				return;
+			}
+			armReset(false);
+			hud.resetLayout();
+			selected = null;
+			rebuildPanel();
+		});
+		resetButton.tooltip(Component.literal(armed ? "Click again to go back to the three default boxes"
+				: "Back to the three default boxes"));
+		toolbar.child(resetButton);
+	}
+
 	private boolean overPanel(double x, double y) {
 		return toolbar.isInBoundingBox(x, y) || (panel != null && panel.isInBoundingBox(x, y));
 	}
@@ -194,6 +230,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private void rebuildPanel() {
 		if (panel != null) root.removeChild(panel);
 		panel = null;
+		scaleSlider = null;
 		if (selected == null) return;
 		Box box = selected;
 		panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.content());
@@ -233,12 +270,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		panel.child(background);
 
-		DiscreteSliderComponent scale = UIComponents.discreteSlider(Sizing.expand(), 0.5, 2);
+		DiscreteSliderComponent scale = UIComponents.discreteSlider(Sizing.expand(), HudLayout.MIN_SCALE, HudLayout.MAX_SCALE);
 		scale.decimalPlaces(1);
 		scale.setFromDiscreteValue(box.scale);
 		scale.verticalSizing(Sizing.fixed(CONTROL));
+		// One notch over the slider is one step too, as when scrolling on the box.
+		scale.scrollStep(SCALE_STEP / (HudLayout.MAX_SCALE - HudLayout.MIN_SCALE));
 		scale.message(text -> Component.literal(text + "×"));
 		scale.onChanged().subscribe(value -> box.scale = (float) scale.discreteValue());
+		scale.tooltip(Component.literal("Box size. You can also scroll on the box."));
+		scaleSlider = scale;
 		panel.child(row("Size", scale));
 
 		FlowLayout align = row("Align");

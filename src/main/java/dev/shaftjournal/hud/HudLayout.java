@@ -13,6 +13,9 @@ import com.google.gson.JsonParseException;
  */
 public final class HudLayout {
 	public static final int VERSION = 1;
+	/** The smallest and largest box size. */
+	public static final float MIN_SCALE = 0.5f;
+	public static final float MAX_SCALE = 2;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public enum Visibility {
@@ -162,7 +165,7 @@ public final class HudLayout {
 		if (box.align == null) box.align = Align.LEFT;
 		if (!isColor(box.labelColor)) box.labelColor = "7";
 		if (!isColor(box.valueColor)) box.valueColor = "f";
-		box.scale = clamp(box.scale == 0 ? 1 : box.scale, 0.5f, 2);
+		box.scale = clamp(box.scale == 0 ? 1 : box.scale, MIN_SCALE, MAX_SCALE);
 		box.x = clamp(box.x, 0, 1);
 		box.y = clamp(box.y, 0, 1);
 		if (box.lines == null) box.lines = new ArrayList<>();
