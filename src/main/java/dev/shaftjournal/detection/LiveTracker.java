@@ -38,6 +38,11 @@ public final class LiveTracker {
 		return tracker.inMiningArea();
 	}
 
+	/** The shaft the player is in, or null. Call on the client thread. */
+	public Shaft currentShaft() {
+		return tracker.current();
+	}
+
 	/** Called for every chat and action-bar message, before other mods can hide or change it. */
 	public void onGameMessage(Component message, boolean overlay) {
 		if (overlay) return;

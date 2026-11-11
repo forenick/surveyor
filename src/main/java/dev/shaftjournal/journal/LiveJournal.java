@@ -62,6 +62,22 @@ public final class LiveJournal {
 		return List.copyOf(entries);
 	}
 
+	/** The finished shafts of the current session, in order; empty before the first one. */
+	public List<JournalEntry> sessionEntries() {
+		Journal.Session session = journal.session();
+		if (session == null) return List.of();
+		List<JournalEntry> result = new ArrayList<>();
+		for (int i = entries.size() - 1; i >= 0 && entries.get(i).sessionId() == session.id(); i--) {
+			result.addFirst(entries.get(i));
+		}
+		return result;
+	}
+
+	/** See {@link Journal#spawnTimerMillis}. */
+	public Long spawnTimerMillis(long now) {
+		return journal.spawnTimerMillis(now);
+	}
+
 	public void newSession() {
 		journal.newSession(System.currentTimeMillis());
 	}

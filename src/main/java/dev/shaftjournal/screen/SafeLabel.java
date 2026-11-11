@@ -9,8 +9,8 @@ import net.minecraft.network.chat.Style;
  * to vanilla's hover handling, which crashes on null. That happens when the mouse is inside a label
  * but not over its text, e.g. to the right of a short line in a full-width label (crash of 0.4.0).
  */
-final class SafeLabel extends LabelComponent {
-	SafeLabel(Component text) {
+public final class SafeLabel extends LabelComponent {
+	public SafeLabel(Component text) {
 		super(text);
 	}
 

@@ -62,6 +62,19 @@ class JournalTest {
 	}
 
 	@Test
+	void spawnTimerForTheHud() {
+		assertNull(journal.spawnTimerMillis(0));
+		at(0).hit(true);
+		at(10_000).hit(true);
+		assertEquals(15_000, journal.spawnTimerMillis(15_000));
+		assertEquals(50_000, journal.spawnTimerMillis(200_000), "a break counts for 40 s at most");
+		at(20_000).chat(WOW);
+		assertEquals(20_000, journal.spawnTimerMillis(90_000), "frozen at the found time");
+		visitShaft(23_000, "JADE_1");
+		assertNull(journal.spawnTimerMillis(30_000), "nothing until the next search starts");
+	}
+
+	@Test
 	void pickobulusCountsAsMining() {
 		at(0).hit(true);
 		at(35_000).chat("§aYou used your §6Pickobulus §aPickaxe Ability!");

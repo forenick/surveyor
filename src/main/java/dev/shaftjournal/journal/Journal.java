@@ -91,6 +91,16 @@ public final class Journal {
 		return searching;
 	}
 
+	/**
+	 * What the HUD's spawn timer shows: while searching, the time so far (a break counts for at most
+	 * {@link #PAUSE_MILLIS}, as when the shaft is found); after "WOW!", the timed spawn until that
+	 * shaft is left; otherwise null.
+	 */
+	public Long spawnTimerMillis(long now) {
+		if (searching) return searchMillis + Math.max(0, Math.min(now - lastMiningAt, PAUSE_MILLIS));
+		return timedSearch;
+	}
+
 	/** The player started or kept hitting a block. */
 	public void onBlockHit(long now) {
 		mining(now);

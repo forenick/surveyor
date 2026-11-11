@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import dev.shaftjournal.ShaftJournal;
 import dev.shaftjournal.detection.CorpseLoot;
+import dev.shaftjournal.hud.EditHudScreen;
 import dev.shaftjournal.detection.ItemCount;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.journal.JournalEntry;
@@ -196,6 +198,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			nav.child(button(">", sessionIndex > 0, () -> showSession(sessionIndex - 1)));
 		}
 		bar.child(nav);
+		ButtonComponent editHud = UIComponents.button(Component.literal("Edit HUD"),
+				b -> minecraft.gui.setScreen(new EditHudScreen(this, ShaftJournal.HUD)));
+		editHud.horizontalSizing(Sizing.content(6));
+		editHud.margins(Insets.left(6));
+		bar.child(editHud);
 		return bar;
 	}
 

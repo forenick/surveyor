@@ -13,6 +13,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 
 import dev.shaftjournal.detection.LiveTracker;
+import dev.shaftjournal.hud.LiveHud;
 import dev.shaftjournal.journal.LiveJournal;
 import dev.shaftjournal.recorder.ShaftRecorder;
 import dev.shaftjournal.screen.JournalScreen;
@@ -24,6 +25,8 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
@@ -42,6 +45,7 @@ public class ShaftJournal implements ClientModInitializer {
 	public static final ShaftRecorder RECORDER = new ShaftRecorder();
 	public static final LiveTracker TRACKER = new LiveTracker();
 	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea);
+	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL);
 
 	private final ShaftRecorder recorder = RECORDER;
 
@@ -60,6 +64,10 @@ public class ShaftJournal implements ClientModInitializer {
 		KeyMappingHelper.registerKeyMapping(JOURNAL_KEY);
 		ClientTickEvents.END_CLIENT_TICK.register(this::openJournalIfAsked);
 		ClientLifecycleEvents.CLIENT_STARTED.register(JOURNAL::start);
+		ClientLifecycleEvents.CLIENT_STARTED.register(HUD::start);
+		ClientTickEvents.END_CLIENT_TICK.register(HUD::onTick);
+		// Drawn under the chat, so chat messages stay readable over a box.
+		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(MOD_ID, "hud"), HUD::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			recorder.stop();
 			JOURNAL.close();

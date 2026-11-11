@@ -4,6 +4,27 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.5.0 (2026-11-11)
+HUD, slice 1 of the design in `Docs/hud-design.md` (mockup `Docs/mockups/hud-v1.html`).
+- Three HUD boxes:
+  - **Session:** shafts, shafts per hour, powder and Fine from corpses. Average spawn is there
+    but hidden.
+  - **Spawn:** the spawn timer and the session average, under the crosshair.
+  - **Current shaft:** time inside, corpses looted/total with their types, cold and campfires.
+    Only shows inside a shaft.
+- The spawn timer runs while you search, stops at "WOW!" and shows that time until you leave the
+  shaft, then waits for the next search. A break counts for 40 s at most, as in the journal.
+- **Edit HUD** in the journal's top bar opens the editor:
+  - drag boxes anywhere, then click one to change it
+  - per box: title, when it shows, background, size, alignment, and the label and value colours
+    (16 Minecraft colours, plus bold)
+  - per line: show/hide, order and number format
+  - **Reset** brings back the defaults
+  - values that aren't known right now show example numbers in the editor
+- Saved to `.minecraft/shaftjournal/hud.json` when the editor closes. A hand edit that breaks
+  something is repaired on load where possible.
+- Box titles can contain `{shaft_type}`, which the Current shaft box uses for e.g. "Jade Shaft".
+
 ## 0.4.1 (2026-11-11)
 - Fixed a crash when hovering a journal label next to its text instead of on it (e.g. the empty
   part of a full-width line). owo-lib passes "no text here" on to Minecraft, which crashes on it;
