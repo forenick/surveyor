@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.4.1 (2026-11-11)
+- Fixed a crash when hovering a journal label next to its text instead of on it (e.g. the empty
+  part of a full-width line). owo-lib passes "no text here" on to Minecraft, which crashes on it;
+  the journal's labels now answer with an empty style instead.
+
 ## 0.4.0 (2026-11-11)
 - Renamed from ShaftTools to ShaftJournal. The journal is becoming the mod's main menu.
 - `/shaftjournal` or the short `/sj` opens the journal. Every subcommand works under both names,

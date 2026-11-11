@@ -834,7 +834,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static LabelComponent label(String text) {
-		return UIComponents.label(Component.literal(text));
+		return new SafeLabel(Component.literal(text));
 	}
 
 	/** A label that wraps to its parent's width instead of running past it. */
