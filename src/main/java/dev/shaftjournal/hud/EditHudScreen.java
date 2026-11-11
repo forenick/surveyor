@@ -14,6 +14,7 @@ import dev.shaftjournal.screen.SafeLabel;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.DiscreteSliderComponent;
+import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.SmallCheckboxComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
@@ -29,6 +30,7 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
@@ -49,6 +51,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final String CODES = "0123456789abcdef";
 	/** How much one scroll notch over the selected box changes its size; the Size slider's step. */
 	private static final float SCALE_STEP = 0.1f;
+	/** Space around the screen's content, so the toolbar and panel don't touch the edge. */
+	private static final int PADDING = 4;
+	/** Where the toolbar may sit, as relative positions in order of preference: top middle, bottom middle, corners. */
+	private static final int[][] TOOLBAR_SPOTS = {{50, 0}, {50, 100}, {0, 0}, {100, 0}, {0, 100}, {100, 100}};
 	/** The 16 Minecraft text colours, in code order. */
 	private static final int[] COLORS = {0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
 			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
@@ -67,6 +73,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private ButtonComponent resetButton;
 	/** Reset was clicked once; the next click resets, any other click cancels. */
 	private boolean resetArmed;
+	private int toolbarSpot = -1;
 	private Box selected;
 	private Box dragging;
 	private double grabX;
@@ -92,9 +99,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	protected void build(FlowLayout root) {
 		this.root = root;
-		root.padding(Insets.of(4));
+		root.padding(Insets.of(PADDING));
 		root.horizontalAlignment(HorizontalAlignment.CENTER);
 		toolbar = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		moveToolbar(0);
 		toolbar.surface(PANEL);
 		toolbar.padding(Insets.of(3));
 		toolbar.gap(4);
@@ -112,8 +120,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
 		drawn.clear();
 		for (Box box : hud.layout().boxes) {
-			List<String> lines = HudBoxText.lines(box, hud.data(), true);
-			if (lines.isEmpty()) lines = List.of("§8(empty)");
+			List<String> lines = lines(box);
 			HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines, width, height);
 			drawn.put(box, bounds);
 			HudRenderer.draw(graphics, font, box, lines, bounds);
@@ -127,9 +134,14 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 					box == selected ? OUTLINE_SELECTED : OUTLINE);
 		}
 		if (selected == null) {
-			String hint = "§7Drag a box to move it · click it to edit · scroll on it to resize · Esc to close";
-			graphics.text(font, hint, (width - font.width(hint)) / 2, height - 60, 0xFFFFFFFF, true);
+			// Two lines, so it fits at 1080p's auto GUI scale (480 wide) and smaller.
+			String[] hint = {"§7Drag a box to move it · click it to edit · Esc to close",
+					"§7Scroll on the selected box to resize it · arrow keys nudge it"};
+			for (int i = 0; i < hint.length; i++) {
+				graphics.text(font, hint[i], (width - font.width(hint[i])) / 2, height - 64 + i * 11, 0xFFFFFFFF, true);
+			}
 		}
+		placeToolbar();
 		// Everything after this draws on top, so the panel covers the boxes, text included.
 		graphics.nextStratum();
 		super.extractRenderState(graphics, mouseX, mouseY, delta);
@@ -182,6 +194,24 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return true;
 	}
 
+	/** Arrow keys nudge the selected box by 1 pixel, or 10 with Shift, unless a text field is being typed in. */
+	@Override
+	public boolean keyPressed(KeyEvent key) {
+		if (selected != null && !(root.focusHandler().focused() instanceof GreedyInputUIComponent)) {
+			int step = key.hasShiftDown() ? 10 : 1;
+			int dx = key.isLeft() ? -step : key.isRight() ? step : 0;
+			int dy = key.isUp() ? -step : key.isDown() ? step : 0;
+			if (dx != 0 || dy != 0) {
+				// Measured now, not taken from the last frame, so key repeats faster than frames all count.
+				HudRenderer.Bounds bounds = HudRenderer.bounds(font, selected, lines(selected), width, height);
+				selected.x = HudRenderer.fractionX(bounds.x() + dx, bounds.width(), width);
+				selected.y = HudRenderer.fractionY(bounds.y() + dy, bounds.height(), height);
+				return true;
+			}
+		}
+		return super.keyPressed(key);
+	}
+
 	@Override
 	public boolean mouseReleased(MouseButtonEvent release) {
 		if (dragging == null) return super.mouseReleased(release);
@@ -219,6 +249,49 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		resetButton.tooltip(Component.literal(armed ? "Click again to go back to the three default boxes"
 				: "Back to the three default boxes"));
 		toolbar.child(resetButton);
+	}
+
+	/** The box's lines as the editor shows them: example values, and a placeholder when it has none. */
+	private List<String> lines(Box box) {
+		List<String> lines = HudBoxText.lines(box, hud.data(), true);
+		return lines.isEmpty() ? List.of("§8(empty)") : lines;
+	}
+
+	/**
+	 * Moves the toolbar off any box (so every box stays clickable) and off the side panel: the first
+	 * free spot in {@link #TOOLBAR_SPOTS}, or the top middle when none is free. Not while dragging,
+	 * so it doesn't jump around under the mouse.
+	 */
+	private void placeToolbar() {
+		if (dragging != null || toolbar.width() == 0) return;
+		int spot = 0;
+		for (int i = 0; i < TOOLBAR_SPOTS.length; i++) {
+			int x = PADDING + Math.round(TOOLBAR_SPOTS[i][0] / 100f * (width - 2 * PADDING - toolbar.width()));
+			int y = PADDING + Math.round(TOOLBAR_SPOTS[i][1] / 100f * (height - 2 * PADDING - toolbar.height()));
+			if (isFree(x, y, toolbar.width(), toolbar.height())) {
+				spot = i;
+				break;
+			}
+		}
+		moveToolbar(spot);
+	}
+
+	private void moveToolbar(int spot) {
+		if (spot == toolbarSpot) return;
+		toolbarSpot = spot;
+		toolbar.positioning(Positioning.relative(TOOLBAR_SPOTS[spot][0], TOOLBAR_SPOTS[spot][1]));
+	}
+
+	/** True when this area overlaps no box (outline included) and not the side panel. */
+	private boolean isFree(int x, int y, int w, int h) {
+		for (HudRenderer.Bounds b : drawn.values()) {
+			if (overlap(x, y, w, h, b.x() - 1, b.y() - 1, b.width() + 2, b.height() + 2)) return false;
+		}
+		return panel == null || !overlap(x, y, w, h, panel.x(), panel.y(), panel.width(), panel.height());
+	}
+
+	private static boolean overlap(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+		return x1 < x2 + w2 && x2 < x1 + w1 && y1 < y2 + h2 && y2 < y1 + h1;
 	}
 
 	private boolean overPanel(double x, double y) {

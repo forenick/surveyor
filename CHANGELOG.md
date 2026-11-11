@@ -4,6 +4,15 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.5.3 (2026-11-11)
+Edit HUD tweaks.
+- The toolbar moves out of the way: when a box or the side panel is under it, it goes to the bottom
+  middle or a free corner, so no box can get stuck under it. It doesn't move while you drag.
+- Arrow keys nudge the selected box by 1 pixel, or 10 with Shift (not while typing a title).
+- With no finished shaft this session, the editor previews the Session box with example numbers,
+  instead of "Shafts: 0" next to an example "Shafts/h: 19.4". The HUD itself still shows 0.
+- The hint is two lines, so it fits on small screens.
+
 ## 0.5.2 (2026-11-11)
 Edit HUD tweaks.
 - Scroll on the selected box to change its size, in steps of 0.1 from 0.5× to 2×. The Size slider

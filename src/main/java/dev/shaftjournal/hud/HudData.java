@@ -2,6 +2,7 @@ package dev.shaftjournal.hud;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,15 +23,17 @@ public final class HudData {
 	public static final HudData EXAMPLE = example();
 
 	private final Map<HudValue, Object> values = new EnumMap<>(HudValue.class);
+	/** Values that are real but say nothing yet (a session's zeros before its first shaft); the editor shows examples. */
+	private final Set<HudValue> placeholders = EnumSet.noneOf(HudValue.class);
 
 	public Object get(HudValue value) {
 		return values.get(value);
 	}
 
-	/** This value, or the example when it's missing. */
+	/** This value, or the example when it's missing or only a placeholder. */
 	public Object getOrExample(HudValue value) {
 		Object v = values.get(value);
-		return v != null ? v : EXAMPLE.values.get(value);
+		return v != null && !placeholders.contains(value) ? v : EXAMPLE.values.get(value);
 	}
 
 	private HudData put(HudValue value, Object v) {
@@ -73,6 +76,10 @@ public final class HudData {
 		data.put(HudValue.SESSION_SHAFTS, session.shafts());
 		data.put(HudValue.SESSION_POWDER, session.powder());
 		data.put(HudValue.SESSION_CORPSE_FINE, session.fine());
+		// The HUD shows 0 shafts, but the editor previews the whole box with examples instead of mixing them in.
+		if (session.summary() == null) {
+			data.placeholders.addAll(List.of(HudValue.SESSION_SHAFTS, HudValue.SESSION_POWDER, HudValue.SESSION_CORPSE_FINE));
+		}
 		data.put(HudValue.AVERAGE_SPAWN, session.averageSpawn());
 		// Counted up to now, so the rate drops while a search drags on.
 		if (session.summary() != null) data.put(HudValue.SHAFTS_PER_HOUR, session.summary().shaftsPerHour(now));
