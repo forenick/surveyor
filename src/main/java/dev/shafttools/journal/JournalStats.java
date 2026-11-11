@@ -16,6 +16,12 @@ public final class JournalStats {
 	/** Shafts per hour is only shown for sessions at least this long. A display choice, not a game number. */
 	public static final long MIN_RATE_MILLIS = 5 * 60_000L;
 
+	/**
+	 * A session needs this many timed spawns to count for "fastest session", so one lucky spawn
+	 * isn't a record. A display choice, not a game number.
+	 */
+	public static final int MIN_TIMED_FOR_RECORD = 3;
+
 	/** Corpse types in the order the screen lists them. Unknown types follow, alphabetically. */
 	public static final List<String> CORPSE_ORDER = List.of("Lapis", "Umber", "Tungsten", "Vanguard");
 
@@ -44,6 +50,10 @@ public final class JournalStats {
 
 		public int shafts() {
 			return entries.size();
+		}
+
+		public int timedSpawns() {
+			return (int) entries.stream().filter(e -> e.searchMillis() != null).count();
 		}
 
 		/** Null when no spawn in the session was timed. */
@@ -86,6 +96,9 @@ public final class JournalStats {
 			Best mostPowder,
 			Best mostLapis,
 			SessionSummary bestRate,
+			SessionSummary fastestSession,
+			SessionSummary mostShafts,
+			JournalEntry mostGems,
 			Map<String, Map<String, Integer>> types,
 			Map<String, Integer> corpsesSeen,
 			Map<String, Integer> shaftsWithCorpse) {
@@ -180,15 +193,30 @@ public final class JournalStats {
 		}
 
 		SessionSummary bestRate = null;
+		SessionSummary fastestSession = null;
+		SessionSummary mostShafts = null;
 		for (SessionSummary session : sessions) {
 			Double rate = session.shaftsPerHour();
 			if (rate != null && (bestRate == null || rate > bestRate.shaftsPerHour())) bestRate = session;
+			if (session.timedSpawns() >= MIN_TIMED_FOR_RECORD && (fastestSession == null
+					|| session.averageSearchMillis() < fastestSession.averageSearchMillis())) fastestSession = session;
+			if (mostShafts == null || session.shafts() > mostShafts.shafts()) mostShafts = session;
+		}
+		JournalEntry mostGems = null;
+		for (JournalEntry entry : entries) {
+			if (entry.gems() != null && entry.gems().fineEquivalent() > 0
+					&& (mostGems == null || entry.gems().fineEquivalent() > mostGems.gems().fineEquivalent())) mostGems = entry;
 		}
 
 		return new AllTime(entries.size(), sessions.size(),
 				sessions.stream().mapToLong(SessionSummary::lengthMillis).sum(), powder,
 				orderedMap(looted), averageSearch(entries), fastest, List.copyOf(oldestFirst),
-				mostPowder, mostLapis, bestRate, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse));
+				mostPowder, mostLapis, bestRate, fastestSession, mostShafts, mostGems, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse));
+	}
+
+	/** The average spawn time over every timed shaft in the newest {@code count} sessions (newest first). */
+	public static Long recentAverage(List<SessionSummary> newestFirst, int count) {
+		return averageSearch(newestFirst.stream().limit(count).flatMap(s -> s.entries().stream()).toList());
 	}
 
 	static Long averageSearch(List<JournalEntry> entries) {

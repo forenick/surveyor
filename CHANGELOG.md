@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.3 (2026-11-11)
+- Stats tab layout: Personal bests moved under "Corpses looted"; the spawn chart is taller.
+- Personal bests reworked: fastest spawn, fastest session (needs 3+ timed spawns), most shafts per hour,
+  most shafts in a session, most Lapis, powder and gems in one shaft. Coin records show "Soon" until
+  prices exist, as does the all-time Coins total.
+- The gray shaft IDs and dates next to records are replaced by a » arrow that opens that shaft or
+  session. Clicking a bar in the spawn chart opens that session.
+- Spawn chart: starts right after the axis (no more gap on the left), shows the all-time average as a
+  yellow line, and has the first and last session date under it. New "Last 5 sessions" average with
+  how much faster or slower it is than your all-time average.
+- "Avg spawn per session" lost "oldest first"; "Shafts with this corpse" is now "Corpse chance per
+  shaft" with a line explaining it.
+
 ## 0.3.2 (2026-11-11)
 - Stats tab: the type 1 / type 2 / crystal counts moved from a line under each shaft type into a tooltip;
   hover the row to see them.

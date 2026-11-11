@@ -104,6 +104,14 @@ class JournalStatsTest {
 		assertEquals(List.of("Lapis", "Umber", "Tungsten", "Vanguard"), List.copyOf(stats.corpsesSeen().keySet()));
 		// The one-minute session is too short for a rate, so the real session is the best.
 		assertEquals(realJournal().getFirst().sessionId(), stats.bestRate().id());
+		// The added session has one timed spawn, too few for a record; the real one has six.
+		assertEquals(realJournal().getFirst().sessionId(), stats.fastestSession().id());
+		assertEquals(6, stats.mostShafts().shafts());
+		assertNull(stats.mostGems());
+		// Newest session first: the added JADE_C (30 s) alone, then all seven shafts.
+		List<JournalStats.SessionSummary> sessions = JournalStats.sessions(entries);
+		assertEquals(30_000L, JournalStats.recentAverage(sessions, 1));
+		assertEquals(JournalStats.averageSearch(entries), JournalStats.recentAverage(sessions, 5));
 		assertEquals(realJournal().getFirst().sessionId(), stats.oldestFirst().getFirst().id());
 	}
 

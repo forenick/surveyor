@@ -142,6 +142,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			case STATS -> {
 				footer.child(label("§8Counted from your own " + entries.size() + " shafts"));
 				footer.child(label("§8Hover a row for details"));
+				footer.child(label("§8» opens it"));
 			}
 		}
 		root.child(footer);
@@ -196,6 +197,25 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		selectLastShaft();
 		tab = Tab.SESSION;
 		rebuild();
+	}
+
+	/** Opens the session that holds this shaft, with the shaft selected. */
+	private void openShaft(JournalEntry entry) {
+		for (int i = 0; i < sessions.size(); i++) {
+			int index = sessions.get(i).entries().indexOf(entry);
+			if (index >= 0) {
+				sessionIndex = i;
+				selected = index;
+				tab = Tab.SESSION;
+				rebuild();
+				return;
+			}
+		}
+	}
+
+	private void openSession(SessionSummary session) {
+		int index = sessions.indexOf(session);
+		if (index >= 0) showSession(index);
 	}
 
 	private void selectLastShaft() {
@@ -389,29 +409,52 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(keyValue("Sessions", "§f" + stats.sessions()));
 		totals.child(keyValue("Time shafting", "§f" + SummaryText.duration(stats.timeMillis())));
 		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
+		totals.child(keyValue("Coins", SOON));
 		totals.child(section("Corpses looted"));
 		for (String type : corpseTypes(stats.corpsesSeen())) {
 			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0)));
 		}
-		columns.child(scrollColumn(Sizing.fill(26), totals));
+		totals.child(section("Personal bests"));
+		JournalEntry fastest = stats.fastest();
+		totals.child(record("Fastest spawn", fastest == null ? null : spawn(fastest.searchMillis()),
+				fastest == null ? null : () -> openShaft(fastest), fastest == null ? null : fastest.shaftId()));
+		SessionSummary fastestSession = stats.fastestSession();
+		totals.child(record("Fastest session", fastestSession == null ? null : spawn(fastestSession.averageSearchMillis()) + " §7avg",
+				fastestSession == null ? null : () -> openSession(fastestSession), fastestSession == null ? null : sessionName(fastestSession)));
+		SessionSummary bestRate = stats.bestRate();
+		totals.child(record("Most shafts per hour", bestRate == null ? null : "§f" + decimal(bestRate.shaftsPerHour()),
+				bestRate == null ? null : () -> openSession(bestRate), bestRate == null ? null : sessionName(bestRate)));
+		SessionSummary mostShafts = stats.mostShafts();
+		totals.child(record("Most shafts in a session", mostShafts == null ? null : "§f" + mostShafts.shafts(),
+				mostShafts == null ? null : () -> openSession(mostShafts), mostShafts == null ? null : sessionName(mostShafts)));
+		JournalStats.Best lapis = stats.mostLapis();
+		totals.child(record("Most Lapis in a shaft", lapis == null ? null : "§9" + lapis.value(),
+				lapis == null ? null : () -> openShaft(lapis.entry()), lapis == null ? null : lapis.entry().shaftId()));
+		JournalStats.Best powder = stats.mostPowder();
+		totals.child(record("Most powder in a shaft", powder == null ? null : "§b" + number(powder.value()),
+				powder == null ? null : () -> openShaft(powder.entry()), powder == null ? null : powder.entry().shaftId()));
+		JournalEntry gems = stats.mostGems();
+		totals.child(record("Most gems in a shaft", gems == null ? null : "§f≈" + decimal(gems.gems().fineEquivalent()) + " Fine",
+				gems == null ? null : () -> openShaft(gems), gems == null ? null : gems.shaftId()));
+		totals.child(record("Most valuable shaft", SOON, null, null));
+		totals.child(record("Most coins per hour", SOON, null, null));
+		columns.child(scrollColumn(Sizing.fill(32), totals));
 
 		FlowLayout spawn = column();
 		spawn.child(header("Spawn time"));
-		spawn.child(keyValue("All-time average", spawn(stats.averageSearchMillis())));
-		JournalEntry fastest = stats.fastest();
-		spawn.child(keyValue("Fastest spawn", fastest == null ? "§8-"
-				: spawn(fastest.searchMillis()) + " §8" + fastest.shaftId() + ", " + day(fastest.enteredAt())));
-		spawn.child(section("Avg spawn per session, oldest first"));
-		spawn.child(chart(stats.oldestFirst()));
-		spawn.child(section("Personal bests"));
-		spawn.child(keyValue("Most powder", stats.mostPowder() == null ? "§8-"
-				: "§b" + number(stats.mostPowder().value()) + " §8" + stats.mostPowder().entry().shaftId()));
-		spawn.child(keyValue("Most Lapis", stats.mostLapis() == null ? "§8-"
-				: "§9" + stats.mostLapis().value() + " §8" + stats.mostLapis().entry().shaftId()));
-		SessionSummary best = stats.bestRate();
-		spawn.child(keyValue("Best session", best == null ? "§8-"
-				: "§f" + decimal(best.shaftsPerHour()) + " per hour §8" + day(best.start())));
-		spawn.child(section("Shafts with this corpse"));
+		spawn.child(keyValue("All-time average", stats.averageSearchMillis() == null ? "§8-"
+				: "§e" + SummaryText.duration(stats.averageSearchMillis())));
+		Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
+		if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
+			long difference = recent - stats.averageSearchMillis();
+			String change = difference <= 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
+					: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
+			spawn.child(keyValue("Last " + RECENT_SESSIONS + " sessions", "§f" + SummaryText.duration(recent) + change));
+		}
+		spawn.child(section("Avg spawn per session"));
+		spawn.child(chart(stats.oldestFirst(), stats.averageSearchMillis()));
+		spawn.child(section("Corpse chance per shaft"));
+		spawn.child(wrapped("§7How many of your shafts had at least one corpse of that type"));
 		for (String type : corpseTypes(stats.corpsesSeen())) {
 			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
 			FlowLayout row = barRow(corpseColor(type) + type, with / (double) stats.shafts(),
@@ -440,28 +483,53 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			row.tooltip(tooltip);
 			odds.child(row);
 		}
-		columns.child(scrollColumn(Sizing.fill(30), odds));
+		columns.child(scrollColumn(Sizing.fill(27), odds));
 		content.child(columns);
+	}
+
+	private static final String SOON = "§6Soon";
+	private static final int RECENT_SESSIONS = 5;
+
+	/**
+	 * A personal-best row: the value and an arrow that opens the shaft or session it belongs to.
+	 * Without a record yet, shows a dash.
+	 */
+	private FlowLayout record(String key, String value, Runnable open, String target) {
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		row.gap(4);
+		row.verticalAlignment(VerticalAlignment.TOP);
+		LabelComponent keyLabel = label("§7" + key);
+		keyLabel.horizontalSizing(Sizing.expand());
+		row.child(keyLabel);
+		row.child(label(value == null ? "§8-" : value));
+		if (open != null) {
+			LabelComponent arrow = label("§b»");
+			arrow.cursorStyle(CursorStyle.HAND);
+			arrow.tooltip(Component.literal("§7Open " + target));
+			arrow.mouseDown().subscribe((event, doubleClick) -> {
+				open.run();
+				return true;
+			});
+			row.child(arrow);
+		}
+		return row;
+	}
+
+	private static String sessionName(SessionSummary session) {
+		return "session from " + day(session.start()) + " " + clock(session.start());
 	}
 
 	/** Spawn-time axis steps; the smallest that gives at most four lines is used. */
 	private static final long[] AXIS_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
 
-	private FlowLayout chart(List<SessionSummary> oldestFirst) {
+	private FlowLayout chart(List<SessionSummary> oldestFirst, Long average) {
 		List<SessionSummary> timed = oldestFirst.stream().filter(s -> s.averageSearchMillis() != null).toList();
-		int chartHeight = Math.clamp(height / 5, 44, 72);
-		FlowLayout chart = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(chartHeight));
-		chart.gap(3);
+		FlowLayout wrapper = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		if (timed.isEmpty()) {
-			chart.child(label("§8No timed spawns yet"));
-			return chart;
+			wrapper.child(label("§8No timed spawns yet"));
+			return wrapper;
 		}
-		// Room for the newest sessions in the middle column; older ones scroll off the left.
-		int plotWidth = Math.max(60, width * 38 / 100 - 50);
-		int barWidth = Math.clamp((plotWidth - 4) / timed.size() - 2, 3, 10);
-		int maxBars = Math.max(1, (plotWidth - 4) / (barWidth + 2));
-		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
-
+		int chartHeight = Math.clamp(height / 3, 50, 110);
 		long slowestSeconds = Math.max(1, timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) / 1000);
 		long step = AXIS_STEPS[AXIS_STEPS.length - 1];
 		for (long candidate : AXIS_STEPS) {
@@ -471,43 +539,89 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 		}
 		long topSeconds = Math.max(step, (slowestSeconds + step - 1) / step * step);
+		int axisWidth = 0;
+		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
+			axisWidth = Math.max(axisWidth, font.width(axisLabel(seconds)));
+		}
+		axisWidth += 2;
+
+		// The middle column's width, minus the axis; older sessions drop off the left when they don't fit.
+		int plotWidth = Math.max(60, width - 16 - 10 - width * 32 / 100 - width * 27 / 100 - 12 - axisWidth - 3);
+		int barWidth = Math.clamp((plotWidth - 2) / timed.size() - 2, 3, 12);
+		int maxBars = Math.max(1, (plotWidth - 2) / (barWidth + 2));
+		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
+
 		int top = 4;
 		int base = chartHeight - 5;
 		int plotHeight = base - top;
-
-		StackLayout axis = UIContainers.stack(Sizing.fixed(30), Sizing.fixed(chartHeight));
+		FlowLayout chart = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(chartHeight));
+		chart.gap(3);
+		StackLayout axis = UIContainers.stack(Sizing.fixed(axisWidth), Sizing.fixed(chartHeight));
 		StackLayout plot = UIContainers.stack(Sizing.expand(), Sizing.fixed(chartHeight));
 		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
 			int y = base - (int) (plotHeight * seconds / topSeconds);
 			LabelComponent tick = label("§8" + axisLabel(seconds));
-			tick.horizontalSizing(Sizing.fixed(30));
+			tick.horizontalSizing(Sizing.fixed(axisWidth));
 			tick.horizontalTextAlignment(HorizontalAlignment.RIGHT);
 			tick.positioning(Positioning.absolute(0, y - 4));
 			axis.child(tick);
-			BoxComponent line = UIComponents.box(Sizing.fill(100), Sizing.fixed(1));
-			line.fill(true);
-			line.color(Color.ofArgb(seconds == 0 ? 0x40FFFFFF : 0x18FFFFFF));
-			line.positioning(Positioning.absolute(0, y));
-			plot.child(line);
+			plot.child(line(y, seconds == 0 ? 0x40FFFFFF : 0x18FFFFFF));
 		}
 		FlowLayout bars = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(base));
 		bars.verticalAlignment(VerticalAlignment.BOTTOM);
 		bars.gap(2);
-		bars.padding(Insets.left(3));
+		bars.padding(Insets.left(2));
 		bars.positioning(Positioning.absolute(0, 0));
 		for (SessionSummary session : timed) {
 			int barHeight = Math.max(1, (int) (plotHeight * session.averageSearchMillis() / 1000.0 / topSeconds));
 			BoxComponent bar = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
 			bar.fill(true);
 			bar.color(GREEN);
+			bar.cursorStyle(CursorStyle.HAND);
 			bar.tooltip(List.of(Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
-					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.shafts() + " shafts")));
+					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.timedSpawns() + " shafts"),
+					Component.literal("§8Click to open")));
+			bar.mouseDown().subscribe((event, doubleClick) -> {
+				openSession(session);
+				return true;
+			});
 			bars.child(bar);
 		}
 		plot.child(bars);
+		if (average != null) {
+			int y = base - (int) Math.min(plotHeight, plotHeight * average / 1000.0 / topSeconds);
+			plot.child(line(y, 0xB0FFFF55));
+		}
 		chart.child(axis);
 		chart.child(plot);
-		return chart;
+		wrapper.child(chart);
+
+		// Dates under the first and last bar.
+		StackLayout dates = UIContainers.stack(Sizing.fill(100), Sizing.fixed(10));
+		LabelComponent first = label("§8" + day(timed.getFirst().start()));
+		first.positioning(Positioning.absolute(axisWidth + 3 + 2, 1));
+		dates.child(first);
+		if (timed.size() > 1) {
+			String lastText = "§8" + day(timed.getLast().start());
+			int lastX = axisWidth + 3 + 2 + (timed.size() - 1) * (barWidth + 2) + barWidth - font.width(lastText);
+			int firstEnd = axisWidth + 5 + font.width("§8" + day(timed.getFirst().start()));
+			if (lastX > firstEnd + 6) {
+				LabelComponent last = label(lastText);
+				last.positioning(Positioning.absolute(lastX, 1));
+				dates.child(last);
+			}
+		}
+		wrapper.child(dates);
+		if (average != null) wrapper.child(label("§eYellow line §7all-time average"));
+		return wrapper;
+	}
+
+	private static BoxComponent line(int y, int argb) {
+		BoxComponent line = UIComponents.box(Sizing.fill(100), Sizing.fixed(1));
+		line.fill(true);
+		line.color(Color.ofArgb(argb));
+		line.positioning(Positioning.absolute(0, y));
+		return line;
 	}
 
 	/** "0", "30s", "1m", "1m 30s". */
