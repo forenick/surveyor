@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.4 (2026-11-11)
+- Personal bests use short labels: "Shafts / h", "Shafts / session", "Lapis / shaft", "Powder / shaft",
+  "Gems / shaft", "Coins / shaft", "Coins / h".
+- The open arrow is a small dark gray icon (with a larger click area) instead of an aqua ».
+- Corpses looted shows a yellow "(soon)" where each type's coin value will go once prices exist.
+- "Corpse chance per shaft" is now "Corpse % per shaft" without the explanation line; "average" is
+  "avg" next to the chart.
+
 ## 0.3.3 (2026-11-11)
 - Stats tab layout: Personal bests moved under "Corpses looted"; the spawn chart is taller.
 - Personal bests reworked: fastest spawn, fastest session (needs 3+ timed spawns), most shafts per hour,

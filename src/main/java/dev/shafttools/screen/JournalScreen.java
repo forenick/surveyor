@@ -142,7 +142,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			case STATS -> {
 				footer.child(label("§8Counted from your own " + entries.size() + " shafts"));
 				footer.child(label("§8Hover a row for details"));
-				footer.child(label("§8» opens it"));
+				footer.child(label("§8Click an arrow to open it"));
 			}
 		}
 		root.child(footer);
@@ -412,7 +412,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(keyValue("Coins", SOON));
 		totals.child(section("Corpses looted"));
 		for (String type : corpseTypes(stats.corpsesSeen())) {
-			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0)));
+			// Coin value of the loot comes with prices.
+			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0) + " §e(soon)"));
 		}
 		totals.child(section("Personal bests"));
 		JournalEntry fastest = stats.fastest();
@@ -422,27 +423,27 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(record("Fastest session", fastestSession == null ? null : spawn(fastestSession.averageSearchMillis()) + " §7avg",
 				fastestSession == null ? null : () -> openSession(fastestSession), fastestSession == null ? null : sessionName(fastestSession)));
 		SessionSummary bestRate = stats.bestRate();
-		totals.child(record("Most shafts per hour", bestRate == null ? null : "§f" + decimal(bestRate.shaftsPerHour()),
+		totals.child(record("Shafts / h", bestRate == null ? null : "§f" + decimal(bestRate.shaftsPerHour()),
 				bestRate == null ? null : () -> openSession(bestRate), bestRate == null ? null : sessionName(bestRate)));
 		SessionSummary mostShafts = stats.mostShafts();
-		totals.child(record("Most shafts in a session", mostShafts == null ? null : "§f" + mostShafts.shafts(),
+		totals.child(record("Shafts / session", mostShafts == null ? null : "§f" + mostShafts.shafts(),
 				mostShafts == null ? null : () -> openSession(mostShafts), mostShafts == null ? null : sessionName(mostShafts)));
 		JournalStats.Best lapis = stats.mostLapis();
-		totals.child(record("Most Lapis in a shaft", lapis == null ? null : "§9" + lapis.value(),
+		totals.child(record("Lapis / shaft", lapis == null ? null : "§9" + lapis.value(),
 				lapis == null ? null : () -> openShaft(lapis.entry()), lapis == null ? null : lapis.entry().shaftId()));
 		JournalStats.Best powder = stats.mostPowder();
-		totals.child(record("Most powder in a shaft", powder == null ? null : "§b" + number(powder.value()),
+		totals.child(record("Powder / shaft", powder == null ? null : "§b" + number(powder.value()),
 				powder == null ? null : () -> openShaft(powder.entry()), powder == null ? null : powder.entry().shaftId()));
 		JournalEntry gems = stats.mostGems();
-		totals.child(record("Most gems in a shaft", gems == null ? null : "§f≈" + decimal(gems.gems().fineEquivalent()) + " Fine",
+		totals.child(record("Gems / shaft", gems == null ? null : "§f≈" + decimal(gems.gems().fineEquivalent()) + " Fine",
 				gems == null ? null : () -> openShaft(gems), gems == null ? null : gems.shaftId()));
-		totals.child(record("Most valuable shaft", SOON, null, null));
-		totals.child(record("Most coins per hour", SOON, null, null));
+		totals.child(record("Coins / shaft", SOON, null, null));
+		totals.child(record("Coins / h", SOON, null, null));
 		columns.child(scrollColumn(Sizing.fill(32), totals));
 
 		FlowLayout spawn = column();
 		spawn.child(header("Spawn time"));
-		spawn.child(keyValue("All-time average", stats.averageSearchMillis() == null ? "§8-"
+		spawn.child(keyValue("All-time avg", stats.averageSearchMillis() == null ? "§8-"
 				: "§e" + SummaryText.duration(stats.averageSearchMillis())));
 		Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
 		if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
@@ -453,8 +454,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		spawn.child(section("Avg spawn per session"));
 		spawn.child(chart(stats.oldestFirst(), stats.averageSearchMillis()));
-		spawn.child(section("Corpse chance per shaft"));
-		spawn.child(wrapped("§7How many of your shafts had at least one corpse of that type"));
+		spawn.child(section("Corpse % per shaft"));
 		for (String type : corpseTypes(stats.corpsesSeen())) {
 			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
 			FlowLayout row = barRow(corpseColor(type) + type, with / (double) stats.shafts(),
@@ -488,6 +488,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static final String SOON = "§6Soon";
+	private static final net.minecraft.resources.Identifier OPEN_ARROW =
+			net.minecraft.resources.Identifier.fromNamespaceAndPath("shafttools", "textures/gui/open_arrow.png");
 	private static final int RECENT_SESSIONS = 5;
 
 	/**
@@ -503,7 +505,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		row.child(keyLabel);
 		row.child(label(value == null ? "§8-" : value));
 		if (open != null) {
-			LabelComponent arrow = label("§b»");
+			// A 3x5 icon inside padding, so the click area is bigger than the icon.
+			FlowLayout arrow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+			arrow.padding(Insets.of(2, 2, 2, 1));
+			arrow.margins(Insets.top(-1));
+			arrow.child(UIComponents.texture(OPEN_ARROW, 0, 0, 3, 5, 3, 5).blend(true));
 			arrow.cursorStyle(CursorStyle.HAND);
 			arrow.tooltip(Component.literal("§7Open " + target));
 			arrow.mouseDown().subscribe((event, doubleClick) -> {
@@ -612,7 +618,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 		}
 		wrapper.child(dates);
-		if (average != null) wrapper.child(label("§eYellow line §7all-time average"));
+		if (average != null) wrapper.child(label("§eYellow line §7all-time avg"));
 		return wrapper;
 	}
 
