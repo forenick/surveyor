@@ -1,5 +1,7 @@
 package dev.shafttools.journal;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BooleanSupplier;
 
 import org.slf4j.Logger;
@@ -19,6 +21,8 @@ public final class LiveJournal {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftTools Journal");
 
 	private final Journal journal;
+	/** Every saved entry, in file order. Only touched on the client thread. */
+	private final List<JournalEntry> entries = new ArrayList<>();
 	private JournalFile file;
 
 	public LiveJournal(BooleanSupplier inMiningArea) {
@@ -29,7 +33,8 @@ public final class LiveJournal {
 	public void start(Minecraft client) {
 		file = new JournalFile(client.gameDirectory.toPath().resolve("shafttools").resolve("journal.jsonl"));
 		file.load().thenAccept(entries -> client.execute(() -> {
-			journal.resume(entries);
+			this.entries.addAll(0, entries);
+			journal.resume(this.entries);
 			LOGGER.info("Loaded {} journal entries from {}", entries.size(), file.path());
 		}));
 	}
@@ -51,6 +56,11 @@ public final class LiveJournal {
 		if (!wasRunning && journal.searchRunning()) LOGGER.info("Spawn timer started");
 	}
 
+	/** A copy of every saved entry, in file order. Call on the client thread. */
+	public List<JournalEntry> entries() {
+		return List.copyOf(entries);
+	}
+
 	public void newSession() {
 		journal.newSession(System.currentTimeMillis());
 	}
@@ -60,6 +70,7 @@ public final class LiveJournal {
 	}
 
 	private void onEntry(JournalEntry entry) {
+		entries.add(entry);
 		if (file != null) file.append(entry);
 		var chat = Minecraft.getInstance().gui.hud.getChat();
 		for (String line : SummaryText.lines(entry, journal.session())) {

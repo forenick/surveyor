@@ -8,12 +8,18 @@ base {
 
 repositories {
 	mavenCentral()
+	maven { url = "https://maven.wispforest.io/releases/" }
 }
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// owo bundles its own libraries (jar-in-jar), so its Maven dependencies are not needed.
+	implementation("io.wispforest:owo-lib:${project.owo_version}") { transitive = false }
+
+	// owo injects its endec interfaces into Minecraft classes, so tests that touch them need endec.
+	testRuntimeOnly "io.wispforest:endec:0.1.12"
 
 	testImplementation platform("org.junit:junit-bom:5.13.4")
 	testImplementation "org.junit.jupiter:junit-jupiter"

@@ -70,7 +70,7 @@ public final class SummaryText {
 	}
 
 	/** E.g. "45s", "12m 27s", "1h 03m". */
-	static String duration(long millis) {
+	public static String duration(long millis) {
 		long seconds = Math.max(0, millis) / 1000;
 		if (seconds < 60) return seconds + "s";
 		if (seconds < 3600) return seconds / 60 + "m " + seconds % 60 + "s";

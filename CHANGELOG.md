@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.0 (2026-11-11)
+- Journal screen, opened with `/shafttools journal` or a hotkey (unbound by default; set it under
+  Controls → ShaftTools). Built with owo-ui, which is now a required dependency (owo-lib 0.13.1+26.2).
+  - Session tab: totals (shafts, average spawn, shafts per hour, powder, Lapis looted), one row per shaft,
+    and details for the selected shaft: Mayhem buff, powder split, cold, campfires, corpse loot as item
+    icons, mined gems. `<` and `>` page through earlier sessions.
+  - Corpse loot merges every Rough, Flawed and Fine gem into one "Gemstones" slot counted in Fine
+    (80:1); hover it for the full list. Flawless and better gems keep their own slot.
+  - Sessions tab: every session, newest first; click one to open it.
+  - Stats tab: all-time totals, average and fastest spawn, average spawn per session (chart),
+    personal bests, and how often each shaft type and corpse type showed up in your shafts.
+- All text uses Minecraft's own font renderer, so resource-pack fonts apply.
+- Item icons are vanilla stand-ins for now (`item_icons.txt`); the tooltip shows the real name.
+
 ## 0.2.1 (2026-11-11)
 - Spawn timer counts Pickobulus (and other pickaxe abilities) as mining, not only block hits.
 - Spawn timer pauses: a gap of more than 40 s without mining only counts as 40 s, so breaks
