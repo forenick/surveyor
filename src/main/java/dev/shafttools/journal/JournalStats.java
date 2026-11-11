@@ -86,8 +86,13 @@ public final class JournalStats {
 			Best mostPowder,
 			Best mostLapis,
 			SessionSummary bestRate,
-			Map<String, Integer> variants,
-			Map<String, Integer> corpsesSeen) {
+			Map<String, Map<String, Integer>> types,
+			Map<String, Integer> corpsesSeen,
+			Map<String, Integer> shaftsWithCorpse) {
+		/** Shafts with a known type. */
+		public int typedShafts() {
+			return types.values().stream().flatMap(v -> v.values().stream()).mapToInt(Integer::intValue).sum();
+		}
 	}
 
 	/** Groups entries (in file order) into sessions, newest first. */
@@ -123,6 +128,14 @@ public final class JournalStats {
 		return ordered;
 	}
 
+	/** The 4-letter type before the underscore, e.g. "JASP"; null without a shaft ID. */
+	public static String type(JournalEntry entry) {
+		String id = entry.shaftId();
+		if (id == null) return null;
+		int underscore = id.lastIndexOf('_');
+		return underscore < 0 ? null : id.substring(0, underscore);
+	}
+
 	/** The variant after the underscore, e.g. "1", "2" or "C"; null without a shaft ID. */
 	public static String variant(JournalEntry entry) {
 		String id = entry.shaftId();
@@ -138,7 +151,8 @@ public final class JournalStats {
 
 		Map<String, Integer> looted = new LinkedHashMap<>();
 		Map<String, Integer> seen = new LinkedHashMap<>();
-		Map<String, Integer> variants = new LinkedHashMap<>();
+		Map<String, Map<String, Integer>> types = new LinkedHashMap<>();
+		Map<String, Integer> shaftsWithCorpse = new LinkedHashMap<>();
 		JournalEntry fastest = null;
 		Best mostPowder = null;
 		Best mostLapis = null;
@@ -149,8 +163,13 @@ public final class JournalStats {
 				seen.merge(corpse.type(), 1, Integer::sum);
 				if (corpse.looted()) looted.merge(corpse.type(), 1, Integer::sum);
 			}
+			entry.corpses().stream().map(Corpse::type).distinct()
+					.forEach(type -> shaftsWithCorpse.merge(type, 1, Integer::sum));
+			String type = type(entry);
 			String variant = variant(entry);
-			if (variant != null) variants.merge(variant, 1, Integer::sum);
+			if (type != null && variant != null) {
+				types.computeIfAbsent(type, t -> new LinkedHashMap<>()).merge(variant, 1, Integer::sum);
+			}
 			if (entry.searchMillis() != null && (fastest == null || entry.searchMillis() < fastest.searchMillis())) {
 				fastest = entry;
 			}
@@ -169,7 +188,7 @@ public final class JournalStats {
 		return new AllTime(entries.size(), sessions.size(),
 				sessions.stream().mapToLong(SessionSummary::lengthMillis).sum(), powder,
 				orderedMap(looted), averageSearch(entries), fastest, List.copyOf(oldestFirst),
-				mostPowder, mostLapis, bestRate, variants, orderedMap(seen));
+				mostPowder, mostLapis, bestRate, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse));
 	}
 
 	static Long averageSearch(List<JournalEntry> entries) {
@@ -191,6 +210,21 @@ public final class JournalStats {
 		other.sort(null);
 		known.addAll(other);
 		return known;
+	}
+
+	/** Types with the most shafts first; variants in the order 1, 2, C, then others. */
+	private static Map<String, Map<String, Integer>> byTotal(Map<String, Map<String, Integer>> types) {
+		List<Map.Entry<String, Map<String, Integer>>> list = new ArrayList<>(types.entrySet());
+		list.sort(Comparator.comparingInt((Map.Entry<String, Map<String, Integer>> e) ->
+				e.getValue().values().stream().mapToInt(Integer::intValue).sum()).reversed());
+		Map<String, Map<String, Integer>> sorted = new LinkedHashMap<>();
+		for (Map.Entry<String, Map<String, Integer>> e : list) {
+			Map<String, Integer> variants = new LinkedHashMap<>();
+			e.getValue().keySet().stream().sorted(Comparator.comparingInt(v -> "12C".indexOf(v) < 0 ? 9 : "12C".indexOf(v)))
+					.forEach(v -> variants.put(v, e.getValue().get(v)));
+			sorted.put(e.getKey(), variants);
+		}
+		return sorted;
 	}
 
 	private static Map<String, Integer> orderedMap(Map<String, Integer> counts) {

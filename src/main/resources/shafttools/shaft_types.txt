@@ -1,0 +1,20 @@
+# Shaft type codes (the 4 letters before "_" in the shaft ID) and the names the journal shows.
+# Source: Docs/research/01-shaft-mechanics.md. "seen" = confirmed in Nick's recordings;
+# the others come from the wiki/SkyHanni and are unconfirmed. Unknown codes show as the code itself.
+AMET = Amethyst      # seen
+AQUA = Aquamarine    # seen
+JADE = Jade          # seen
+JASP = Jasper        # seen
+LITT = Littlefoot    # seen (LITT_L, Littlefoot's Den)
+ONYX = Onyx          # seen
+OPAL = Opal          # seen
+PERI = Peridot       # seen
+RUBY = Ruby          # seen
+SAPP = Sapphire      # seen
+TITA = Titanium      # seen
+TOPA = Topaz         # seen
+AMBE = Amber         # unconfirmed
+CITR = Citrine       # unconfirmed
+TUNG = Tungsten      # unconfirmed
+UMBE = Umber         # unconfirmed
+FAIR = Vanguard      # unconfirmed (the Fairy shaft, FAIR_1)

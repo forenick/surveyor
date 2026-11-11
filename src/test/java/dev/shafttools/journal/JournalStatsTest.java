@@ -92,7 +92,14 @@ class JournalStatsTest {
 		assertEquals("AMET_1", stats.mostLapis().entry().shaftId());
 		// The real file still has 0.2.0's times; PERI_1 (8.9 s) is the fastest.
 		assertEquals("PERI_1", stats.fastest().shaftId());
-		assertEquals(Map.of("1", 5, "C", 2), stats.variants());
+		// AQUA_C (real) and JADE_C (added): two types with a crystal, listed by shaft count.
+		assertEquals(Map.of("1", 1, "C", 1), stats.types().get("JADE"));
+		assertEquals(Map.of("C", 1), stats.types().get("AQUA"));
+		assertEquals(7, stats.typedShafts());
+		assertEquals(List.of("JADE", "PERI", "AMET", "TITA", "AQUA", "ONYX"), List.copyOf(stats.types().keySet()));
+		// Lapis in AMET_1, TITA_1, AQUA_C, ONYX_1 and JADE_C; Umber in PERI_1, JADE_1, TITA_1, ONYX_1.
+		assertEquals(5, stats.shaftsWithCorpse().get("Lapis"));
+		assertEquals(4, stats.shaftsWithCorpse().get("Umber"));
 		assertEquals(9, stats.corpsesSeen().get("Lapis"));
 		assertEquals(List.of("Lapis", "Umber", "Tungsten", "Vanguard"), List.copyOf(stats.corpsesSeen().keySet()));
 		// The one-minute session is too short for a rate, so the real session is the best.

@@ -4,6 +4,14 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.3.1 (2026-11-11)
+- Stats tab, "Shaft types seen": one row per shaft type (Jasper, Peridot, Vanguard, ...) with its share of
+  your shafts, and a smaller line underneath with how many were type 1, type 2 and crystal. Names come
+  from `shaft_types.txt`; codes not listed there show as the code.
+- Average spawn chart has a time axis (0, 1m, 2m, ...) with grid lines, and bars sized to fit the screen.
+- "Corpses seen, per shaft" is now "Shafts with this corpse": the share of your shafts that had at least
+  one corpse of that type. Hover a row for the count and the average per shaft. Moved under Personal bests.
+
 ## 0.3.0 (2026-11-11)
 - Journal screen, opened with `/shafttools journal` or a hotkey (unbound by default; set it under
   Controls → ShaftTools). Built with owo-ui, which is now a required dependency (owo-lib 0.13.1+26.2).

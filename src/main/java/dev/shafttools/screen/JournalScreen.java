@@ -78,6 +78,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private final List<JournalEntry> entries;
 	private final List<SessionSummary> sessions;
 	private final ItemIcons icons = new ItemIcons();
+	private final ShaftNames shaftNames = ShaftNames.load();
 	private Tab tab = Tab.SESSION;
 	private int sessionIndex;
 	private int selected;
@@ -382,7 +383,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		for (String type : corpseTypes(stats.corpsesSeen())) {
 			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0)));
 		}
-		columns.child(scrollColumn(Sizing.fill(27), totals));
+		columns.child(scrollColumn(Sizing.fill(26), totals));
 
 		FlowLayout spawn = column();
 		spawn.child(header("Spawn time"));
@@ -400,46 +401,111 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		SessionSummary best = stats.bestRate();
 		spawn.child(keyValue("Best session", best == null ? "§8-"
 				: "§f" + decimal(best.shaftsPerHour()) + " per hour §8" + day(best.start())));
+		spawn.child(section("Shafts with this corpse"));
+		for (String type : corpseTypes(stats.corpsesSeen())) {
+			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
+			FlowLayout row = barRow(corpseColor(type) + type, with / (double) stats.shafts(),
+					Math.round(100.0 * with / stats.shafts()) + "%", corpseArgb(type));
+			row.tooltip(List.of(Component.literal("§f" + type + " corpses"),
+					Component.literal("§7In " + with + " of " + stats.shafts() + " shafts"),
+					Component.literal("§7" + String.format(Locale.ROOT, "%.2f", stats.corpsesSeen().get(type) / (double) stats.shafts())
+							+ " per shaft on average")));
+			spawn.child(row);
+		}
 		columns.child(scrollColumn(Sizing.expand(), spawn));
 
 		FlowLayout odds = column();
 		odds.child(header("Shaft types seen"));
-		int withId = stats.variants().values().stream().mapToInt(Integer::intValue).sum();
-		stats.variants().entrySet().stream()
-				.sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-				.forEach(e -> odds.child(barRow(variantName(e.getKey()), e.getValue() / (double) withId,
-						Math.round(100.0 * e.getValue() / withId) + "%", "C".equals(e.getKey()) ? 0xFFFF55FF : 0xFF55FFFF)));
-		odds.child(section("Corpses seen, per shaft"));
-		double most = stats.corpsesSeen().values().stream().mapToInt(Integer::intValue).max().orElse(1) / (double) stats.shafts();
-		for (String type : corpseTypes(stats.corpsesSeen())) {
-			double perShaft = stats.corpsesSeen().get(type) / (double) stats.shafts();
-			odds.child(barRow(corpseColor(type) + type, perShaft / most,
-					String.format(Locale.ROOT, "%.2f", perShaft), corpseArgb(type)));
+		int typed = stats.typedShafts();
+		for (Map.Entry<String, Map<String, Integer>> type : stats.types().entrySet()) {
+			int total = type.getValue().values().stream().mapToInt(Integer::intValue).sum();
+			odds.child(barRow("§f" + shaftNames.name(type.getKey()), total / (double) typed,
+					Math.round(100.0 * total / typed) + "%", 0xFF55FFFF));
+			List<String> parts = new ArrayList<>();
+			type.getValue().forEach((variant, count) -> {
+				if (!variant.equals("L")) parts.add(count + " " + variantName(variant));
+			});
+			if (!parts.isEmpty()) {
+				LabelComponent breakdown = wrapped("§8" + String.join(" · ", parts));
+				breakdown.margins(Insets.of(0, 3, 4, 0));
+				odds.child(breakdown);
+			}
 		}
 		columns.child(scrollColumn(Sizing.fill(30), odds));
 		content.child(columns);
 	}
 
+	/** Spawn-time axis steps; the smallest that gives at most four lines is used. */
+	private static final long[] AXIS_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
+
 	private FlowLayout chart(List<SessionSummary> oldestFirst) {
 		List<SessionSummary> timed = oldestFirst.stream().filter(s -> s.averageSearchMillis() != null).toList();
-		if (timed.size() > 40) timed = timed.subList(timed.size() - 40, timed.size());
-		int chartHeight = Math.clamp(height / 7, 28, 48);
+		int chartHeight = Math.clamp(height / 5, 44, 72);
 		FlowLayout chart = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(chartHeight));
-		chart.verticalAlignment(VerticalAlignment.BOTTOM);
-		chart.gap(2);
-		chart.surface(Surface.outline(0x14FFFFFF));
-		chart.padding(Insets.of(2));
-		long slowest = timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1);
+		chart.gap(3);
+		if (timed.isEmpty()) {
+			chart.child(label("§8No timed spawns yet"));
+			return chart;
+		}
+		// Room for the newest sessions in the middle column; older ones scroll off the left.
+		int plotWidth = Math.max(60, width * 38 / 100 - 50);
+		int barWidth = Math.clamp((plotWidth - 4) / timed.size() - 2, 3, 10);
+		int maxBars = Math.max(1, (plotWidth - 4) / (barWidth + 2));
+		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
+
+		long slowestSeconds = Math.max(1, timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) / 1000);
+		long step = AXIS_STEPS[AXIS_STEPS.length - 1];
+		for (long candidate : AXIS_STEPS) {
+			if ((slowestSeconds + candidate - 1) / candidate <= 4) {
+				step = candidate;
+				break;
+			}
+		}
+		long topSeconds = Math.max(step, (slowestSeconds + step - 1) / step * step);
+		int top = 4;
+		int base = chartHeight - 5;
+		int plotHeight = base - top;
+
+		StackLayout axis = UIContainers.stack(Sizing.fixed(30), Sizing.fixed(chartHeight));
+		StackLayout plot = UIContainers.stack(Sizing.expand(), Sizing.fixed(chartHeight));
+		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
+			int y = base - (int) (plotHeight * seconds / topSeconds);
+			LabelComponent tick = label("§8" + axisLabel(seconds));
+			tick.horizontalSizing(Sizing.fixed(30));
+			tick.horizontalTextAlignment(HorizontalAlignment.RIGHT);
+			tick.positioning(Positioning.absolute(0, y - 4));
+			axis.child(tick);
+			BoxComponent line = UIComponents.box(Sizing.fill(100), Sizing.fixed(1));
+			line.fill(true);
+			line.color(Color.ofArgb(seconds == 0 ? 0x40FFFFFF : 0x18FFFFFF));
+			line.positioning(Positioning.absolute(0, y));
+			plot.child(line);
+		}
+		FlowLayout bars = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(base));
+		bars.verticalAlignment(VerticalAlignment.BOTTOM);
+		bars.gap(2);
+		bars.padding(Insets.left(3));
+		bars.positioning(Positioning.absolute(0, 0));
 		for (SessionSummary session : timed) {
-			BoxComponent bar = UIComponents.box(Sizing.fixed(6), Sizing.fixed(Math.max(1, (int) ((chartHeight - 6) * session.averageSearchMillis() / slowest))));
+			int barHeight = Math.max(1, (int) (plotHeight * session.averageSearchMillis() / 1000.0 / topSeconds));
+			BoxComponent bar = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
 			bar.fill(true);
 			bar.color(GREEN);
 			bar.tooltip(List.of(Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
 					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.shafts() + " shafts")));
-			chart.child(bar);
+			bars.child(bar);
 		}
-		if (timed.isEmpty()) chart.child(label("§8No timed spawns yet"));
+		plot.child(bars);
+		chart.child(axis);
+		chart.child(plot);
 		return chart;
+	}
+
+	/** "0", "30s", "1m", "1m 30s". */
+	private static String axisLabel(long seconds) {
+		if (seconds == 0) return "0";
+		if (seconds < 60) return seconds + "s";
+		return seconds % 60 == 0 ? seconds / 60 + "m" : seconds / 60 + "m " + seconds % 60 + "s";
 	}
 
 	private FlowLayout barRow(String name, double fraction, String value, int argb) {
@@ -447,7 +513,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		row.verticalAlignment(VerticalAlignment.CENTER);
 		row.gap(4);
 		LabelComponent nameLabel = label("§f" + name);
-		nameLabel.horizontalSizing(Sizing.fixed(52));
+		nameLabel.horizontalSizing(Sizing.fixed(62));
 		row.child(nameLabel);
 		FlowLayout track = UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(5));
 		track.surface(Surface.flat(0x14FFFFFF));
@@ -656,9 +722,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private static String variantName(String variant) {
 		return switch (variant) {
-			case "1" -> "Type 1";
-			case "2" -> "Type 2";
-			case "C" -> "Crystal";
+			case "1" -> "type 1";
+			case "2" -> "type 2";
+			case "C" -> "crystal";
 			default -> "_" + variant;
 		};
 	}
