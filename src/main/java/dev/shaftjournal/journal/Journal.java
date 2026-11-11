@@ -102,9 +102,11 @@ public final class Journal {
 	/**
 	 * What the HUD's spawn timer shows: while searching, the time so far (a break counts for at most
 	 * {@link #PAUSE_MILLIS}, as when the shaft is found); after "WOW!", the timed spawn until that
-	 * shaft is left; otherwise null.
+	 * shaft is left; otherwise null. Also null once the session has run out, because the next
+	 * activity starts a new session and drops that timer.
 	 */
 	public Long spawnTimerMillis(long now) {
+		if (activeSession(now) == null) return null;
 		if (searching) return searchMillis + Math.max(0, Math.min(now - lastMiningAt, PAUSE_MILLIS));
 		return timedSearch;
 	}

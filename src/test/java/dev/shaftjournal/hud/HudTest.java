@@ -16,6 +16,7 @@ import com.google.gson.JsonParseException;
 import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.hud.HudData.SessionTotals;
+import dev.shaftjournal.hud.HudLayout.Anchor;
 import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.hud.HudLayout.Visibility;
 import dev.shaftjournal.hud.HudValue.Kind;
@@ -81,13 +82,13 @@ class HudTest {
 	@Test
 	void repairsAHandEditedFile() {
 		HudLayout read = HudLayout.fromJson("""
-				{"boxes": [{"id": "mine", "labelColor": "z", "scale": 9, "x": -1,
+				{"boxes": [{"id": "mine", "labelColor": "z", "scale": 9, "anchorX": "SIDEWAYS",
 				  "lines": [{"value": "nope"}, {"value": "spawn_timer", "format": -5}]}, null]}""");
 		Box box = read.boxes.getFirst();
 		assertEquals(1, read.boxes.size());
 		assertEquals("7", box.labelColor);
 		assertEquals(2, box.scale);
-		assertEquals(0, box.x);
+		assertEquals(Anchor.START, box.anchorX, "an unknown anchor becomes the default");
 		assertEquals(Visibility.MINES, box.visibility);
 		assertEquals(1, box.lines.size());
 		assertEquals("Spawn: ", box.lines.getFirst().prefix);
@@ -95,6 +96,47 @@ class HudTest {
 		assertTrue(HudLayout.fromJson("{}").boxes.isEmpty(), "deleting every box is allowed");
 		assertThrows(JsonParseException.class, () -> HudLayout.fromJson("[]"));
 		assertThrows(JsonParseException.class, () -> HudLayout.fromJson("{\"boxes\": null}"));
+	}
+
+	@Test
+	void convertsVersion1Positions() {
+		HudLayout read = HudLayout.fromJson("""
+				{"version": 1, "boxes": [{"id": "a", "x": 1.0, "y": 0.0}, {"id": "b", "x": 0.5, "y": 0.58},
+				  {"id": "c", "x": 0.0, "y": 1.0}, {"id": "d", "x": 0.25, "y": 0.9}]}""");
+		List<Box> boxes = read.boxes;
+		assertEquals(List.of(Anchor.END, Anchor.START), List.of(boxes.get(0).anchorX, boxes.get(0).anchorY));
+		assertEquals(List.of(0, 0), List.of(boxes.get(0).offsetX, boxes.get(0).offsetY), "edges convert exactly");
+		assertEquals(List.of(Anchor.MIDDLE, Anchor.MIDDLE), List.of(boxes.get(1).anchorX, boxes.get(1).anchorY));
+		assertEquals(0, boxes.get(1).offsetX);
+		assertEquals(21, boxes.get(1).offsetY, "8% of the 262 usable pixels below the middle");
+		assertEquals(List.of(Anchor.START, Anchor.END), List.of(boxes.get(2).anchorX, boxes.get(2).anchorY));
+		assertEquals(List.of(118, 26), List.of(boxes.get(3).offsetX, boxes.get(3).offsetY));
+		assertEquals(HudLayout.VERSION, read.version);
+		assertFalse(read.toJson().contains("\"x\""), "the old fields aren't written back");
+	}
+
+	@Test
+	void anchorsPlaceBoxesFromTheirEdge() {
+		// A 60 px box on a 480 px screen.
+		assertEquals(4, Anchor.START.start(0, 60, 480));
+		assertEquals(416, Anchor.END.start(0, 60, 480), "right edge on the margin");
+		assertEquals(210, Anchor.MIDDLE.start(0, 60, 480));
+		assertEquals(4, Anchor.START.start(-50, 60, 480), "kept inside the margin");
+		for (Anchor anchor : Anchor.values()) {
+			assertEquals(100, anchor.start(anchor.offset(100, 60, 480), 60, 480), anchor + " round trip");
+		}
+		// The anchored edge stays put when the text gets wider.
+		assertEquals(416 + 60, Anchor.END.start(0, 60, 480) + 60);
+		assertEquals(386 + 90, Anchor.END.start(0, 90, 480) + 90);
+		assertEquals(Anchor.START, Anchor.forPosition(10, 60, 480));
+		assertEquals(Anchor.MIDDLE, Anchor.forPosition(200, 60, 480));
+		assertEquals(Anchor.END, Anchor.forPosition(400, 60, 480));
+	}
+
+	@Test
+	void repairsMissingAndDuplicateIds() {
+		HudLayout read = HudLayout.fromJson("{\"boxes\": [{\"id\": \"box1\"}, {}, {\"id\": \"box1\"}, {\"id\": \" \"}]}");
+		assertEquals(List.of("box1", "box2", "box3", "box4"), read.boxes.stream().map(b -> b.id).toList());
 	}
 
 	@Test

@@ -71,6 +71,7 @@ public class ShaftJournal implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			recorder.stop();
 			JOURNAL.close();
+			HUD.close();
 		});
 		TRACKER.addListener(JOURNAL::onEvent);
 		// Only watches the player's own block hits; PASS leaves the hit itself untouched.

@@ -75,6 +75,15 @@ class JournalTest {
 	}
 
 	@Test
+	void spawnTimerEndsWithTheSession() {
+		at(0).hit(true);
+		at(60_000).hit(true);
+		assertEquals(80_000, journal.spawnTimerMillis(60_000 + Journal.SESSION_GAP_MILLIS), "40 s of mining plus a 40 s break");
+		assertNull(journal.spawnTimerMillis(60_001 + Journal.SESSION_GAP_MILLIS),
+				"the next activity starts a new session and drops this timer, so it isn't shown");
+	}
+
+	@Test
 	void aPortalLeftUnenteredIsNotTimedForTheNextShaft() {
 		at(0).hit(true);
 		at(20_000).chat(WOW);

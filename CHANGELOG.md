@@ -4,6 +4,32 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.6.1 (2026-11-11)
+Code review fixes for the HUD and the editor.
+- Boxes are now placed from an edge or the middle of the screen (the "anchor"), plus a distance in
+  pixels. The anchored edge stays put when the window, the GUI scale or the box's text changes, so
+  boxes lined up on the left, right or middle stay lined up in game, and stacked boxes keep their
+  gap on any screen size.
+  - Snapping to the screen picks the anchor; lining up with a box anchored on the same edge takes
+    its anchor; anywhere else a box is anchored to the third of the screen it's in.
+  - `hud.json` moves to version 2. Old files are converted on load: boxes at an edge or the middle
+    stay exactly where they were, others can move a few pixels once.
+- Snapping skips spots a box can't reach without crossing the margin, so the guide never points
+  somewhere the box isn't.
+- The gap number is drawn beside both boxes instead of over their text.
+- Scrolling on a box changes its size once per whole notch, so touchpads don't jump straight to
+  0.5× or 2×.
+- The toolbar stays put while Reset asks "Really reset?". When no spot is free it picks the one
+  that covers the least, and never a whole box if it can help it.
+- The spawn timer clears once the session has run out (15 minutes without activity) instead of
+  showing a time that the next block hit will throw away.
+- Saving the HUD can no longer replace your layout with the defaults while it is still loading,
+  and saves happen one at a time in order.
+- A `hud.json` that can't be parsed is kept as `hud.json.<date-time>.bad`, so a second broken file
+  doesn't replace the first backup. One that only can't be read for a moment stays where it is; the
+  first save copies it first.
+- Missing or duplicate box ids in `hud.json` are repaired on load.
+
 ## 0.6.0 (2026-11-11)
 Snapping in Edit HUD (mockup `Docs/mockups/hud-snapping.html`, approved by Nick).
 - While you drag, a box snaps when an edge or its middle comes within 4 pixels of:

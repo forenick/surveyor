@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import dev.shaftjournal.hud.HudLayout.Align;
+import dev.shaftjournal.hud.HudLayout.Anchor;
 import dev.shaftjournal.hud.HudLayout.Background;
 import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.hud.HudLayout.Line;
@@ -83,6 +84,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private double grabY;
 	/** What the dragged box snapped to, drawn while dragging. */
 	private List<HudSnap.Guide> guides = List.of();
+	/** Scrolling not yet turned into a size step: touchpads send many small amounts per notch. */
+	private double scrollLeft;
+	/** The layout the selection belongs to; when the HUD swaps it (loaded late, Reset), the selection goes. */
+	private HudLayout shownLayout;
 
 	/** @param parent the screen to go back to, or null */
 	public EditHudScreen(Screen parent, LiveHud hud) {
@@ -123,6 +128,15 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+		if (hud.layout() != shownLayout) {
+			if (shownLayout != null) {
+				selected = null;
+				dragging = null;
+				guides = List.of();
+				rebuildPanel();
+			}
+			shownLayout = hud.layout();
+		}
 		drawn.clear();
 		for (Box box : hud.layout().boxes) {
 			List<String> lines = lines(box);
@@ -140,9 +154,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		for (HudSnap.Guide guide : guides) {
 			graphics.fill(guide.x(), guide.y(), guide.x() + guide.width(), guide.y() + guide.height(), GUIDE);
-			if (guide.label() != null) {
-				graphics.text(font, guide.label(), guide.x() + guide.width() + 2, guide.y() + guide.height() / 2 - 4, GUIDE, true);
-			}
+			if (guide.label() != null) graphics.text(font, guide.label(), guide.labelX(), guide.labelY(), GUIDE, true);
 		}
 		if (selected == null) {
 			// Two lines, so it fits at 1080p's auto GUI scale (480 wide) and smaller.
@@ -170,6 +182,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			HudRenderer.Bounds bounds = drawn.get(box);
 			if (bounds != null && bounds.contains(click.x(), click.y())) hit = box;
 		}
+		if (hit != selected) scrollLeft = 0;
 		selected = hit;
 		if (hit != null) {
 			HudRenderer.Bounds bounds = drawn.get(hit);
@@ -191,25 +204,29 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		if (bounds == null) return true;
 		int x = (int) Math.round(drag.x() - grabX);
 		int y = (int) Math.round(drag.y() - grabY);
-		Float fractionX = null;
-		Float fractionY = null;
+		Anchor anchorX = null;
+		Anchor anchorY = null;
 		guides = List.of();
 		if (!minecraft.hasControlDown()) {
 			List<HudSnap.Rect> others = new ArrayList<>();
 			drawn.forEach((box, b) -> {
-				if (box != dragging) others.add(new HudSnap.Rect(b.x(), b.y(), b.width(), b.height()));
+				if (box != dragging) others.add(new HudSnap.Rect(b.x(), b.y(), b.width(), b.height(), box.anchorX, box.anchorY));
 			});
-			HudSnap.Result snap = HudSnap.snap(new HudSnap.Rect(x, y, bounds.width(), bounds.height()), others, width,
-					height, HudRenderer.MARGIN);
+			HudSnap.Result snap = HudSnap.snap(new HudSnap.Rect(x, y, bounds.width(), bounds.height(), dragging.anchorX,
+					dragging.anchorY), others, width, height, HudLayout.MARGIN);
 			x = (int) Math.round(snap.x());
 			y = (int) Math.round(snap.y());
-			// A screen snap is saved as the edge or middle itself, so it holds at any window size.
-			fractionX = snap.fractionX();
-			fractionY = snap.fractionY();
+			anchorX = snap.anchorX();
+			anchorY = snap.anchorY();
 			guides = snap.guides();
 		}
-		dragging.x = fractionX != null ? fractionX : HudRenderer.fractionX(x, bounds.width(), width);
-		dragging.y = fractionY != null ? fractionY : HudRenderer.fractionY(y, bounds.height(), height);
+		// Without a snap that says otherwise, a box is anchored to the third of the screen it's in.
+		x = Anchor.clamp(x, bounds.width(), width);
+		y = Anchor.clamp(y, bounds.height(), height);
+		dragging.anchorX = anchorX != null ? anchorX : Anchor.forPosition(x, bounds.width(), width);
+		dragging.anchorY = anchorY != null ? anchorY : Anchor.forPosition(y, bounds.height(), height);
+		dragging.offsetX = dragging.anchorX.offset(x, bounds.width(), width);
+		dragging.offsetY = dragging.anchorY.offset(y, bounds.height(), height);
 		return true;
 	}
 
@@ -219,8 +236,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		if (vertical == 0 || bounds == null || overPanel(mouseX, mouseY) || !bounds.contains(mouseX, mouseY)) {
 			return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
 		}
+		// One step per whole notch: a touchpad's many small amounts add up instead of each being a step.
+		if (Math.signum(vertical) != Math.signum(scrollLeft)) scrollLeft = 0;
+		scrollLeft += vertical;
+		// The tiny nudge stops ten 0.1s (0.9999999 in floating point) from falling short of a notch.
+		int steps = (int) (scrollLeft + Math.copySign(1e-6, scrollLeft));
+		if (steps == 0) return true;
+		scrollLeft -= steps;
+		if (Math.abs(scrollLeft) < 1e-6) scrollLeft = 0;
 		// Rounded to the slider's one decimal, so scrolling and the slider land on the same sizes.
-		float scale = Math.round((selected.scale + Math.signum((float) vertical) * SCALE_STEP) * 10) / 10f;
+		float scale = Math.round((selected.scale + steps * SCALE_STEP) * 10) / 10f;
 		selected.scale = Math.max(HudLayout.MIN_SCALE, Math.min(HudLayout.MAX_SCALE, scale));
 		if (scaleSlider != null) scaleSlider.setFromDiscreteValue(selected.scale);
 		return true;
@@ -235,9 +260,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			int dy = key.isUp() ? -step : key.isDown() ? step : 0;
 			if (dx != 0 || dy != 0) {
 				// Measured now, not taken from the last frame, so key repeats faster than frames all count.
+				// The anchor stays: nudging only moves the box.
 				HudRenderer.Bounds bounds = HudRenderer.bounds(font, selected, lines(selected), width, height);
-				selected.x = HudRenderer.fractionX(bounds.x() + dx, bounds.width(), width);
-				selected.y = HudRenderer.fractionY(bounds.y() + dy, bounds.height(), height);
+				int x = Anchor.clamp(bounds.x() + dx, bounds.width(), width);
+				int y = Anchor.clamp(bounds.y() + dy, bounds.height(), height);
+				selected.offsetX = selected.anchorX.offset(x, bounds.width(), width);
+				selected.offsetY = selected.anchorY.offset(y, bounds.height(), height);
 				return true;
 			}
 		}
@@ -292,21 +320,25 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	/**
 	 * Moves the toolbar off any box (so every box stays clickable) and off the side panel: the first
-	 * free spot in {@link #TOOLBAR_SPOTS}, or the top middle when none is free. Not while dragging,
-	 * so it doesn't jump around under the mouse.
+	 * free spot in {@link #TOOLBAR_SPOTS}. When none is free, the spot that covers the least, never
+	 * a whole box if it can help it. Not while dragging, so it doesn't jump around under the mouse,
+	 * and not while Reset waits for its second click, so the button stays under the mouse.
 	 */
 	private void placeToolbar() {
-		if (dragging != null || toolbar.width() == 0) return;
-		int spot = 0;
+		if (dragging != null || resetArmed || toolbar.width() == 0) return;
+		int best = 0;
+		long bestCost = Long.MAX_VALUE;
 		for (int i = 0; i < TOOLBAR_SPOTS.length; i++) {
 			int x = PADDING + Math.round(TOOLBAR_SPOTS[i][0] / 100f * (width - 2 * PADDING - toolbar.width()));
 			int y = PADDING + Math.round(TOOLBAR_SPOTS[i][1] / 100f * (height - 2 * PADDING - toolbar.height()));
-			if (isFree(x, y, toolbar.width(), toolbar.height())) {
-				spot = i;
-				break;
+			long cost = coverCost(new HudRenderer.Bounds(x, y, toolbar.width(), toolbar.height()));
+			if (cost < bestCost) {
+				best = i;
+				bestCost = cost;
 			}
+			if (cost == 0) break;
 		}
-		moveToolbar(spot);
+		moveToolbar(best);
 	}
 
 	private void moveToolbar(int spot) {
@@ -315,16 +347,22 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		toolbar.positioning(Positioning.relative(TOOLBAR_SPOTS[spot][0], TOOLBAR_SPOTS[spot][1]));
 	}
 
-	/** True when this area overlaps no box (outline included) and not the side panel. */
-	private boolean isFree(int x, int y, int w, int h) {
+	/**
+	 * How bad it is to put the toolbar here: 0 when it covers nothing. Covering the side panel is
+	 * worst, then hiding a whole box (it couldn't be clicked at all), then the pixels of boxes covered.
+	 */
+	private long coverCost(HudRenderer.Bounds area) {
+		long cost = 0;
 		for (HudRenderer.Bounds b : drawn.values()) {
-			if (overlap(x, y, w, h, b.x() - 1, b.y() - 1, b.width() + 2, b.height() + 2)) return false;
+			HudRenderer.Bounds outlined = b.grown(1);
+			long covered = area.overlapArea(outlined);
+			cost += covered;
+			if (covered == (long) outlined.width() * outlined.height()) cost += 1_000_000;
 		}
-		return panel == null || !overlap(x, y, w, h, panel.x(), panel.y(), panel.width(), panel.height());
-	}
-
-	private static boolean overlap(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
-		return x1 < x2 + w2 && x2 < x1 + w1 && y1 < y2 + h2 && y2 < y1 + h1;
+		if (panel != null && area.overlapArea(new HudRenderer.Bounds(panel.x(), panel.y(), panel.width(), panel.height())) > 0) {
+			cost += 100_000_000;
+		}
+		return cost;
 	}
 
 	private boolean overPanel(double x, double y) {

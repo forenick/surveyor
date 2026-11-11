@@ -5,9 +5,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +32,6 @@ import dev.shaftjournal.util.DataFolder;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.util.Util;
 
 /**
  * The in-game HUD: keeps the layout ({@code .minecraft/shaftjournal/hud.json}), refreshes the
@@ -36,6 +41,8 @@ public final class LiveHud {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 	/** Values refresh every this many ticks: often enough for a seconds timer. */
 	private static final int REFRESH_TICKS = 4;
+	private static final DateTimeFormatter BACKUP_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+	private static final String DEFAULT_JSON = HudLayout.defaults().toJson();
 
 	private final LiveTracker tracker;
 	private final LiveJournal journal;
@@ -48,8 +55,19 @@ public final class LiveHud {
 	private List<Prepared> prepared;
 	private int preparedWidth;
 	private int preparedHeight;
-	/** Set once the layout was saved, so a late-loading file doesn't replace newer changes. */
-	private boolean saved;
+	/**
+	 * Reads and writes {@code hud.json} one at a time, in order: the read always comes before the
+	 * first save, and an older save can't land after a newer one.
+	 */
+	private final ExecutorService io = Executors.newSingleThreadExecutor(task -> {
+		Thread thread = new Thread(task, "ShaftJournal HUD");
+		thread.setDaemon(true);
+		return thread;
+	});
+	/** The file has been read (or found missing or unreadable). Client thread. */
+	private boolean loaded;
+	/** The file exists but couldn't be read, so the first save keeps a copy of it first. I/O thread only. */
+	private boolean backupBeforeSave;
 	private boolean inMines;
 	private boolean inShaft;
 	private Path file;
@@ -66,54 +84,95 @@ public final class LiveHud {
 	/** Reads the saved layout off the render thread; the defaults show until it's loaded. */
 	public void start(Minecraft client) {
 		file = DataFolder.in(client.gameDirectory.toPath()).resolve("hud.json");
-		CompletableFuture.supplyAsync(this::read, Util.ioPool()).thenAccept(read -> {
-			if (read == null) return;
-			client.execute(() -> {
-				// Too late: the editor already works on (or saved) the layout in memory.
-				if (saved || client.gui.screen() instanceof EditHudScreen) {
-					LOGGER.warn("Loaded {} after the HUD editor was opened; keeping the editor's layout", file);
-					return;
-				}
-				layout = read;
-				prepared = null;
-			});
-		});
+		CompletableFuture.supplyAsync(this::read, io).thenAccept(read -> client.execute(() -> loaded(read)));
 	}
 
+	private void loaded(HudLayout read) {
+		loaded = true;
+		if (read == null) return;
+		// Changed in the editor before the file came in: those changes win (and were saved after this read).
+		if (!unchanged()) {
+			LOGGER.warn("Loaded {} after the HUD was changed in the editor; keeping the changes", file);
+			return;
+		}
+		// The editor notices the new layout and drops its selection.
+		layout = read;
+		prepared = null;
+	}
+
+	/** True while the layout is still the defaults: nothing to keep or save. */
+	private boolean unchanged() {
+		return layout.toJson().equals(DEFAULT_JSON);
+	}
+
+	/** I/O thread. */
 	private HudLayout read() {
 		if (!Files.exists(file)) return null;
+		String json;
 		try {
-			return HudLayout.fromJson(Files.readString(file, StandardCharsets.UTF_8));
-		} catch (IOException | JsonParseException e) {
+			json = Files.readString(file, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			// It may be fine and only locked for a moment, so it stays; the first save copies it first.
+			backupBeforeSave = true;
+			LOGGER.warn("Could not read {}, using the default HUD", file, e);
+			return null;
+		}
+		try {
+			return HudLayout.fromJson(json);
+		} catch (JsonParseException e) {
 			// Keep the broken file, or the next save would replace a hand edit with the defaults.
-			Path backup = file.resolveSibling("hud.json.bad");
 			try {
-				Files.move(file, backup, StandardCopyOption.REPLACE_EXISTING);
+				Path backup = Files.move(file, backupPath());
 				LOGGER.warn("Could not read {}, moved it to {} and using the default HUD", file, backup, e);
 			} catch (IOException moveFailed) {
-				LOGGER.warn("Could not read {} or move it to {}, using the default HUD", file, backup, e);
+				backupBeforeSave = true;
+				LOGGER.warn("Could not read {} or move it away, using the default HUD", file, e);
 			}
 			return null;
 		}
 	}
 
+	/** A new name for each backup, so a second broken file doesn't replace the first one's backup. */
+	private Path backupPath() {
+		return file.resolveSibling("hud.json." + LocalDateTime.now().format(BACKUP_TIME) + ".bad");
+	}
+
 	/** Writes the layout off the render thread. Call on the client thread after changing it. */
 	public void save() {
-		saved = true;
 		prepared = null;
-		if (file == null) return;
+		// The file is still being read and nothing changed: writing the defaults now would replace it.
+		if (file == null || (!loaded && unchanged())) return;
 		String json = layout.toJson();
-		Path target = file;
-		Util.ioPool().execute(() -> {
+		Runnable write = () -> {
 			try {
-				Files.createDirectories(target.getParent());
-				Path temp = target.resolveSibling("hud.json.tmp");
+				Files.createDirectories(file.getParent());
+				if (backupBeforeSave && Files.exists(file)) {
+					Files.copy(file, backupPath());
+					backupBeforeSave = false;
+				}
+				Path temp = file.resolveSibling("hud.json.tmp");
 				Files.writeString(temp, json, StandardCharsets.UTF_8);
-				Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+				Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
 			} catch (IOException e) {
-				LOGGER.error("Could not save the HUD to {}", target, e);
+				LOGGER.error("Could not save the HUD to {}", file, e);
 			}
-		});
+		};
+		try {
+			io.execute(write);
+		} catch (RejectedExecutionException e) {
+			// The game is closing and the I/O thread has stopped (the editor was still open): write it here.
+			write.run();
+		}
+	}
+
+	/** Lets queued saves finish. Call when the game closes. */
+	public void close() {
+		io.shutdown();
+		try {
+			if (!io.awaitTermination(5, TimeUnit.SECONDS)) LOGGER.warn("HUD save did not finish in time");
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 	/** The layout the editor changes in place. Client thread only. */

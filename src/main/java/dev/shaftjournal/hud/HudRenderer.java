@@ -11,8 +11,6 @@ import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 public final class HudRenderer {
 	/** Space between the text and the box edge, before scaling. */
 	static final int PADDING = 3;
-	/** Space between a box and the screen edge; also the gap between snapped boxes. Nick's choice (2026-11-11). */
-	static final int MARGIN = 4;
 	private static final int LINE_GAP = 1;
 	private static final int DARK = 0x80000000;
 
@@ -20,6 +18,18 @@ public final class HudRenderer {
 	public record Bounds(int x, int y, int width, int height) {
 		public boolean contains(double px, double py) {
 			return px >= x && px < x + width && py >= y && py < y + height;
+		}
+
+		/** How many pixels this and the other area share; 0 when they don't overlap. */
+		public long overlapArea(Bounds o) {
+			long w = Math.min(x + width, o.x + o.width) - Math.max(x, o.x);
+			long h = Math.min(y + height, o.y + o.height) - Math.max(y, o.y);
+			return w <= 0 || h <= 0 ? 0 : w * h;
+		}
+
+		/** This area grown by {@code by} pixels on every side. */
+		public Bounds grown(int by) {
+			return new Bounds(x - by, y - by, width + 2 * by, height + 2 * by);
 		}
 	}
 
@@ -29,19 +39,8 @@ public final class HudRenderer {
 	public static Bounds bounds(Font font, Box box, List<String> lines, int screenWidth, int screenHeight) {
 		int width = Math.round(innerWidth(font, lines) * box.scale);
 		int height = Math.round(innerHeight(font, lines) * box.scale);
-		int freeX = Math.max(0, screenWidth - 2 * MARGIN - width);
-		int freeY = Math.max(0, screenHeight - 2 * MARGIN - height);
-		return new Bounds(MARGIN + Math.round(box.x * freeX), MARGIN + Math.round(box.y * freeY), width, height);
-	}
-
-	/** The position fraction that puts the box's top-left corner at this point. */
-	public static float fractionX(int x, int width, int screenWidth) {
-		int free = screenWidth - 2 * MARGIN - width;
-		return free <= 0 ? 0 : Math.max(0, Math.min(1, (x - MARGIN) / (float) free));
-	}
-
-	public static float fractionY(int y, int height, int screenHeight) {
-		return fractionX(y, height, screenHeight);
+		return new Bounds(box.anchorX.start(box.offsetX, width, screenWidth),
+				box.anchorY.start(box.offsetY, height, screenHeight), width, height);
 	}
 
 	public static void draw(GuiGraphicsExtractor graphics, Font font, Box box, List<String> lines, Bounds bounds) {

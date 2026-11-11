@@ -47,8 +47,17 @@ public final class HudData {
 	 *
 	 * @param summary null before the first shaft
 	 */
-	public record SessionTotals(long shafts, long powder, double fine, Long averageSpawn, SessionSummary summary) {
-		public static final SessionTotals NONE = new SessionTotals(0, 0, 0, null, null);
+	public record SessionTotals(long powder, double fine, SessionSummary summary) {
+		public static final SessionTotals NONE = new SessionTotals(0, 0, null);
+
+		public long shafts() {
+			return summary == null ? 0 : summary.shafts();
+		}
+
+		/** Null before a spawn was timed. */
+		public Long averageSpawn() {
+			return summary == null ? null : summary.averageSearchMillis();
+		}
 
 		/** @param entries the finished shafts of one session, in order */
 		public static SessionTotals of(List<JournalEntry> entries, TextPatterns patterns) {
@@ -60,8 +69,7 @@ public final class HudData {
 				LootSummary loot = LootSummary.of(entry.loots(), patterns);
 				if (loot.gems() != null) fine += loot.gems().fine();
 			}
-			SessionSummary summary = new SessionSummary(entries.getFirst().sessionId(), entries);
-			return new SessionTotals(entries.size(), powder, fine, summary.averageSearchMillis(), summary);
+			return new SessionTotals(powder, fine, new SessionSummary(entries.getFirst().sessionId(), entries));
 		}
 	}
 
