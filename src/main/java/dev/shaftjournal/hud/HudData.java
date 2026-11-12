@@ -32,6 +32,8 @@ public final class HudData {
 	}
 
 	private final Map<Key, Object> values = new HashMap<>();
+	/** Numbers behind values shown as text, for colour rules: Cold's -12 behind "-12❄". */
+	private final Map<Key, Double> numbers = new HashMap<>();
 	/** Values that are real but say nothing yet (a session's zeros before its first shaft); the editor shows examples. */
 	private final Set<Key> placeholders = new HashSet<>();
 
@@ -50,6 +52,17 @@ public final class HudData {
 		Key key = key(value, range);
 		Object v = values.get(key);
 		return v != null && !placeholders.contains(key) ? v : EXAMPLE.values.get(key);
+	}
+
+	/**
+	 * The value as a number for colour rules, or null when it's missing or not a number.
+	 *
+	 * @param example the editor: missing values and placeholders give the example's number
+	 */
+	public Double number(HudValue value, Range range, boolean example) {
+		Key key = key(value, range);
+		HudData from = example && (values.get(key) == null || placeholders.contains(key)) ? EXAMPLE : this;
+		return from.values.get(key) instanceof Number n ? (Double) n.doubleValue() : from.numbers.get(key);
 	}
 
 	/** Leaves out ranges the value doesn't have, so a hand-edited file can't ask for one. */
@@ -156,7 +169,7 @@ public final class HudData {
 			if (shaft.id() != null) data.put(HudValue.SHAFT_TYPE, names.name(shaft.id().type()));
 			data.put(HudValue.SHAFT_TIME, Math.max(0, now - shaft.enteredAt()));
 			data.put(HudValue.SHAFT_CORPSES, corpses(shaft.corpses()));
-			if (shaft.cold() != null) data.put(HudValue.SHAFT_COLD, shaft.cold() + "❄");
+			if (shaft.cold() != null) data.cold(shaft.cold());
 			data.put(HudValue.SHAFT_CAMPFIRES, (long) shaft.campfiresPlaced().size());
 		}
 		return data;
@@ -199,7 +212,12 @@ public final class HudData {
 				.put(HudValue.SHAFT_TYPE, "Jade")
 				.put(HudValue.SHAFT_TIME, 134_000L)
 				.put(HudValue.SHAFT_CORPSES, "2/4 Lapis, Umber")
-				.put(HudValue.SHAFT_COLD, "-12❄")
+				.cold(-12)
 				.put(HudValue.SHAFT_CAMPFIRES, 1L);
+	}
+
+	private HudData cold(int cold) {
+		numbers.put(key(HudValue.SHAFT_COLD, null), (double) cold);
+		return put(HudValue.SHAFT_COLD, cold + "❄");
 	}
 }

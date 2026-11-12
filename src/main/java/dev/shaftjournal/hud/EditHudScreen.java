@@ -94,6 +94,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Anchor[][] NEW_BOX_SPOTS = {{Anchor.START, Anchor.MIDDLE}, {Anchor.END, Anchor.MIDDLE},
 			{Anchor.START, Anchor.END}, {Anchor.END, Anchor.END}, {Anchor.MIDDLE, Anchor.END}, {Anchor.MIDDLE, Anchor.MIDDLE}};
 
+	/** {@link #panelKind}s besides a line page. */
+	private static final Object MAIN = "main";
+	private static final Object PICKER = "picker";
 	/** The 16 Minecraft text colours, in code order. */
 	private static final int[] COLORS = {0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
 			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
@@ -111,17 +114,17 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private PanelScroll panelScroll;
 	/** The panel's height last frame; a rebuilt panel starts at it, so it doesn't flicker while it's measured. */
 	private int panelHeight = 200;
-	/** Whether the panel was built as the value list, so the scroll position only stays within one kind. */
-	private boolean panelPicker;
+	/** What the panel was built as: {@link #MAIN}, {@link #PICKER} or the edited line; the scroll position only stays within one. */
+	private Object panelKind;
 	/** The selected box's Size slider, kept in step when scrolling. */
 	private DiscreteSliderComponent scaleSlider;
 	private ButtonComponent resetButton;
 	private ButtonComponent undoButton;
 	private ButtonComponent redoButton;
-	/** The selected box's title field; read every frame (see {@link #syncTitle}). */
-	private TextBoxComponent titleField;
-	/** Scroll the title field back to its start next frame, once the panel has its real size. */
-	private boolean homeTitle;
+	/** The panel's text fields, read every frame (see {@link #syncFields}). */
+	private final List<Field> fields = new ArrayList<>();
+	/** Fields to scroll back to their start next frame, once the panel has its real size. */
+	private final List<TextBoxComponent> homeFields = new ArrayList<>();
 	/** The box the side panel was built for. */
 	private Box panelBox;
 	/** The panel's line rows in order, and the parts of each row that start a drag (grip and name). */
@@ -143,6 +146,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private FlowLayout deleteRow;
 	/** The box whose panel shows the value list for adding a line, or null. */
 	private Box pickerBox;
+	/** The line whose page the panel shows (its text and colours), or null. */
+	private Line editedLine;
 	private int toolbarSpot = -1;
 	private Box selected;
 	private Box dragging;
@@ -219,12 +224,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			}
 			shownLayout = hud.layout();
 		}
-		if (homeTitle && titleField != null) {
-			homeTitle = false;
-			titleField.moveCursorToEnd(false);
-			titleField.moveCursorToStart(false);
+		for (TextBoxComponent field : homeFields) {
+			field.moveCursorToEnd(false);
+			field.moveCursorToStart(false);
 		}
-		syncTitle();
+		homeFields.clear();
+		syncFields();
 		recordChanges(false);
 		undoButton.active(history.canUndo());
 		redoButton.active(history.canRedo());
@@ -282,7 +287,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
 		// Whatever came before this click (typing a title, scrolling) is its own undo step.
-		syncTitle();
+		syncFields();
 		recordChanges(true);
 		mouseHeld = true;
 		if (resetArmed && !resetButton.isInBoundingBox(click.x(), click.y())) armReset(false);
@@ -432,7 +437,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	public void removed() {
 		super.removed();
-		syncTitle();
+		syncFields();
 		hud.save();
 	}
 
@@ -504,14 +509,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		deleteRow.child(deleteButton);
 	}
 
+	/** A text field and what to do with its text. */
+	private record Field(TextBoxComponent box, Consumer<String> apply) {
+	}
+
 	/**
-	 * Copies the title field into the box. Polled, not an owo change event: Caxton (a font mod)
-	 * cancels the text field's change call, so with it installed typed titles never arrived.
+	 * Copies the text fields into the layout. Polled, not an owo change event: Caxton (a font mod)
+	 * cancels the text field's change call, so with it installed typed text never arrived.
 	 */
-	private void syncTitle() {
-		if (titleField != null && panelBox != null && !titleField.getValue().equals(panelBox.title)) {
-			panelBox.title = titleField.getValue();
-		}
+	private void syncFields() {
+		for (Field field : fields) field.apply().accept(field.box().getValue());
 	}
 
 	/**
@@ -527,7 +534,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			return;
 		}
 		if (!now) {
-			if (dragging != null || lineDrag >= 0 || mouseHeld || titleFocused()) return;
+			if (dragging != null || lineDrag >= 0 || mouseHeld || typing()) return;
 			long time = Util.getMillis();
 			if (!json.equals(unsettled)) {
 				unsettled = json;
@@ -541,13 +548,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		hud.save();
 	}
 
-	private boolean titleFocused() {
-		return titleField != null && root.focusHandler().focused() == titleField;
+	private boolean typing() {
+		return root.focusHandler().focused() instanceof TextBoxComponent;
 	}
 
 	/** Goes one step back, or forward with {@code redo}; the same box stays selected. */
 	private void undo(boolean redo) {
-		syncTitle();
+		syncFields();
 		recordChanges(true);
 		String json = redo ? history.redo() : history.undo();
 		if (json == null) return;
@@ -657,13 +664,14 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	// ---- side panel ----
 
 	private void removePanel() {
-		syncTitle();
+		syncFields();
 		if (panelScroll != null) root.removeChild(panelScroll);
 		panelScroll = null;
 		panel = null;
 		panelBox = null;
 		scaleSlider = null;
-		titleField = null;
+		fields.clear();
+		homeFields.clear();
 		lineRows.clear();
 		lineHandles.clear();
 		deleteButton = null;
@@ -673,8 +681,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	private void rebuildPanel() {
 		boolean picker = selected != null && pickerBox == selected;
+		// A line page only while its line is still in the selected box (not after an undo or switching boxes).
+		if (selected == null || picker || !selected.lines.contains(editedLine)) editedLine = null;
+		Object kind = picker ? PICKER : editedLine != null ? editedLine : MAIN;
 		// Same box, same kind of panel: stay where it was scrolled to, e.g. after changing a line near the bottom.
-		double offset = panelScroll != null && panelBox == selected && panelPicker == picker ? panelScroll.offset() : 0;
+		double offset = panelScroll != null && panelBox == selected && panelKind == kind ? panelScroll.offset() : 0;
 		removePanel();
 		if (selected == null) {
 			pickerBox = null;
@@ -682,7 +693,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		Box box = selected;
 		panelBox = box;
-		panelPicker = picker;
+		panelKind = kind;
 		panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.content());
 		panel.padding(Insets.of(5));
 		panel.gap(1);
@@ -702,18 +713,15 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			return;
 		}
 		pickerBox = null;
+		if (editedLine != null) {
+			buildLinePage(box, editedLine);
+			return;
+		}
 		SmallCheckboxComponent showTitle = UIComponents.smallCheckbox(Component.empty());
 		showTitle.checked(box.showTitle);
 		showTitle.onChanged().subscribe(checked -> box.showTitle = checked);
 		showTitle.tooltip(Component.literal("Show the title"));
-		TextBoxComponent title = UIComponents.textBox(Sizing.expand());
-		title.verticalSizing(Sizing.fixed(CONTROL + 2));
-		title.setMaxLength(64);
-		title.text(box.title);
-		titleField = title;
-		// The text goes in while the field is still 0 wide, and with Caxton (a font mod) that can leave
-		// the first letter scrolled out of view. Next frame, at the real width, it's scrolled back.
-		homeTitle = true;
+		TextBoxComponent title = textField(box.title, 64, text -> box.title = text);
 		title.tooltip(Component.literal("Box title. {shaft_type} shows the shaft's type."));
 		FlowLayout titleRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		titleRow.gap(3);
@@ -827,13 +835,23 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		name.cursorStyle(CursorStyle.MOVE);
 		row.child(name);
 		List<String> formats = HudFormat.options(value.kind());
-		if (formats.size() > 1) {
+		if (line.advanced) {
+			// The free text sets the format and range in its tags.
+			name.text(Component.literal("§b" + value.displayName()));
+		} else if (formats.size() > 1) {
 			Object current = hud.data().getOrExample(value, line.range);
 			row.child(button(HudFormat.format(value.kind(), line.format, current), b -> {
 				line.format = (line.format + 1) % formats.size();
 				rebuildPanel();
 			}).tooltip(Component.literal("Number format, click to change")));
 		}
+		ButtonComponent edit = button("✎", b -> {
+			editedLine = line;
+			rebuildPanel();
+		});
+		edit.tooltip(Component.literal(line.advanced ? "Free text and colour rules (this line uses free text)"
+				: "Free text and colour rules"));
+		row.child(edit);
 		ButtonComponent remove = button("§c×", b -> {
 			box.lines.remove(line);
 			rebuildPanel();
@@ -845,7 +863,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		whole.gap(1);
 		whole.child(row);
 		List<HudValue.Range> ranges = value.ranges();
-		if (ranges.size() > 1) {
+		if (ranges.size() > 1 && !line.advanced) {
 			FlowLayout rangeRow = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 			rangeRow.gap(2);
 			rangeRow.verticalAlignment(VerticalAlignment.CENTER);
@@ -862,6 +880,152 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		lineRows.add(whole);
 		lineHandles.add(List.of(grip, name));
 		return whole;
+	}
+
+	/**
+	 * A line's own page: its value's ready-made colour rule, its own thresholds, and free text. Changes
+	 * show live on the box, like everything else in the editor.
+	 */
+	private void buildLinePage(Box box, Line line) {
+		HudValue value = line.hudValue();
+		FlowLayout header = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		header.verticalAlignment(VerticalAlignment.CENTER);
+		LabelComponent title = label("§f" + value.displayName());
+		title.horizontalSizing(Sizing.expand());
+		header.child(title);
+		header.child(button("Back", b -> {
+			editedLine = null;
+			rebuildPanel();
+		}));
+		panel.child(header);
+
+		if (value.hasNumber()) {
+			panel.child(section("Colours"));
+			String ready = HudColors.readyRule(value);
+			if (ready != null) {
+				SmallCheckboxComponent rule = UIComponents.smallCheckbox(Component.literal(ready));
+				rule.checked(line.readyRule);
+				rule.onChanged().subscribe(on -> line.readyRule = on);
+				rule.tooltip(Component.literal("A ready-made colour rule: " + ready + ". Your own rules below come first."));
+				panel.child(rule);
+			}
+			List<HudLayout.ColorRule> rules = line.rules == null ? List.of() : line.rules;
+			for (HudLayout.ColorRule rule : rules) ruleRows(line, rule);
+			ButtonComponent add = button("+ Add colour rule", b -> {
+				if (line.rules == null) line.rules = new ArrayList<>();
+				HudLayout.ColorRule rule = new HudLayout.ColorRule();
+				Double now = hud.data().number(value, line.range, true);
+				// Starts at the value shown now, so it's easy to see which way it goes.
+				if (now != null) rule.value = Math.round(value.kind() == HudValue.Kind.TIME ? now / 1000 : now);
+				line.rules.add(rule);
+				rebuildPanel();
+			});
+			add.tooltip(Component.literal("Colour the value when it's over or under a number you pick. "
+					+ "The first rule that matches wins."));
+			add.margins(Insets.top(2));
+			panel.child(add);
+		}
+
+		panel.child(section("Free text"));
+		SmallCheckboxComponent free = UIComponents.smallCheckbox(Component.literal("Use free text for this line"));
+		free.checked(line.advanced);
+		free.onChanged().subscribe(on -> {
+			// It starts from the line as it looks now; switching back and forth keeps what was typed.
+			if (on && (line.text == null || line.text.isBlank())) line.text = HudBoxText.basicText(box, line);
+			line.advanced = on;
+			rebuildPanel();
+		});
+		panel.child(free);
+		if (line.advanced) {
+			TextBoxComponent text = textField(line.text, 256, typed -> line.text = typed);
+			text.tooltip(tagHelp(value));
+			panel.child(text);
+			LabelComponent hint = label("§8&7 is a colour, &l bold, {spawn_timer} a value. Hover the text for all of them.");
+			hint.maxWidth(PANEL_WIDTH - 10);
+			panel.child(hint);
+			panel.child(button("Reset to basic text", b -> {
+				line.text = HudBoxText.basicText(box, line);
+				rebuildPanel();
+			}).tooltip(Component.literal("Start the text again from the line's basic look")));
+		}
+	}
+
+	/** One colour rule: over/under, the number and remove on one row, the colour swatches under it. */
+	private void ruleRows(Line line, HudLayout.ColorRule rule) {
+		HudValue.Kind kind = line.hudValue().kind();
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		row.gap(2);
+		row.verticalAlignment(VerticalAlignment.CENTER);
+		row.margins(Insets.top(2));
+		row.child(button(rule.when == HudLayout.ColorRule.When.OVER ? "Over" : "Under", b -> {
+			rule.when = rule.when == HudLayout.ColorRule.When.OVER ? HudLayout.ColorRule.When.UNDER : HudLayout.ColorRule.When.OVER;
+			rebuildPanel();
+		}).tooltip(Component.literal("Click to switch between over and under")));
+		TextBoxComponent number = textField(HudFormat.thresholdText(kind, rule.value), 12, typed -> {
+			// Half-typed numbers are skipped; the rule keeps its last good one.
+			Double parsed = HudFormat.parseThreshold(kind, typed);
+			if (parsed != null) rule.value = parsed;
+		});
+		number.tooltip(Component.literal(kind == HudValue.Kind.TIME ? "A time, like 1:30 or 90 (seconds)" : "A number"));
+		row.child(number);
+		ButtonComponent remove = button("§c×", b -> {
+			line.rules.remove(rule);
+			if (line.rules.isEmpty()) line.rules = null;
+			rebuildPanel();
+		});
+		remove.tooltip(Component.literal("Remove this rule"));
+		row.child(remove);
+		panel.child(row);
+		FlowLayout swatches = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		swatches.gap(1);
+		swatches.margins(Insets.left(2));
+		for (int i = 0; i < COLORS.length; i++) {
+			String code = String.valueOf(CODES.charAt(i));
+			FlowLayout swatch = UIContainers.horizontalFlow(Sizing.fixed(SWATCH), Sizing.fixed(SWATCH));
+			swatch.surface(Surface.flat(0xFF000000 | COLORS[i])
+					.and(Surface.outline(code.equals(rule.color) ? 0xFFFFFFFF : 0xFF000000)));
+			swatch.tooltip(Component.literal(COLOR_NAMES[i]));
+			swatch.mouseDown().subscribe((click, doubled) -> {
+				rule.color = code;
+				rebuildPanel();
+				return true;
+			});
+			swatches.child(swatch);
+		}
+		panel.child(swatches);
+	}
+
+	/** The free-text field's tooltip: the codes, this line's own tag, and every tag with its options. */
+	private static Component tagHelp(HudValue own) {
+		StringBuilder help = new StringBuilder("§fFree text\n§7&0-&f colours, &l bold, &o italic, &n underline, "
+				+ "&m strikethrough, &r back to the label colour.\n§7Values: §f{value_id}§7, options after a colon, "
+				+ "e.g. §f{session_powder:all_time:short}§7.\n");
+		for (HudValue value : HudValue.values()) {
+			help.append(value == own ? "\n§e" : "\n§f").append('{').append(value.id()).append('}');
+			List<String> options = new ArrayList<>();
+			for (HudValue.Range range : value.ranges()) options.add(range.name().toLowerCase(java.util.Locale.ROOT));
+			options.addAll(HudFormat.names(value.kind()));
+			if (!options.isEmpty()) help.append(" §8").append(String.join(", ", options));
+		}
+		return Component.literal(help.toString());
+	}
+
+	/** A text field whose text goes to {@code apply} as it's typed (see {@link #syncFields}). */
+	private TextBoxComponent textField(String text, int maxLength, Consumer<String> apply) {
+		TextBoxComponent field = UIComponents.textBox(Sizing.expand());
+		field.verticalSizing(Sizing.fixed(CONTROL + 2));
+		field.setMaxLength(maxLength);
+		field.text(text);
+		String[] last = {text};
+		fields.add(new Field(field, typed -> {
+			if (typed.equals(last[0])) return;
+			last[0] = typed;
+			apply.accept(typed);
+		}));
+		// The text goes in while the field is still 0 wide, and with Caxton (a font mod) that can leave
+		// the first letter scrolled out of view. Next frame, at the real width, it's scrolled back.
+		homeFields.add(field);
+		return field;
 	}
 
 	/** The line whose grip or name is at this point, or -1. */

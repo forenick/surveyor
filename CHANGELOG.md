@@ -4,6 +4,23 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.9.0 (2026-11-12)
+HUD slice 3: free text and colours that follow the value.
+- Every line in Edit HUD has a **✎** button that opens the line's own page; **Back** returns to the box.
+- **Ready-made colour rules** to tick: the spawn timer turns red above the session's average spawn, and Cold
+  turns yellow at -50❄ and red at -80❄ (your numbers).
+- **Your own colour rules:** "Over" or "Under" a number, then a colour, e.g. green under 1:30 and red over
+  3:00. Times can be typed as 1:30 or 90. The first rule that matches wins, before the ready-made one.
+- **Free text:** tick "Use free text" and the line becomes text you type, starting from how it looks now,
+  e.g. `&7Spawn &8» &e{spawn_timer} &7(avg {average_spawn})`.
+  - `&0`-`&f` are the 16 colours, `&l` bold, `&o` italic, `&n` underline, `&m` strikethrough, and `&r` goes
+    back to the box's label colour.
+  - Tags can pick a range and number format: `{session_powder:all_time:short}`. Hover the text field for
+    every tag and its options. A tag with a typo stays as typed, so you can spot it.
+  - A colour rule colours only the line's own value; the rest of the text keeps your colours.
+  - Box titles take the same tag options.
+  - Lines with free text show their name in aqua; their format and range are set in the tags.
+
 ## 0.8.0 (2026-11-12)
 HUD slice 2: your own boxes, any value in any box, and time ranges.
 - **+ New box** in the Edit HUD toolbar adds an empty box in a free spot and selects it. **Delete box** at the

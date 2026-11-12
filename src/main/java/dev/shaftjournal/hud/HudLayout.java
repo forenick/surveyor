@@ -98,6 +98,17 @@ public final class HudLayout {
 		public int format;
 		/** Which shafts the value adds up; null for values without ranges. */
 		public Range range;
+		/**
+		 * Free text with &amp; codes and {value_id} tags instead of prefix + value. The text is kept when this is
+		 * switched off, so switching back brings it back.
+		 */
+		public boolean advanced;
+		/** The free text; null until the line was first switched to it. */
+		public String text;
+		/** The value's ready-made colour rule is on (see {@link HudColors#readyRule}). */
+		public boolean readyRule;
+		/** Own colour thresholds, checked in order before the ready-made rule; null when there are none. */
+		public List<ColorRule> rules;
 
 		public Line() {
 		}
@@ -118,6 +129,23 @@ public final class HudLayout {
 		/** Null when the file names a value this version doesn't know. */
 		public HudValue hudValue() {
 			return HudValue.byId(value);
+		}
+	}
+
+	/** One colour threshold on a line's value, e.g. red over 3:00. */
+	public static final class ColorRule {
+		public enum When {
+			OVER, UNDER
+		}
+
+		public When when = When.OVER;
+		/** In the value's unit; seconds for times. */
+		public double value;
+		/** A Minecraft colour code, "0" to "f". */
+		public String color = "c";
+
+		public boolean matches(double number) {
+			return when == When.UNDER ? number < value : number > value;
 		}
 	}
 
@@ -262,6 +290,17 @@ public final class HudLayout {
 			if (line.format < 0 || line.format >= formats) line.format = 0;
 			// Files from before ranges have none: those values were all session values.
 			if (!value.hasRange(line.range)) line.range = value.defaultRange();
+			if (HudColors.readyRule(value) == null) line.readyRule = false;
+			if (line.rules != null) {
+				line.rules.removeIf(rule -> rule == null);
+				for (ColorRule rule : line.rules) {
+					if (rule.when == null) rule.when = ColorRule.When.OVER;
+					if (!isColor(rule.color)) rule.color = "c";
+					if (!Double.isFinite(rule.value)) rule.value = 0;
+				}
+				if (line.rules.isEmpty() || !value.hasNumber()) line.rules = null;
+			}
+			if (line.advanced && line.text == null) line.advanced = false;
 		}
 	}
 

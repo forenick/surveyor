@@ -288,4 +288,104 @@ class HudTest {
 		return HudData.live(SessionTotals.of(entries, patterns), Totals.of(entries, patterns),
 				Totals.of(List.of(entries.getLast()), patterns), null, null, now, ShaftNames.defaults());
 	}
+
+	@Test
+	void freeText() {
+		Box box = HudLayout.defaults().boxes.get(1);
+		Line spawn = box.lines.getFirst();
+		assertEquals("&7Spawn: &f&l{spawn_timer}", HudBoxText.basicText(box, spawn));
+		spawn.advanced = true;
+		spawn.text = "Spawn &8» &e{spawn_timer} &7(avg {average_spawn:seconds}) {nope} {spawn_timer:all_time} &lB&aG &rx";
+		assertEquals("§7Spawn §8» §e1:42 §7(avg 85s) {nope} {spawn_timer:all_time} §lB§aG §r§7x",
+				HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"plain text starts in the label colour; unknown tags and options stay as typed; a colour ends bold");
+		Line powder = new Line(HudValue.SESSION_POWDER);
+		powder.range = Range.ALL_TIME;
+		powder.format = 1;
+		assertEquals("&7Powder: &f{session_powder:all_time:short}", HudBoxText.basicText(new Box(), powder));
+		powder.advanced = true;
+		powder.text = "{session_powder:per_hour} / {session_powder:shaft:plain}";
+		Box one = new Box();
+		one.lines.add(powder);
+		assertEquals("§7137,166/h / 7120", HudBoxText.lines(one, HudData.EXAMPLE, false).getFirst());
+		assertEquals("Jade 1.2M", HudBoxText.tags("{shaft_type} {session_powder:all_time:short}", HudData.EXAMPLE, false),
+				"titles take options too");
+	}
+
+	@Test
+	void colourRules() {
+		Box box = HudLayout.defaults().boxes.get(1);
+		Line spawn = box.lines.getFirst();
+		assertEquals("§7Spawn: §f§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst());
+		spawn.readyRule = true;
+		assertEquals("§7Spawn: §c§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"1:42 is above the 1:25 average");
+		HudLayout.ColorRule fast = new HudLayout.ColorRule();
+		fast.when = HudLayout.ColorRule.When.UNDER;
+		fast.value = 120;
+		fast.color = "a";
+		spawn.rules = new java.util.ArrayList<>(List.of(fast));
+		assertEquals("§7Spawn: §a§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"own thresholds come first; times compare in seconds");
+		spawn.advanced = true;
+		spawn.text = "&8» &e&l{spawn_timer} &7avg {average_spawn} {spawn_timer:seconds}";
+		assertEquals("§7§8» §e§l§a§l1:42§e§l §7avg 1:25 §a102s§7", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"the line's own value takes the rule's colour in any format, the rest keeps its colour");
+
+		Line cold = new Line(HudValue.SHAFT_COLD);
+		cold.readyRule = true;
+		HudData data = HudData.EXAMPLE;
+		assertNull(HudColors.color(cold, data, false), "-12 is fine");
+		assertEquals(-12.0, data.number(HudValue.SHAFT_COLD, null, false));
+		Line campfires = new Line(HudValue.SHAFT_CAMPFIRES);
+		campfires.readyRule = true;
+		assertNull(HudColors.color(campfires, data, false), "no ready-made rule for campfires");
+		HudData empty = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
+		assertNull(HudColors.color(spawn, empty, false), "nothing to compare");
+	}
+
+	@Test
+	void coldThresholds() throws Exception {
+		Line cold = new Line(HudValue.SHAFT_COLD);
+		cold.readyRule = true;
+		java.lang.reflect.Method put = HudData.class.getDeclaredMethod("cold", int.class);
+		put.setAccessible(true);
+		for (int[] c : new int[][] {{-49, 0}, {-50, 'e'}, {-79, 'e'}, {-80, 'c'}, {-99, 'c'}}) {
+			HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
+			put.invoke(data, c[0]);
+			assertEquals(c[1] == 0 ? null : String.valueOf((char) c[1]), HudColors.color(cold, data, false), "cold " + c[0]);
+		}
+	}
+
+	@Test
+	void thresholdsAsTyped() {
+		assertEquals(90.0, HudFormat.parseThreshold(Kind.TIME, "1:30"));
+		assertEquals(90.0, HudFormat.parseThreshold(Kind.TIME, " 90 "));
+		assertNull(HudFormat.parseThreshold(Kind.TIME, "1:3"));
+		assertNull(HudFormat.parseThreshold(Kind.TIME, "1:75"));
+		assertEquals(-50.0, HudFormat.parseThreshold(Kind.TEXT, "-50"));
+		assertEquals(43436.0, HudFormat.parseThreshold(Kind.INTEGER, "43,436"));
+		assertNull(HudFormat.parseThreshold(Kind.DECIMAL, "abc"));
+		assertEquals("1:30", HudFormat.thresholdText(Kind.TIME, 90));
+		assertEquals("-50", HudFormat.thresholdText(Kind.TEXT, -50));
+		assertEquals("2.5", HudFormat.thresholdText(Kind.DECIMAL, 2.5));
+	}
+
+	@Test
+	void colourSettingsAreRepaired() {
+		HudLayout read = HudLayout.fromJson("""
+				{"boxes": [{"id": "a", "lines": [
+				  {"value": "spawn_timer", "readyRule": true, "rules": [null, {"when": "SIDEWAYS", "value": 90, "color": "z"}]},
+				  {"value": "shaft_corpses", "readyRule": true, "rules": [{"value": 1}]},
+				  {"value": "shaft_cold", "advanced": true}]}]}""");
+		List<Line> lines = read.boxes.getFirst().lines;
+		assertTrue(lines.get(0).readyRule);
+		assertEquals(1, lines.get(0).rules.size());
+		assertEquals(HudLayout.ColorRule.When.OVER, lines.get(0).rules.getFirst().when);
+		assertEquals("c", lines.get(0).rules.getFirst().color);
+		assertFalse(lines.get(1).readyRule, "corpses have no ready-made rule");
+		assertNull(lines.get(1).rules, "corpses aren't a number");
+		assertFalse(lines.get(2).advanced, "free text without text falls back to the basic line");
+		assertEquals(read.toJson(), HudLayout.fromJson(read.toJson()).toJson());
+	}
 }

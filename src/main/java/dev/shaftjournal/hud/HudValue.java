@@ -103,6 +103,11 @@ public enum HudValue {
 		return hasRange(Range.SESSION) ? Range.SESSION : ranges.isEmpty() ? null : ranges.getFirst();
 	}
 
+	/** Whether colour thresholds can compare it: every number, and Cold (shown as text like "-12❄"). */
+	public boolean hasNumber() {
+		return kind != Kind.TEXT || this == SHAFT_COLD;
+	}
+
 	/** The value with this ID, or null. */
 	public static HudValue byId(String id) {
 		for (HudValue value : values()) {
