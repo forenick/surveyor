@@ -56,7 +56,8 @@ import dev.shaftjournal.hud.HudLayout.Line;
 import dev.shaftjournal.screen.SafeLabel;
 
 public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
-	private static final int PANEL_FILL = 0xE8141414;
+	// opaque, boxes behind it bled through the text
+	private static final int PANEL_FILL = 0xFF141414;
 	private static final int PANEL_OUTLINE = 0x30FFFFFF;
 	private static final Surface PANEL = Surface.flat(PANEL_FILL).and(Surface.outline(PANEL_OUTLINE));
 	private static final Surface MENU = Surface.flat(0xF0101010).and(Surface.outline(0xFFA0A0A0));
@@ -65,9 +66,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			.and((graphics, c) -> graphics.fill(c.x(), c.y(), c.x() + 2, c.y() + c.height(), 0x40FFFFFF));
 	private static final Surface DIVIDER = (graphics, c) -> graphics.fill(c.x(), c.y(), c.x() + c.width(), c.y() + 1,
 			0x1CFFFFFF);
-	private static final int PANEL_WIDTH = 204;
-	// panel minus its padding
-	private static final int INNER = PANEL_WIDTH - 10;
+	// fits 480x270, grows on wide screens (gui scale 2)
+	private static final int PANEL_MIN = 204;
+	private static final int PANEL_MAX = 280;
 	private static final int ROW_LABEL = 62;
 	private static final int KEY = 38;
 	// action buttons / choices + line rows. fits 480x270
@@ -849,6 +850,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	// sizes known after layout
 	private void fitPanel() {
 		if (panelScroll == null || panelScroll.width() == 0) return;
+		// gui scale changed w/ the panel open
+		if (builtPanelWidth != panelWidth()) {
+			rebuildPanel();
+			return;
+		}
 		// no room beside it = leave the top for the toolbar
 		boolean narrow = toolbar.width() + panelScroll.width() + 3 * PADDING > width;
 		// title goes first, so the panel keeps the full height at 480 wide
@@ -919,13 +925,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	// equal cells, so options never wrap one by one
-	private static final class Grid extends FlowLayout {
+	private final class Grid extends FlowLayout {
 		private final int cell;
 
 		Grid(int columns, int keyWidth) {
-			super(Sizing.fixed(INNER - keyWidth - 2), Sizing.content(), Algorithm.LTR_TEXT);
+			super(Sizing.fixed(inner() - keyWidth - 2), Sizing.content(), Algorithm.LTR_TEXT);
 			gap(2);
-			cell = (INNER - keyWidth - 2 - (columns - 1) * 2) / columns;
+			cell = (inner() - keyWidth - 2 - (columns - 1) * 2) / columns;
 		}
 
 		ButtonComponent add(ButtonComponent button) {
@@ -966,6 +972,17 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
 			return maxScrollAmount() > 0 && super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
 		}
+	}
+
+	private int builtPanelWidth;
+
+	private int panelWidth() {
+		return Math.clamp(width * 30 / 100, PANEL_MIN, PANEL_MAX);
+	}
+
+	// panel minus its padding
+	private int inner() {
+		return panelWidth() - 10;
 	}
 
 	private void removePanel() {
@@ -1019,7 +1036,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		pageBox = box.id;
 		panelBox = box;
 		panelKey = box.id + "/" + (picking ? "picker" : editedIndex >= 0 ? "line" + editedIndex : "box");
-		panel = UIContainers.verticalFlow(Sizing.fixed(PANEL_WIDTH), Sizing.content());
+		builtPanelWidth = panelWidth();
+		panel = UIContainers.verticalFlow(Sizing.fixed(builtPanelWidth), Sizing.content());
 		panel.padding(Insets.of(5));
 		panel.gap(1);
 		panelScroll = new PanelScroll(panelHeight, panel);
@@ -1161,10 +1179,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			for (HudValue value : HudValue.values()) {
 				if (value.group() != group) continue;
 				HoverRow row = new HoverRow();
-				LabelComponent name = label(clip("§f" + value.displayName(), 86));
-				name.horizontalSizing(Sizing.fixed(88));
+				int nameWidth = 88 + (inner() - (PANEL_MIN - 10)) / 2;
+				LabelComponent name = label(clip("§f" + value.displayName(), nameWidth - 2));
+				name.horizontalSizing(Sizing.fixed(nameWidth));
 				row.child(name);
-				LabelComponent shows = label(clip(HudBoxText.line(box, new Line(value), hud.data(), true), INNER - 88 - 20));
+				LabelComponent shows = label(clip(HudBoxText.line(box, new Line(value), hud.data(), true), inner() - nameWidth - 20));
 				shows.horizontalSizing(Sizing.expand());
 				row.child(shows);
 				if (box.lines.stream().anyMatch(line -> line.hudValue() == value)) {
@@ -1205,7 +1224,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		String text = HudBoxText.line(box, line, hud.data(), true);
 		if (!line.shown) text = "§8" + strip(text);
 		// grip, checkbox, marker, gaps + slack so it never wraps
-		LabelComponent look = label(clip(text, INNER - 40));
+		LabelComponent look = label(clip(text, inner() - 40));
 		look.horizontalSizing(Sizing.expand());
 		tip(look, "Click to change the label, range, format and colours");
 		row.child(look);
@@ -1338,7 +1357,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				: "Type the whole line yourself, with colours like &e and values like {spawn_timer}. "
 						+ "For two values on one line, or a colour per word. Starts from how the line looks now.");
 		// clipped, caxton fonts push the button out
-		FlowLayout customHead = heading(clip("Custom text §8(ADVANCED)", INNER - fixedWidth(custom) - 2));
+		FlowLayout customHead = heading(clip("Custom text §8(ADVANCED)", inner() - fixedWidth(custom) - 2));
 		customHead.child(spacer());
 		customHead.child(custom);
 		panel.child(customHead);
@@ -1380,7 +1399,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		panel.child(insert);
 
 		freeHint = label(TEXT_HINT);
-		freeHint.maxWidth(INNER);
+		freeHint.maxWidth(inner());
 		freeHintText = TEXT_HINT;
 		panel.child(freeHint);
 		ButtonComponent again = iconTextButton(pixels(RESET_ICON), "Reset", null, b -> {
@@ -1405,7 +1424,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			if (!text.equals(previewRaw)) {
 				previewRaw = text;
 				// padding, + note and gap if hidden
-				int room = INNER - 8 - (previewLine.shown ? 0 : font.width(HIDDEN_NOTE) + 4);
+				int room = inner() - 8 - (previewLine.shown ? 0 : font.width(HIDDEN_NOTE) + 4);
 				preview.text(Component.literal(clip(text, room)));
 			}
 		}
@@ -1720,7 +1739,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		String name = strip(HudBoxText.tags(box.title, hud.data(), true)).strip();
 		if (name.isEmpty()) name = "Box";
 		// crumb padding 2px each
-		int room = INNER - font.width("HUD") - font.width(gap) - 4;
+		int room = inner() - font.width("HUD") - font.width(gap) - 4;
 		Crumb home = new Crumb("HUD", () -> {
 			selected = null;
 			rebuildPanel();

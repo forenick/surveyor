@@ -49,8 +49,15 @@ import dev.shaftjournal.journal.SummaryText;
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private enum Tab { SESSION, SESSIONS, STATS }
 
-	// higher dropOrder hides first, 0 = never
-	private record Column(String key, String title, int width, boolean right, int dropOrder) {
+	// higher dropOrder hides first, 0 = never. extra = spare room handed out by fit()
+	private record Column(String key, String title, int width, boolean right, int dropOrder, int extra) {
+		Column(String key, String title, int width, boolean right, int dropOrder) {
+			this(key, title, width, right, dropOrder, 0);
+		}
+
+		int total() {
+			return width + extra;
+		}
 	}
 
 	private static final Surface PANEL = Surface.flat(0xE8141414).and(Surface.outline(0x30FFFFFF));
@@ -182,7 +189,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		nav.gap(4);
 		if (tab == Tab.SESSION && !sessions.isEmpty()) {
 			nav.child(button("<", sessionIndex < sessions.size() - 1, () -> showSession(sessionIndex + 1)));
-			nav.child(label("§f" + sessionRange(sessions.get(sessionIndex))));
+			nav.child(label("§f" + sessionRange(sessions.get(sessionIndex), navRoom())));
 			nav.child(button(">", sessionIndex > 0, () -> showSession(sessionIndex - 1)));
 		}
 		bar.child(nav);
@@ -561,8 +568,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 		int plotWidth = Math.max(60, width - 2 * PADDING - 2 * GAP - width * STATS_LEFT / 100 - width * STATS_RIGHT / 100
 				- 2 * COLUMN_PADDING - axisWidth - AXIS_GAP);
-		int barWidth = Math.clamp((plotWidth - 2) / timed.size() - 2, 3, 12);
-		int maxBars = Math.max(1, (plotWidth - 2) / (barWidth + 2));
+		// display choice: bars up to 24 wide, gap grows w/ them
+		int barWidth = Math.clamp((plotWidth - 2) * 4 / 5 / timed.size(), 3, 24);
+		int barGap = Math.clamp(barWidth / 4, 2, 6);
+		int maxBars = Math.max(1, (plotWidth - 2) / (barWidth + barGap));
 		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
 
 		int top = 4;
@@ -583,7 +592,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		FlowLayout bars = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(base));
 		bars.verticalAlignment(VerticalAlignment.BOTTOM);
-		bars.gap(2);
+		bars.gap(barGap);
 		bars.padding(Insets.left(2));
 		bars.positioning(Positioning.absolute(0, 0));
 		for (SessionSummary session : timed) {
@@ -616,7 +625,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		dates.child(first);
 		if (timed.size() > 1) {
 			String lastText = "§8" + day(timed.getLast().start());
-			int lastX = axisWidth + AXIS_GAP + 2 + (timed.size() - 1) * (barWidth + 2) + barWidth - font.width(lastText);
+			int lastX = axisWidth + AXIS_GAP + 2 + (timed.size() - 1) * (barWidth + barGap) + barWidth - font.width(lastText);
 			int firstEnd = axisWidth + AXIS_GAP + 2 + font.width("§8" + day(timed.getFirst().start()));
 			if (lastX > firstEnd + 6) {
 				LabelComponent last = label(lastText);
@@ -677,7 +686,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			if (drop == null) break;
 			visible.remove(drop);
 		}
-		return visible;
+		// wide screens (gui scale 2) spread the spare room, up to 2x each
+		int base = visible.stream().mapToInt(Column::width).sum();
+		int spare = available - base - COLUMN_GAP * (visible.size() - 1);
+		if (spare <= 0) return visible;
+		List<Column> spread = new ArrayList<>();
+		for (Column c : visible) {
+			int extra = Math.min(c.width(), spare * c.width() / base);
+			spread.add(new Column(c.key(), c.title(), c.width(), c.right(), c.dropOrder(), extra));
+		}
+		return spread;
 	}
 
 	private FlowLayout table(List<Column> columns, FlowLayout rows) {
@@ -718,13 +736,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private static LabelComponent cell(Column column, String text) {
 		LabelComponent label = label(text);
-		label.horizontalSizing(Sizing.fixed(column.width()));
+		label.horizontalSizing(Sizing.fixed(column.total()));
 		if (column.right()) label.horizontalTextAlignment(HorizontalAlignment.RIGHT);
 		return label;
 	}
 
 	private static FlowLayout barCell(Column column, Long millis, long slowest) {
-		FlowLayout cell = UIContainers.horizontalFlow(Sizing.fixed(column.width()), Sizing.content());
+		FlowLayout cell = UIContainers.horizontalFlow(Sizing.fixed(column.total()), Sizing.content());
 		cell.verticalAlignment(VerticalAlignment.CENTER);
 		cell.gap(3);
 		if (millis == null) {
@@ -734,7 +752,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		LabelComponent text = label("§f" + SummaryText.duration(millis));
 		text.horizontalSizing(Sizing.fixed(column.width() - SPAWN_BAR - 3));
 		cell.child(text);
-		BoxComponent bar = UIComponents.box(Sizing.fixed(Math.max(1, (int) (SPAWN_BAR * millis / Math.max(1, slowest)))), Sizing.fixed(3));
+		int barMax = SPAWN_BAR + column.extra();
+		BoxComponent bar = UIComponents.box(Sizing.fixed(Math.max(1, (int) (barMax * millis / Math.max(1, slowest)))), Sizing.fixed(3));
 		bar.fill(true);
 		bar.color(GREEN);
 		cell.child(bar);
@@ -886,8 +905,19 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return (date.getYear() == today.getYear() ? DAY : DAY_YEAR).format(date);
 	}
 
-	private static String sessionRange(SessionSummary session) {
-		return day(session.start()) + " " + clock(session.start()) + " to " + clock(session.end());
+	// shorter at 480 wide, the full range ran under the tabs
+	private String sessionRange(SessionSummary session, int room) {
+		String start = day(session.start()) + " " + clock(session.start());
+		String full = start + " to " + clock(session.end());
+		if (font.width(full) <= room) return full;
+		return font.width(start) <= room ? start : day(session.start());
+	}
+
+	// top bar minus everything but the date: padding, title, tabs, arrows, edit hud, gaps
+	private int navRoom() {
+		int used = 2 * PADDING + 8 + font.width("Shaft Journal") + 10 + font.width("Edit HUD") + 18 + 2 * 16 + 5 * 4 + 2 * 4;
+		for (String tab : List.of("Session", "Sessions", "Stats")) used += font.width(tab) + 12;
+		return width - used;
 	}
 
 	private static String number(long value) {

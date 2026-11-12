@@ -4,6 +4,18 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.13.2 (2026-11-12)
+Checked at GUI scale 2 on 1080p (960×540), what most SkyBlock players use, plus scales 3 and 4.
+- **Journal tables use the width.** At scale 2 the Session and Sessions columns sat in the left half; now spare
+  room is spread over the columns (up to twice their width) and the spawn bars grow with it.
+- **Spawn chart bars are wider** (up to 24 px) with gaps that grow with them, so a few sessions fill the chart.
+- **Session date fits at 480 wide.** "Yesterday 17:16 to 17:35" ran under the tabs and hid the ‹ button; it
+  now drops "to 17:35" (or the time too) when there's no room.
+- **Edit HUD panel grows on wide screens**: 30% of the width, between 204 and 280 px, so the add-a-line list
+  shows full names ("Fine from corpses", "ShaftJournal version") at scale 2. Scales 3 and 4 stay the same.
+  Changing the GUI scale with the panel open rebuilds it.
+- **The panel is opaque**: a box under it no longer shows through its text.
+
 ## 0.13.1 (2026-11-12)
 Fixes from a code review of 0.12.0 to 0.13.0, plus a Ping that works on Hypixel.
 - **Ping works on Hypixel.** Hypixel puts a fixed 1 in the tab list for you, so Ping was stuck at 1ms. Now it
