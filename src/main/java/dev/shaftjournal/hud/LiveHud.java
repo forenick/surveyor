@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +37,7 @@ import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.LiveJournal;
 import dev.shaftjournal.screen.ShaftNames;
 import dev.shaftjournal.util.DataFolder;
+import dev.shaftjournal.util.SafeWrite;
 
 public final class LiveHud {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
@@ -146,14 +146,11 @@ public final class LiveHud {
 		String json = layout.toJson();
 		Runnable write = () -> {
 			try {
-				Files.createDirectories(file.getParent());
 				if (backupBeforeSave && Files.exists(file)) {
 					Files.copy(file, backupPath());
 					backupBeforeSave = false;
 				}
-				Path temp = file.resolveSibling("hud.json.tmp");
-				Files.writeString(temp, json, StandardCharsets.UTF_8);
-				Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+				SafeWrite.write(file, json);
 			} catch (IOException e) {
 				LOGGER.error("Could not save the HUD to {}", file, e);
 			}

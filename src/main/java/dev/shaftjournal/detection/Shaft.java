@@ -10,6 +10,7 @@ import dev.shaftjournal.detection.ShaftEvent.CampfirePlaced;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
 import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
+import dev.shaftjournal.detection.ShaftEvent.CrystalOwned;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -78,6 +79,9 @@ public final class Shaft {
 			case CampfirePlaced placed -> campfiresPlaced.add(now);
 			case ScrapFound scrap -> scrapFound++;
 			case CrystalFound crystal -> crystals.add(crystal.item());
+			case CrystalOwned owned -> {
+				if (!crystals.isEmpty()) crystals.removeLast();
+			}
 			case Pristine pristine -> {
 				pristineProcs++;
 				add(pristineItems, pristine.gems());

@@ -12,6 +12,8 @@ import com.google.gson.JsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.shaftjournal.util.SafeWrite;
+
 // "money" in config.json. io thread only, hand edits picked up by mtime
 final class MoneyConfig {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
@@ -34,8 +36,7 @@ final class MoneyConfig {
 			if (!Files.exists(file)) {
 				JsonObject json = new JsonObject();
 				json.add("money", GSON.toJsonTree(MoneySettings.DEFAULTS));
-				Files.createDirectories(file.getParent());
-				Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
+				SafeWrite.write(file, GSON.toJson(json));
 			}
 			long mtime = Files.getLastModifiedTime(file).toMillis();
 			if (mtime == loadedMtime) return;

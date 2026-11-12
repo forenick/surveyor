@@ -15,6 +15,7 @@ import dev.shaftjournal.detection.ItemCount;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.journal.GemYield;
 import dev.shaftjournal.journal.JournalEntry;
+import dev.shaftjournal.journal.JournalStats;
 import dev.shaftjournal.money.MoneySettings.Crystals;
 import dev.shaftjournal.money.MoneySettings.GemTier;
 import dev.shaftjournal.money.MoneySettings.SellPrice;
@@ -48,9 +49,6 @@ public record ShaftValue(List<Line> lines) {
 			return displayName;
 		}
 
-		public boolean cost() {
-			return this == KEYS || this == CAMPFIRES;
-		}
 	}
 
 	// coins null = no price, costs negative
@@ -71,10 +69,6 @@ public record ShaftValue(List<Line> lines) {
 
 	public List<Line> unpriced() {
 		return lines.stream().filter(l -> l.coins == null).toList();
-	}
-
-	public boolean anyPriced() {
-		return lines.stream().anyMatch(l -> l.coins != null);
 	}
 
 	// saved prices first, todays for anything they miss
@@ -152,14 +146,16 @@ public record ShaftValue(List<Line> lines) {
 		return saved;
 	}
 
-	// pre 0.14.0 entries didnt save it: sacks minus all corpse loot, a bit low
+	// pre 0.14.0 entries didnt save it: sacks - all corpse loot (a bit low) - sacks removed
+	// supercrafts werent saved, removed = their inputs, so only the result counts
 	static Map<String, Long> otherDrops(JournalEntry entry, TextPatterns patterns) {
 		if (entry.otherDrops() != null) return entry.otherDrops();
 		Map<String, Long> drops = new LinkedHashMap<>(entry.sacksAdded());
 		for (CorpseLoot corpse : entry.loots()) {
 			for (ItemCount item : corpse.items()) drops.merge(item.item(), -item.count(), Long::sum);
 		}
-		String type = entry.shaftId() == null || entry.shaftId().length() < 4 ? null : entry.shaftId().substring(0, 4);
+		if (entry.sacksRemoved() != null) entry.sacksRemoved().forEach((item, count) -> drops.merge(item, -count, Long::sum));
+		String type = JournalStats.type(entry);
 		drops.entrySet().removeIf(e -> e.getValue() <= 0 || GemYield.isShaftGem(e.getKey(), type, patterns));
 		return drops;
 	}

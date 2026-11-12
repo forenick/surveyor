@@ -46,7 +46,6 @@ import dev.shaftjournal.journal.LootSummary;
 import dev.shaftjournal.journal.SummaryText;
 import dev.shaftjournal.money.Coins;
 import dev.shaftjournal.money.MoneySettings;
-import dev.shaftjournal.money.MoneySettings.OldShafts;
 import dev.shaftjournal.money.ShaftValue;
 import dev.shaftjournal.money.ShaftValue.Line;
 import dev.shaftjournal.money.ShaftValue.Part;
@@ -82,11 +81,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int STATS_RIGHT = 27;
 	private static final int AXIS_GAP = 3;
 
-	// inside 40 = "10m 00s", 32 wrapped "3m 20s" at gui scale 3
+	// inside width measured per session, see insideMeasured
 	private static final List<Column> SHAFT_COLUMNS = List.of(
 			new Column("number", "#", 14, false, 4), new Column("shaft", "Shaft", 44, false, 0),
 			new Column("time", "Time", 32, false, 2), new Column("spawn", "Spawn", 66, false, 0),
-			new Column("inside", "Inside", 40, true, 1), new Column("corpses", "Corpses", 92, false, 0),
+			new Column("inside", "Inside", 0, true, 1), new Column("corpses", "Corpses", 92, false, 0),
 			new Column("powder", "Powder", 44, true, 0), new Column("gems", "Gems", 40, true, 3));
 	private static final List<Column> SESSION_COLUMNS = List.of(
 			new Column("date", "Date", 56, false, 0), new Column("start", "Start", 32, false, 3),
@@ -106,6 +105,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private int builtHeight;
 	private FlowLayout detail;
 	private final List<FlowLayout> shaftRows = new ArrayList<>();
+	private int moneyChanges = ShaftJournal.MONEY.changes();
 
 	public JournalScreen(List<JournalEntry> entries) {
 		super(Component.literal("Shaft Journal"));
@@ -117,6 +117,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	protected OwoUIAdapter<FlowLayout> createAdapter() {
 		return OwoUIAdapter.create(this, UIContainers::verticalFlow);
+	}
+
+	// prices + settings load on the io thread after the journal opens
+	@Override
+	public void tick() {
+		super.tick();
+		int changes = ShaftJournal.MONEY.changes();
+		if (changes == moneyChanges) return;
+		moneyChanges = changes;
+		fillDetail();
 	}
 
 	@Override
@@ -272,7 +282,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		long slowest = session.entries().stream().filter(e -> e.searchMillis() != null)
 				.mapToLong(JournalEntry::searchMillis).max().orElse(1);
 		int detailWidth = Math.clamp(width * 30 / 100, 140, 230);
-		List<Column> columns = fit(SHAFT_COLUMNS, width - 2 * PADDING - GAP - detailWidth - TABLE_CHROME);
+		List<Column> columns = fit(insideMeasured(session.entries()), width - 2 * PADDING - GAP - detailWidth - TABLE_CHROME);
 		FlowLayout rows = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		for (int i = 0; i < session.entries().size(); i++) {
 			JournalEntry entry = session.entries().get(i);
@@ -307,6 +317,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		main.child(detailScroll);
 		content.child(main);
 		fillDetail();
+	}
+
+	// measured bc pack fonts (caxton, bold) are wider. +1 slack
+	private List<Column> insideMeasured(List<JournalEntry> shafts) {
+		int widest = font.width("Inside");
+		for (JournalEntry entry : shafts) widest = Math.max(widest, font.width(SummaryText.duration(entry.durationMillis())));
+		int inside = widest + 1;
+		return SHAFT_COLUMNS.stream()
+				.map(c -> c.key().equals("inside") ? new Column(c.key(), c.title(), inside, c.right(), c.dropOrder()) : c)
+				.toList();
 	}
 
 	private void select(int index) {
@@ -405,7 +425,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		detail.child(net);
 		int unpriced = value.unpriced().size();
 		if (unpriced > 0) detail.child(wrapped("§c" + unpriced + (unpriced == 1 ? " item has" : " items have") + " no price"));
-		boolean saved = settings.oldShafts() == OldShafts.THAT_DAY && entry.prices() != null && !entry.prices().isEmpty();
+		boolean saved = ShaftJournal.MONEY.usesSavedPrices(entry);
 		long end = entry.enteredAt() + entry.durationMillis();
 		detail.child(wrapped("§8" + (saved ? "Prices from " + day(end) + " " + clock(end) : "Today's prices")));
 	}

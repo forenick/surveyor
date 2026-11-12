@@ -4,6 +4,26 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.14.2 (2026-11-12)
+Code review fixes for 0.14.0 and 0.14.1.
+- **Crystals you didn't get don't count.** When `You have already obtained this Crystal!` follows the
+  `✦ CRYSTAL FOUND` block, no crystal was given, so it's no longer worth Perfect minus 5 Flawless.
+- **Only the 12 gem crystals use the crystal setting.** Any other item named "... Crystal" gets its own price.
+- **Broken price answers are ignored.** A Bazaar or lowest BIN answer with no prices in it no longer wipes the saved
+  prices, and the second lowest BIN source is tried. A failed first source no longer pauses refreshes when the
+  second one worked.
+- **Old prices aren't saved as that day's.** A shaft only saves its prices when the Bazaar prices are at most an hour
+  old (f.e. not when the refresh failed after a long break), and never when there are no Bazaar prices. Otherwise
+  it uses today's prices.
+- **The journal updates when prices arrive.** The shaft view redraws when prices or `config.json` settings finish
+  loading, so the first open no longer shows "No prices yet" or old settings until you reopen it.
+- **Shaft gems on Turkish systems.** Citrine and Peridot gems were missed when the computer's language was Turkish.
+- **Shafts from before 0.14.0** take Sacks removals off their other drops, so a Supercrafted item counts once.
+- **Inside fits any font.** The Inside column is measured from the times in the session instead of a fixed width,
+  so Caxton and bold font packs no longer wrap it. Sessions of short shafts can get the # column back at GUI scale 3.
+- `journal.jsonl` saves each shaft's prices as short lists, so the file grows slower. Older entries still load.
+- Files are written through a temp file everywhere, `config.json` included.
+
 ## 0.14.1 (2026-11-12)
 - **Inside times fit at GUI scale 3.** The Session table's Inside column was too narrow for times of a minute or
   more, so "3m 20s" broke over two lines and ran into the rows around it. It's wide enough for "10m 00s" now. At

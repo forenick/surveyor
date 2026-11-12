@@ -10,6 +10,7 @@ import dev.shaftjournal.detection.ShaftEvent.CampfireUsed;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
 import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
+import dev.shaftjournal.detection.ShaftEvent.CrystalOwned;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -164,7 +165,7 @@ class ChatParserTest {
 	@Test
 	void crystalFound() {
 		String purple = "§5§l" + "▬".repeat(64);
-		assertEquals(List.of(new CrystalFound("Aquamarine Crystal")), parseAll(
+		assertEquals(List.of(new CrystalFound("Aquamarine Crystal"), new CrystalOwned()), parseAll(
 				purple,
 				"§f                           §5§l✦ CRYSTAL FOUND",
 				"§f                            §9Aquamarine Crystal",

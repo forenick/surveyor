@@ -41,6 +41,10 @@ public final class PriceBook {
 		return bazaar.isEmpty() && bins.isEmpty();
 	}
 
+	public boolean hasBazaar() {
+		return !bazaar.isEmpty();
+	}
+
 	public long bazaarAt() {
 		return bazaarAt;
 	}

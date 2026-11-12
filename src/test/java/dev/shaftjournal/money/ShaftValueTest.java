@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.Gson;
 import org.junit.jupiter.api.Test;
 
 import dev.shaftjournal.detection.CorpseLoot;
@@ -154,6 +155,58 @@ class ShaftValueTest {
 		assertEquals(List.of(new Line(Part.OTHER, "Glossy Gemstone", 2, 100_000 * TAX)),
 				value.lines().stream().filter(l -> l.part() == Part.OTHER).toList());
 		assertTrue(value.lines().stream().noneMatch(l -> l.part() == Part.CRYSTALS));
+	}
+
+	@Test
+	void oldEntriesDropSupercraftInputs() {
+		JournalEntry e = entry();
+		// 160 glacite supercrafted into 1 enchanted, made up counts
+		Map<String, Long> added = Map.of("Glacite", 160L, "Enchanted Glacite", 1L, "Glossy Gemstone", 2L);
+		Map<String, Long> removed = Map.of("Glacite", 160L);
+		JournalEntry old = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(), e.exit(),
+				e.exitPowder(), null, e.corpses(), 0, List.of(), e.mayhemBuffs(), e.campfiresAt(), null, 2, 0, Map.of(), added,
+				removed, e.gems(), null, null, null);
+		assertEquals(Map.of("Enchanted Glacite", 1L, "Glossy Gemstone", 2L), ShaftValue.otherDrops(old, PATTERNS));
+	}
+
+	@Test
+	void onlyGemCrystalsUseTheCrystalSetting() {
+		JournalEntry e = entry();
+		// made up item + price
+		ItemIds ids = ItemIds.bundled(Map.of("Frozen Crystal", "FROZEN_CRYSTAL"));
+		Map<String, ItemPrice> prices = new HashMap<>(PRICES);
+		prices.put("FROZEN_CRYSTAL", bz(1_000, 1_100));
+		JournalEntry withDrops = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(),
+				e.exit(), e.exitPowder(), null, e.corpses(), 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(),
+				Map.of(), null, List.of(), Map.of("Frozen Crystal", 3L), null);
+		MoneySettings zero = MoneySettings.DEFAULTS.withCrystals(Crystals.ZERO);
+		assertEquals(3_000 * TAX, ShaftValue.of(withDrops, prices::get, zero, ids, PATTERNS).total(Part.OTHER), 1e-6);
+	}
+
+	@Test
+	void snapshotsNeedFreshBazaarPrices() {
+		long at = 1_000_000_000L;
+		PriceBook bazaar = PriceBook.EMPTY.withBazaar(Map.of("FINE_JADE_GEM", bz(28_000, 30_000)), at);
+		assertTrue(LiveMoney.freshForSnapshot(bazaar, at + 30 * 60_000L));
+		assertFalse(LiveMoney.freshForSnapshot(bazaar, at + LiveMoney.SNAPSHOT_MAX_AGE + 1), "refresh failed, cached prices");
+		assertFalse(LiveMoney.freshForSnapshot(PriceBook.EMPTY.withBins(Map.of("CAGED_WISP", 60_000_000.0), at), at),
+				"no bazaar = gems at npc price");
+		assertFalse(LiveMoney.freshForSnapshot(PriceBook.EMPTY, at));
+	}
+
+	@Test
+	void pricesSaveAsShortArrays() {
+		Gson gson = new Gson();
+		assertEquals("[2400000,2600000.5]", gson.toJson(bz(2_400_000, 2_600_000.5)));
+		assertEquals("[null,null,null,5]", gson.toJson(new ItemPrice(null, null, null, 5.0)));
+		assertEquals(new ItemPrice(null, null, 60_000_000.0), gson.fromJson("[null,null,60000000]", ItemPrice.class));
+		// 0.14.0 + 0.14.1 journal entries
+		assertEquals(new ItemPrice(2_400_000.0, 2_600_000.0, null, 1.0),
+				gson.fromJson("{\"buyOrder\":2400000.0,\"sellOffer\":2600000.0,\"npcSell\":1.0}", ItemPrice.class));
+		Map<String, ItemPrice> saved = Map.of("FINE_JADE_GEM", bz(28_000, 30_000));
+		String json = gson.toJson(entry().withPrices(saved));
+		assertTrue(json.contains("\"prices\":{\"FINE_JADE_GEM\":[28000,30000]}"), json);
+		assertEquals(saved, gson.fromJson(json, JournalEntry.class).prices());
 	}
 
 	@Test

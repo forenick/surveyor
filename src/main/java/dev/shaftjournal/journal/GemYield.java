@@ -45,9 +45,14 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 	}
 
 	public static boolean isShaftGem(String item, String type, TextPatterns patterns) {
-		if (type == null) return false;
+		return shaftGem(item, type, patterns) != null;
+	}
+
+	// ROOT bc turkish locale uppercases "Citrine" to "CİTRİNE"
+	private static Matcher shaftGem(String item, String type, TextPatterns patterns) {
+		if (type == null) return null;
 		Matcher m = patterns.match("gem.item", item);
-		return m != null && m.group("gem").toUpperCase(Locale.ROOT).startsWith(type);
+		return m != null && m.group("gem").toUpperCase(Locale.ROOT).startsWith(type) ? m : null;
 	}
 
 	private static final class Totals {
@@ -58,8 +63,8 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 
 		void add(Map<String, Long> items, String type, TextPatterns patterns, int sign) {
 			items.forEach((item, count) -> {
-				Matcher m = patterns.match("gem.item", item);
-				if (m == null || !m.group("gem").toUpperCase().startsWith(type)) return;
+				Matcher m = shaftGem(item, type, patterns);
+				if (m == null) return;
 				gem = m.group("gem");
 				switch (m.group("quality")) {
 					case "Rough" -> rough += sign * count;

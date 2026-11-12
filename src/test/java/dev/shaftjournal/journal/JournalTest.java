@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -246,6 +247,24 @@ class JournalTest {
 	private void replay(Path recording) throws IOException {
 		// recordings have no block hits, spawns never timed
 		for (ShaftEvent event : RecordingReplay.replay(recording)) journal.onEvent(event, 0);
+	}
+
+	@Test
+	void turkishLocaleStillFindsTheShaftGem() {
+		Locale before = Locale.getDefault();
+		// "Citrine" uppercases to "CİTRİNE" here
+		Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+		try {
+			at(0).tracker.onWorldChange(now);
+			tracker.onScoreboard(now, List.of("§e§lSKYBLOCK", "§711/11/26 §8m19AB CITR_1"));
+			at(5_000).tracker.onChat(now, "§6[Sacks] §a+80§e items§e.§8 (Last 5s.)",
+					List.of("§a  +80 §eFlawed Citrine Gemstone§8 (Gemstones Sack)§a"));
+			at(15_000).tracker.onWorldChange(now);
+		} finally {
+			Locale.setDefault(before);
+		}
+		assertEquals("Citrine", entries.get(0).gems().gem());
+		assertEquals(Map.of(), entries.get(0).otherDrops());
 	}
 
 	private void visitShaft(long enteredAt, String id) {

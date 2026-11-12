@@ -49,11 +49,14 @@ scrap                  ^EXCAVATOR! You found a Suspicious Scrap!$
 # _C shaft crystal, name comes on the next line (recording 1)
 crystal.found          ^ +✦ CRYSTAL FOUND$
 crystal.name           ^ +(?<item>\w+ Crystal)$
+# already had 1, so none given (research/05, nicks call 2026-11-12)
+crystal.owned          ^You have already obtained this Crystal!$
 supercraft             ^You Supercrafted (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
 
 # icon already removed
 gem.item               ^(?<quality>Rough|Flawed|Fine) (?<gem>\w+) Gemstone$
-crystal.item           ^(?<gem>\w+) Crystal$
+# gem crystals only, other "x crystal" items get their own price
+crystal.item           ^(?<gem>Ruby|Amber|Sapphire|Jade|Amethyst|Topaz|Jasper|Opal|Aquamarine|Citrine|Onyx|Peridot) Crystal$
 
 # per item lines are in the hover text
 sacks                  ^\[Sacks\] .*\(Last (?<seconds>\d+)s\.\)$

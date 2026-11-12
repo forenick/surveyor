@@ -10,6 +10,7 @@ import dev.shaftjournal.detection.ShaftEvent.CampfireUsed;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
 import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
+import dev.shaftjournal.detection.ShaftEvent.CrystalOwned;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -73,6 +74,7 @@ public final class ChatParser {
 			crystalNext = true;
 			return null;
 		}
+		if (patterns.matches("crystal.owned", text)) return new CrystalOwned();
 		if ((m = patterns.match("pristine", text)) != null) {
 			return new Pristine(new ItemCount(m.group("item"), TextPatterns.number(m.group("count"))));
 		}

@@ -10,7 +10,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +22,8 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import dev.shaftjournal.util.SafeWrite;
 
 // io thread only (LiveMoney), only reads public price apis, sends nothing about the player
 final class PriceFeed {
@@ -99,29 +100,36 @@ final class PriceFeed {
 		boolean changed = false;
 		if (now - book.bazaarAt() > BAZAAR_MAX_AGE) {
 			try {
-				book = book.withBazaar(PriceBook.parseBazaar(get(BAZAAR)), System.currentTimeMillis());
+				book = book.withBazaar(nonEmpty(PriceBook.parseBazaar(get(BAZAAR)), "Bazaar"), System.currentTimeMillis());
 				changed = true;
 			} catch (IOException | RuntimeException e) {
 				failed("Bazaar", e);
 			}
 		}
 		if (now - book.binsAt() > BINS_MAX_AGE) {
+			Exception last = null;
 			for (URI uri : BINS) {
 				try {
-					book = book.withBins(PriceBook.parseBins(get(uri)), System.currentTimeMillis());
+					book = book.withBins(nonEmpty(PriceBook.parseBins(get(uri)), uri.getHost()), System.currentTimeMillis());
 					changed = true;
+					last = null;
 					break;
 				} catch (IOException | RuntimeException e) {
-					failed("lowest BIN from " + uri.getHost(), e);
+					LOGGER.warn("Could not get lowest BIN prices from {}: {}", uri.getHost(), e.toString());
+					last = e;
+					if (e instanceof Interrupted) break;
 				}
 			}
+			// only when every source failed, a working fallback shouldnt pause refreshes
+			if (last != null) failed("lowest BIN", last);
 		}
 		if (changed) writeJson(pricesFile, book.toJson());
 		if (now - namesAt > NAMES_MAX_AGE) {
 			try {
 				JsonObject items = get(ITEMS);
 				Map<String, Double> npc = ItemIds.parseNpcPrices(items);
-				names = Map.copyOf(ItemIds.parseHypixelItems(items));
+				Map<String, String> parsed = nonEmpty(ItemIds.parseHypixelItems(items), "item list");
+				names = Map.copyOf(parsed);
 				book = book.withNpc(npc);
 				namesAt = System.currentTimeMillis();
 				JsonObject json = new JsonObject();
@@ -137,6 +145,12 @@ final class PriceFeed {
 				failed("item names and NPC", e);
 			}
 		}
+	}
+
+	// 200 w/ an error body parses to nothing, never let it wipe the cache
+	private static <T extends Map<?, ?>> T nonEmpty(T parsed, String what) throws IOException {
+		if (parsed.isEmpty()) throw new IOException(what + " sent no prices");
+		return parsed;
 	}
 
 	private void failed(String what, Exception e) {
@@ -174,13 +188,9 @@ final class PriceFeed {
 		}
 	}
 
-	// tmp + move so a crash never leaves half a file
 	private static void writeJson(Path file, JsonObject json) {
 		try {
-			Files.createDirectories(file.getParent());
-			Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-			Files.writeString(tmp, json.toString(), StandardCharsets.UTF_8);
-			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			SafeWrite.write(file, json.toString());
 		} catch (IOException e) {
 			LOGGER.warn("Could not write {}: {}", file, e.toString());
 		}

@@ -65,6 +65,10 @@ public sealed interface ShaftEvent {
 	record CrystalFound(String item) implements ShaftEvent {
 	}
 
+	// takes back the last CrystalFound
+	record CrystalOwned() implements ShaftEvent {
+	}
+
 	record Supercraft(ItemCount result) implements ShaftEvent {
 	}
 }
