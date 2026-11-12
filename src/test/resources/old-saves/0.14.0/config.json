@@ -1,0 +1,9 @@
+{
+  "money": {
+    "sellPrice": "sell_offer",
+    "gemTier": "fine",
+    "bazaarTax": 1.25,
+    "oldShafts": "today",
+    "crystals": "zero"
+  }
+}

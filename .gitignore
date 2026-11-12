@@ -42,3 +42,6 @@ replay_*.log
 # test runs
 
 logs/
+
+# old-save test output, check by hand
+src/test/resources/old-saves/*/*.new

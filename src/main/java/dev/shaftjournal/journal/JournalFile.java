@@ -81,7 +81,10 @@ public final class JournalFile {
 				number++;
 				if (line.isBlank()) continue;
 				try {
-					entries.add(gson.fromJson(line, JournalEntry.class));
+					JournalEntry entry = gson.fromJson(line, JournalEntry.class);
+					// "null" parses to null
+					if (entry != null) entries.add(entry);
+					else LOGGER.warn("Skipping empty line {} of {}", number, file);
 				} catch (JsonParseException e) {
 					LOGGER.warn("Skipping unreadable line {} of {}: {}", number, file, e.getMessage());
 				}

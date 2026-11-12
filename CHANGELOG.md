@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.17.1 (2026-11-12)
+Old shafting data is now checked on every build, so an update can't wipe or corrupt it.
+- **Old-save tests.** `src/test/resources/old-saves/<version>/` holds real files older versions wrote: Nick's
+  journal, HUD and config from 0.16.0, the 0.2.x journal, and HUD files written by the 0.5.3, 0.6.1, 0.9.0 and 0.12.0
+  jars (all three HUD formats). The build fails if any old shaft, box, line or setting is lost or changed, or if old
+  shafts show different numbers than 0.16.0 did (`expected-journal.txt`, also checked against a clean 0.16.0 build).
+- **HUD backup before converting.** When `hud.json` is in an older format (or a hand edit got repaired), the original
+  is copied to `hud.json.<time>.old` before the first save overwrites it.
+- **A journal line that's just `null`** is skipped instead of loading as an empty shaft.
+
 ## 0.17.0 (2026-11-12)
 Journal changes from Nick's feedback on 0.16.0.
 - **Session tab shows only the session you're in.** With no session going it says so (and that older sessions are in

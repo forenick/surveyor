@@ -77,8 +77,8 @@ public final class LiveHud {
 		return thread;
 	});
 	private boolean loaded;
-	// io thread only
-	private boolean backupBeforeSave;
+	// io thread only. null = no backup, ".bad" unreadable, ".old" older format
+	private String backupSuffix;
 	private boolean inMines;
 	private boolean inShaft;
 	private Path file;
@@ -123,27 +123,30 @@ public final class LiveHud {
 			json = Files.readString(file, StandardCharsets.UTF_8);
 		} catch (IOException e) {
 			// maybe just locked, keep it, first save backs it up
-			backupBeforeSave = true;
+			backupSuffix = ".bad";
 			LOGGER.warn("Could not read {}, using the default HUD", file, e);
 			return null;
 		}
 		try {
-			return HudLayout.fromJson(json);
+			HudLayout layout = HudLayout.fromJson(json);
+			// older format or repaired hand edit, keep the original
+			if (!layout.toJson().equals(json)) backupSuffix = ".old";
+			return layout;
 		} catch (JsonParseException e) {
 			// else the next save overwrites a hand edit
 			try {
-				Path backup = Files.move(file, backupPath());
+				Path backup = Files.move(file, backupPath(".bad"));
 				LOGGER.warn("Could not read {}, moved it to {} and using the default HUD", file, backup, e);
 			} catch (IOException moveFailed) {
-				backupBeforeSave = true;
+				backupSuffix = ".bad";
 				LOGGER.warn("Could not read {} or move it away, using the default HUD", file, e);
 			}
 			return null;
 		}
 	}
 
-	private Path backupPath() {
-		return file.resolveSibling("hud.json." + LocalDateTime.now().format(BACKUP_TIME) + ".bad");
+	private Path backupPath(String suffix) {
+		return file.resolveSibling("hud.json." + LocalDateTime.now().format(BACKUP_TIME) + suffix);
 	}
 
 	// client thread, after changing the layout
@@ -154,9 +157,9 @@ public final class LiveHud {
 		String json = layout.toJson();
 		Runnable write = () -> {
 			try {
-				if (backupBeforeSave && Files.exists(file)) {
-					Files.copy(file, backupPath());
-					backupBeforeSave = false;
+				if (backupSuffix != null && Files.exists(file)) {
+					Files.copy(file, backupPath(backupSuffix));
+					backupSuffix = null;
 				}
 				SafeWrite.write(file, json);
 			} catch (IOException e) {

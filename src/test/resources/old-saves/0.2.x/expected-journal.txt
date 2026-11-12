@@ -1,0 +1,15 @@
+shafts 6
+sessions 1
+time 1114070
+powder 43436
+looted {Lapis=7}
+seen {Lapis=7, Umber=7, Tungsten=7}
+types {PERI={1=1}, JADE={1=1}, AMET={1=1}, TITA={1=1}, AQUA={C=1}, ONYX={1=1}}
+average spawn 127734
+coins 0.0
+1794413802805 PERI_1 BYE powder=1000 corpses={Umber=CorpseCount[looted=0, total=3]} gems=null coins=0.0
+1794413874264 JADE_1 BYE powder=1000 corpses={Umber=CorpseCount[looted=0, total=1], Tungsten=CorpseCount[looted=0, total=2]} gems=null coins=0.0
+1794413927053 AMET_1 BYE powder=16287 corpses={Lapis=CorpseCount[looted=3, total=3], Tungsten=CorpseCount[looted=0, total=1]} gems=null coins=0.0
+1794414148591 TITA_1 BYE powder=12381 corpses={Lapis=CorpseCount[looted=2, total=2], Umber=CorpseCount[looted=0, total=1], Tungsten=CorpseCount[looted=0, total=1]} gems=null coins=0.0
+1794414468634 AQUA_C BYE powder=5934 corpses={Lapis=CorpseCount[looted=1, total=1], Tungsten=CorpseCount[looted=0, total=2]} gems=null coins=0.0
+1794414891062 ONYX_1 BYE powder=6834 corpses={Lapis=CorpseCount[looted=1, total=1], Umber=CorpseCount[looted=0, total=2], Tungsten=CorpseCount[looted=0, total=1]} gems=null coins=0.0

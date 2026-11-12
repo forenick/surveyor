@@ -1,0 +1,9 @@
+{
+  "money": {
+    "sellPrice": "insta_sell",
+    "gemTier": "flawless",
+    "bazaarTax": 1.125,
+    "oldShafts": "that_day",
+    "crystals": "perfect_minus_flawless"
+  }
+}

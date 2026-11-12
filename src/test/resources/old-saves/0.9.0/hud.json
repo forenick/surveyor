@@ -1,0 +1,159 @@
+{
+  "version": 3,
+  "boxes": [
+    {
+      "id": "session",
+      "title": "Session",
+      "showTitle": true,
+      "showInShaft": true,
+      "showInMines": true,
+      "showElsewhere": false,
+      "background": "DARK",
+      "scale": 1.0,
+      "align": "LEFT",
+      "labelColor": "7",
+      "valueColor": "f",
+      "labelBold": false,
+      "valueBold": false,
+      "anchorX": "START",
+      "anchorY": "START",
+      "offsetX": 0,
+      "offsetY": 0,
+      "lines": [
+        {
+          "value": "session_shafts",
+          "prefix": "Shafts: ",
+          "shown": true,
+          "format": 0,
+          "range": "SESSION",
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "shafts_per_hour",
+          "prefix": "Shafts/h: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "average_spawn",
+          "prefix": "Avg spawn: ",
+          "shown": false,
+          "format": 1,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "session_powder",
+          "prefix": "Powder: ",
+          "shown": true,
+          "format": 0,
+          "range": "SESSION",
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "session_corpse_fine",
+          "prefix": "Fine: ",
+          "shown": true,
+          "format": 0,
+          "range": "SESSION",
+          "advanced": false,
+          "readyRule": false
+        }
+      ]
+    },
+    {
+      "id": "spawn",
+      "title": "Spawn",
+      "showTitle": false,
+      "showInShaft": true,
+      "showInMines": true,
+      "showElsewhere": false,
+      "background": "NONE",
+      "scale": 1.0,
+      "align": "CENTER",
+      "labelColor": "7",
+      "valueColor": "f",
+      "labelBold": false,
+      "valueBold": true,
+      "anchorX": "MIDDLE",
+      "anchorY": "MIDDLE",
+      "offsetX": 0,
+      "offsetY": 18,
+      "lines": [
+        {
+          "value": "spawn_timer",
+          "prefix": "Spawn: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "average_spawn",
+          "prefix": "Avg: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        }
+      ]
+    },
+    {
+      "id": "shaft",
+      "title": "{shaft_type} Shaft",
+      "showTitle": true,
+      "showInShaft": true,
+      "showInMines": false,
+      "showElsewhere": false,
+      "background": "FRAME",
+      "scale": 1.0,
+      "align": "LEFT",
+      "labelColor": "7",
+      "valueColor": "f",
+      "labelBold": false,
+      "valueBold": false,
+      "anchorX": "END",
+      "anchorY": "START",
+      "offsetX": 0,
+      "offsetY": 0,
+      "lines": [
+        {
+          "value": "shaft_time",
+          "prefix": "Inside: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "shaft_corpses",
+          "prefix": "Corpses: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "shaft_cold",
+          "prefix": "Cold: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        },
+        {
+          "value": "shaft_campfires",
+          "prefix": "Campfires: ",
+          "shown": true,
+          "format": 0,
+          "advanced": false,
+          "readyRule": false
+        }
+      ]
+    }
+  ]
+}
