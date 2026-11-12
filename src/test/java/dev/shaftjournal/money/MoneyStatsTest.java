@@ -55,6 +55,7 @@ class MoneyStatsTest {
 		assertEquals(14_000_000, stats.coins(), 1e-6);
 		assertEquals(7, stats.valued(), "the one without prices is left out, the empty one counts");
 		assertEquals(2_000_000, stats.perShaft(), 1e-6);
+		assertEquals(Map.of(Part.MINED, 14_000_000.0), stats.parts(), "lines summed per part");
 		assertSame(rich, stats.bestShaft().entry());
 		// 5M over 8 min (start to last shafts end)
 		assertSame(sessions.get(1), stats.bestRate().session());

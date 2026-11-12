@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.16.0 (2026-11-12)
+Journal changes from Nick's feedback on 0.15.0.
+- **Overview tab** (was Sessions) comes first. It groups your sessions by day: each day gets a row with its total
+  time, shafts, powder, coins and coins per hour, and the sessions under it show their start time.
+- **The journal opens on Overview**, or on Session while that session is still going.
+- **Coins / h is gray** in the Overview, so only the coin totals are gold.
+- **Stats tab** has a bar chart icon.
+- **Corpses looted** reads `Lapis 172 +30.7M (+178.6k avg.)`. On narrow screens the total moves to the tooltip.
+- **All-time Coins tooltip** now shows where the coins came from (mined gems, corpse loot, keys, campfires and so
+  on), then the average per shaft and per hour shafting.
+
 ## 0.15.0 (2026-11-12)
 Coins everywhere, slice 2 of the money tracker (design in `Docs/money-design.md`).
 - **Journal tables**: the Session table gets a Coins column per shaft, the Sessions table Coins and Coins / h per

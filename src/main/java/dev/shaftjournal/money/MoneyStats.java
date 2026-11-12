@@ -1,5 +1,6 @@
 package dev.shaftjournal.money;
 
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,9 +10,12 @@ import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalStats;
 import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.money.ShaftValue.CorpseValue;
+import dev.shaftjournal.money.ShaftValue.Part;
 
 // values null = no prices at all yet
-public record MoneyStats(Double coins, int valued, Map<String, CorpseCoins> corpses, Best bestShaft, BestRate bestRate) {
+// parts = all-time total per part, in Part order
+public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<String, CorpseCoins> corpses, Best bestShaft,
+		BestRate bestRate) {
 	public record CorpseCoins(int corpses, double loot, double keys, int unpriced) {
 		public double net() {
 			return loot + keys;
@@ -61,6 +65,7 @@ public record MoneyStats(Double coins, int valued, Map<String, CorpseCoins> corp
 			Function<JournalEntry, ShaftValue> values) {
 		Double coins = null;
 		int valued = 0;
+		Map<Part, Double> parts = new EnumMap<>(Part.class);
 		Map<String, CorpseCoins> corpses = new LinkedHashMap<>();
 		Best best = null;
 		for (JournalEntry entry : entries) {
@@ -68,6 +73,9 @@ public record MoneyStats(Double coins, int valued, Map<String, CorpseCoins> corp
 			if (value == null) continue;
 			valued++;
 			coins = plus(coins, value.net());
+			for (ShaftValue.Line line : value.lines()) {
+				if (line.coins() != null) parts.merge(line.part(), line.coins(), Double::sum);
+			}
 			for (CorpseValue corpse : value.corpses()) {
 				corpses.merge(corpse.type(), new CorpseCoins(1, corpse.loot(), corpse.key(), corpse.unpriced()),
 						(had, one) -> had.plus(corpse));
@@ -80,6 +88,6 @@ public record MoneyStats(Double coins, int valued, Map<String, CorpseCoins> corp
 			Double rate = perHour(session, values);
 			if (rate != null && (bestRate == null || rate > bestRate.perHour())) bestRate = new BestRate(session, rate);
 		}
-		return new MoneyStats(coins, valued, corpses, best, bestRate);
+		return new MoneyStats(coins, valued, parts, corpses, best, bestRate);
 	}
 }
