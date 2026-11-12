@@ -292,7 +292,7 @@ class HudTest {
 	void freeText() {
 		Box box = HudLayout.defaults().boxes.get(1);
 		Line spawn = box.lines.getFirst();
-		assertEquals("&7Spawn: &f&l{spawn_timer}", HudBoxText.basicText(box, spawn));
+		assertEquals("Spawn: &v{spawn_timer}", HudBoxText.basicText(box, spawn));
 		spawn.advanced = true;
 		spawn.text = "Spawn &8» &e{spawn_timer} &7(avg {average_spawn:seconds}) {nope} {spawn_timer:all_time} &lB&aG &rx";
 		assertEquals("§7Spawn §8» §e1:42 §7(avg 85s) {nope} {spawn_timer:all_time} §lB§aG §r§7x",
@@ -301,7 +301,7 @@ class HudTest {
 		Line powder = new Line(HudValue.SESSION_POWDER);
 		powder.range = Range.ALL_TIME;
 		powder.format = 1;
-		assertEquals("&7Powder: &f{session_powder:all_time:short}", HudBoxText.basicText(new Box(), powder));
+		assertEquals("Powder: &v{session_powder:all_time:short}", HudBoxText.basicText(new Box(), powder));
 		powder.advanced = true;
 		powder.text = "{session_powder:per_hour} / {session_powder:shaft:plain}";
 		Box one = new Box();
@@ -309,6 +309,81 @@ class HudTest {
 		assertEquals("§7137,166/h / 7120", HudBoxText.lines(one, HudData.EXAMPLE, false).getFirst());
 		assertEquals("Jade 1.2M", HudBoxText.tags("{shaft_type} {session_powder:all_time:short}", HudData.EXAMPLE, false),
 				"titles take options too");
+	}
+
+	@Test
+	void lineColours() {
+		Box box = HudLayout.defaults().boxes.get(1);
+		Line spawn = box.lines.getFirst();
+		spawn.labelColor = "b";
+		spawn.valueColor = "a";
+		spawn.prefix = "Next: ";
+		assertEquals("§bNext: §a§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst());
+		spawn.readyRule = true;
+		assertEquals("§bNext: §c§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(), "a rule beats the line colour");
+		spawn.readyRule = false;
+		spawn.valueColor = null;
+		assertEquals("§bNext: §f§l1:42", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(), "no own colour = box colour");
+		spawn.shown = false;
+		assertEquals("§bNext: §f§l1:42", HudBoxText.line(box, spawn, HudData.EXAMPLE, false), "hidden lines still render for the editor");
+	}
+
+	@Test
+	void basicTextLooksTheSame() {
+		for (Box box : HudLayout.defaults().boxes) {
+			box.lines.getFirst().labelColor = "6";
+			for (Line line : box.lines) {
+				String basic = HudBoxText.line(box, line, HudData.EXAMPLE, false);
+				line.text = HudBoxText.basicText(box, line);
+				line.advanced = true;
+				assertEquals(visible(basic), visible(HudBoxText.line(box, line, HudData.EXAMPLE, false)),
+						"free text starts out looking like the line: " + line.text);
+			}
+		}
+	}
+
+	// each char w/ its colour + bold, so §7§6a == §6a
+	private static String visible(String text) {
+		StringBuilder out = new StringBuilder();
+		char color = 'f';
+		boolean bold = false;
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c == '§' && i + 1 < text.length()) {
+				char code = text.charAt(++i);
+				if (code == 'l') bold = true;
+				else if (code != 'r') {
+					color = code;
+					bold = false;
+				}
+				continue;
+			}
+			out.append(c).append(color).append(bold ? 'B' : '.');
+		}
+		return out.toString();
+	}
+
+	@Test
+	void freeTextFollowsTheBox() {
+		Box box = new Box();
+		Line powder = new Line(HudValue.SESSION_POWDER);
+		powder.text = HudBoxText.basicText(box, powder);
+		powder.advanced = true;
+		box.lines.add(powder);
+		box.labelColor = "e";
+		box.valueColor = "b";
+		box.valueBold = true;
+		assertEquals("§ePowder: §b§l43,436", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"&v and the start follow the box theme later on");
+		powder.text = "&aX &rY &vZ";
+		assertEquals("§e§aX §r§eY §b§lZ", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst());
+	}
+
+	@Test
+	void unknownTags() {
+		assertEquals(List.of("{gems_hr}", "{session_powder:weekly}", "{Spawn}"),
+				HudBoxText.unknownTags("{spawn_timer} {gems_hr} {session_powder:weekly} {session_powder:per_hour:short} {Spawn}"));
+		assertEquals(List.of(), HudBoxText.unknownTags("no tags { here"));
 	}
 
 	@Test

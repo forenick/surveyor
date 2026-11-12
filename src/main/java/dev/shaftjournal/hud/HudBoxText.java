@@ -12,6 +12,7 @@ import dev.shaftjournal.hud.HudValue.Range;
 public final class HudBoxText {
 	private static final String TITLE_STYLE = "§e§l";
 	private static final Pattern TAG = Pattern.compile("\\{([a-z_]+)((?::[a-z_]+)*)}");
+	private static final Pattern ANY_TAG = Pattern.compile("\\{[^{}]*}");
 	// &k left out on purpose
 	private static final String STYLES = "lonm";
 
@@ -24,19 +25,24 @@ public final class HudBoxText {
 			String title = tags(box.title, data, example).strip();
 			if (!title.isEmpty()) lines.add(TITLE_STYLE + title);
 		}
-		String label = "§" + box.labelColor + (box.labelBold ? "§l" : "");
 		for (Line line : box.lines) {
-			HudValue hudValue = line.hudValue();
-			if (!line.shown || hudValue == null) continue;
-			String rule = HudColors.color(line, data, example);
-			if (line.advanced && line.text != null) {
-				lines.add(free(box, line, rule, data, example));
-				continue;
-			}
-			String value = "§" + (rule != null ? rule : box.valueColor) + (box.valueBold ? "§l" : "");
-			lines.add(label + line.prefix + value + text(hudValue, line.range, line.format, data, example));
+			if (!line.shown) continue;
+			String text = line(box, line, data, example);
+			if (text != null) lines.add(text);
 		}
 		return lines;
+	}
+
+	// also hidden lines, for the editor
+	public static String line(Box box, Line line, HudData data, boolean example) {
+		HudValue hudValue = line.hudValue();
+		if (hudValue == null) return null;
+		String rule = HudColors.color(line, data, example);
+		if (line.advanced && line.text != null) return free(box, line, rule, data, example);
+		String label = "§" + (line.labelColor != null ? line.labelColor : box.labelColor) + (box.labelBold ? "§l" : "");
+		String value = "§" + (rule != null ? rule : line.valueColor != null ? line.valueColor : box.valueColor)
+				+ (box.valueBold ? "§l" : "");
+		return label + line.prefix + value + text(hudValue, line.range, line.format, data, example);
 	}
 
 	static String tags(String text, HudData data, boolean example) {
@@ -56,12 +62,12 @@ public final class HudBoxText {
 		return out.toString();
 	}
 
-	// &r = back to label colour, unknown tags stay as typed
+	// &r = box label colour, &v = box value colour, unknown tags stay as typed
 	static String free(Box box, Line line, String rule, HudData data, boolean example) {
 		String text = line.text;
-		StringBuilder out = new StringBuilder("§").append(box.labelColor);
 		String color = box.labelColor;
-		StringBuilder styles = new StringBuilder();
+		StringBuilder styles = new StringBuilder(box.labelBold ? "l" : "");
+		StringBuilder out = new StringBuilder("§").append(color).append(codes(styles));
 		Matcher tags = TAG.matcher(text);
 		Range own = rule == null ? null : ruleRange(line);
 		int i = 0;
@@ -69,11 +75,20 @@ public final class HudBoxText {
 			char c = text.charAt(i);
 			if (c == '&' && i + 1 < text.length()) {
 				char code = Character.toLowerCase(text.charAt(i + 1));
-				if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r') {
+				if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r' || code == 'v') {
 					// colour resets styles, like vanilla
-					color = code == 'r' ? box.labelColor : String.valueOf(code);
 					styles.setLength(0);
-					out.append(code == 'r' ? "§r" : "").append('§').append(color);
+					if (code == 'r') {
+						color = box.labelColor;
+						if (box.labelBold) styles.append('l');
+						out.append("§r");
+					} else if (code == 'v') {
+						color = box.valueColor;
+						if (box.valueBold) styles.append('l');
+					} else {
+						color = String.valueOf(code);
+					}
+					out.append('§').append(color).append(codes(styles));
 					i += 2;
 					continue;
 				}
@@ -101,6 +116,20 @@ public final class HudBoxText {
 		return out.toString();
 	}
 
+	public static List<String> unknownTags(String text) {
+		List<String> unknown = new ArrayList<>();
+		Matcher any = ANY_TAG.matcher(text);
+		while (any.find()) {
+			Matcher tag = TAG.matcher(any.group());
+			if (!tag.matches() || Tag.parse(tag.group(1), tag.group(2)) == null) unknown.add(any.group());
+		}
+		return unknown;
+	}
+
+	public static String tag(HudValue value, Range range, int format) {
+		return Tag.of(value, range, format);
+	}
+
 	// free text: range of the first tag w/ the lines own value
 	public static Range ruleRange(Line line) {
 		HudValue value = line.hudValue();
@@ -113,10 +142,12 @@ public final class HudBoxText {
 		return line.range;
 	}
 
+	// own colours as codes, box colours stay live (&v)
 	public static String basicText(Box box, Line line) {
 		HudValue value = line.hudValue();
-		return "&" + box.labelColor + (box.labelBold ? "&l" : "") + line.prefix
-				+ "&" + box.valueColor + (box.valueBold ? "&l" : "") + Tag.of(value, line.range, line.format);
+		String label = line.labelColor == null ? "" : "&" + line.labelColor + (box.labelBold ? "&l" : "");
+		String valueCode = line.valueColor == null ? "&v" : "&" + line.valueColor + (box.valueBold ? "&l" : "");
+		return label + line.prefix + valueCode + Tag.of(value, line.range, line.format);
 	}
 
 	private static String codes(CharSequence styles) {

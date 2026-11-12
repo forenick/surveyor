@@ -4,6 +4,28 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.10.0 (2026-11-12)
+Edit HUD: lines are easier to change, without typing codes. Built from `Docs/mockups/hud-lines-v2.html`.
+- **Lines and Box tabs.** A box opens on its lines; title, background, size, align, Show in, colours and
+  Delete box moved to the Box tab.
+- **Lines show how they look**, in their own colours, so two "Fine" lines with different ranges can be told
+  apart. Click a line (or ✎) to open it. Hidden lines are grey. Free-text lines have an aqua ✎.
+- **Line page:** a live preview, a **Label** field (the text before the value), range and format as buttons
+  you can all see (formats show an example like "43.4k"), and a colour for the label and the value: "Box"
+  follows the box's colours, or pick one of the 16. Colour rules are still there and beat the value colour.
+  Remove sits at the top.
+- **Add line** groups the values (Spawn, Session, This shaft), shows what each one looks like, ticks the
+  ones already in the box, and opens the new line straight away. **+ New box** opens it too.
+- **Free text** ("Write this line yourself") gets a bigger field that wraps, **+ Value** (value, then range,
+  then format) and **Colour** menus that type the tag or code at the cursor, a red note for a tag it doesn't
+  know, and the full tag list behind **?**. New code `&v` is the box's value colour; `&r` is the box's label
+  colour (now with its bold). Free text started from a line uses `&v`, so it keeps following the box theme.
+- Each page keeps its scroll position, and going back scrolls to the line you were on.
+- Boxes that don't show where you are now get a light dim and a "hidden here" badge instead of a dark cover,
+  so their text stays readable while you edit.
+- On narrow screens (1080p auto GUI scale) the side panel leaves room at the top for the toolbar, so Done,
+  Reset and + New box aren't covered.
+
 ## 0.9.3 (2026-11-12)
 Comments cut down to the ones that matter (where a number comes from, gotchas), now keyword-short. Added
 Spotless, which fixes unused imports, import order and trailing whitespace; `./gradlew build` fails until

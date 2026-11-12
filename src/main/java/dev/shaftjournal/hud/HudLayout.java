@@ -76,6 +76,10 @@ public final class HudLayout {
 	public static final class Line {
 		public String value;
 		public String prefix;
+		// null = box colour
+		public String labelColor;
+		// null = box colour
+		public String valueColor;
 		public boolean shown = true;
 		public int format;
 		public Range range;
@@ -243,6 +247,8 @@ public final class HudLayout {
 		for (Line line : box.lines) {
 			HudValue value = line.hudValue();
 			if (line.prefix == null) line.prefix = value.defaultPrefix();
+			if (!isColor(line.labelColor)) line.labelColor = null;
+			if (!isColor(line.valueColor)) line.valueColor = null;
 			int formats = HudFormat.options(value.kind()).size();
 			if (line.format < 0 || line.format >= formats) line.format = 0;
 			// pre-range files have none, were all session values

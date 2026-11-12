@@ -5,17 +5,34 @@ import java.util.Locale;
 
 // ids saved in hud.json + tags, never rename
 public enum HudValue {
-	SESSION_SHAFTS("session_shafts", "Shafts", Kind.INTEGER, "Shafts: ", Range.SESSION, Range.ALL_TIME),
-	SHAFTS_PER_HOUR("shafts_per_hour", "Shafts per hour", Kind.DECIMAL, "Shafts/h: "),
-	AVERAGE_SPAWN("average_spawn", "Average spawn", Kind.TIME, "Avg spawn: "),
-	SESSION_POWDER("session_powder", "Powder", Kind.INTEGER, "Powder: ", Range.values()),
-	SESSION_CORPSE_FINE("session_corpse_fine", "Fine from corpses", Kind.DECIMAL, "Fine: ", Range.values()),
-	SPAWN_TIMER("spawn_timer", "Spawn timer", Kind.TIME, "Spawn: "),
-	SHAFT_TYPE("shaft_type", "Shaft type", Kind.TEXT, "Shaft: "),
-	SHAFT_TIME("shaft_time", "Time inside", Kind.TIME, "Inside: "),
-	SHAFT_CORPSES("shaft_corpses", "Corpses", Kind.TEXT, "Corpses: "),
-	SHAFT_COLD("shaft_cold", "Cold", Kind.COLD, "Cold: "),
-	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Kind.INTEGER, "Campfires: ");
+	SESSION_SHAFTS("session_shafts", "Shafts", Group.SESSION, Kind.INTEGER, "Shafts: ", Range.SESSION, Range.ALL_TIME),
+	SHAFTS_PER_HOUR("shafts_per_hour", "Shafts per hour", Group.SESSION, Kind.DECIMAL, "Shafts/h: "),
+	AVERAGE_SPAWN("average_spawn", "Average spawn", Group.SPAWN, Kind.TIME, "Avg spawn: "),
+	SESSION_POWDER("session_powder", "Powder", Group.SESSION, Kind.INTEGER, "Powder: ", Range.values()),
+	SESSION_CORPSE_FINE("session_corpse_fine", "Fine from corpses", Group.SESSION, Kind.DECIMAL, "Fine: ", Range.values()),
+	SPAWN_TIMER("spawn_timer", "Spawn timer", Group.SPAWN, Kind.TIME, "Spawn: "),
+	SHAFT_TYPE("shaft_type", "Shaft type", Group.SHAFT, Kind.TEXT, "Shaft: "),
+	SHAFT_TIME("shaft_time", "Time inside", Group.SHAFT, Kind.TIME, "Inside: "),
+	SHAFT_CORPSES("shaft_corpses", "Corpses", Group.SHAFT, Kind.TEXT, "Corpses: "),
+	SHAFT_COLD("shaft_cold", "Cold", Group.SHAFT, Kind.COLD, "Cold: "),
+	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Group.SHAFT, Kind.INTEGER, "Campfires: ");
+
+	// picker headings, display only
+	public enum Group {
+		SPAWN("Spawn"),
+		SESSION("Session"),
+		SHAFT("This shaft");
+
+		private final String displayName;
+
+		Group(String displayName) {
+			this.displayName = displayName;
+		}
+
+		public String displayName() {
+			return displayName;
+		}
+	}
 
 	// names saved in hud.json, never rename
 	public enum Range {
@@ -58,13 +75,15 @@ public enum HudValue {
 
 	private final String id;
 	private final String displayName;
+	private final Group group;
 	private final Kind kind;
 	private final String defaultPrefix;
 	private final List<Range> ranges;
 
-	HudValue(String id, String displayName, Kind kind, String defaultPrefix, Range... ranges) {
+	HudValue(String id, String displayName, Group group, Kind kind, String defaultPrefix, Range... ranges) {
 		this.id = id;
 		this.displayName = displayName;
+		this.group = group;
 		this.kind = kind;
 		this.defaultPrefix = defaultPrefix;
 		this.ranges = List.of(ranges);
@@ -76,6 +95,10 @@ public enum HudValue {
 
 	public String displayName() {
 		return displayName;
+	}
+
+	public Group group() {
+		return group;
 	}
 
 	public Kind kind() {
