@@ -43,7 +43,9 @@ public record JournalEntry(
 
 	public static JournalEntry of(Shaft shaft, long sessionId, Long searchMillis, TextPatterns patterns) {
 		return new JournalEntry(VERSION, sessionId, shaft.id() == null ? null : shaft.id().id(),
-				shaft.enteredAt(), shaft.durationMillis(), shaft.exitReason().name(), shaft.exitPowder(), searchMillis,
+				shaft.enteredAt(), shaft.durationMillis(),
+				// null = still inside (live coins)
+				shaft.exitReason() == null ? null : shaft.exitReason().name(), shaft.exitPowder(), searchMillis,
 				List.copyOf(shaft.corpses()), shaft.extraCorpses(), List.copyOf(shaft.loots()),
 				List.copyOf(shaft.mayhemBuffs()),
 				shaft.campfiresPlaced().stream().map(at -> at - shaft.enteredAt()).toList(),

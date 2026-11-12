@@ -1,6 +1,7 @@
 package dev.shaftjournal.money;
 
 import java.nio.file.Path;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.ShaftEvent;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.journal.JournalEntry;
@@ -28,6 +30,9 @@ public final class LiveMoney {
 	private final AtomicInteger changes = new AtomicInteger();
 	private PriceFeed feed;
 	private MoneyConfig config;
+	// client thread only, saved entries only (live ones would pile up). cleared when changes() moves
+	private final Map<JournalEntry, ShaftValue> values = new IdentityHashMap<>();
+	private int valuesAt = -1;
 
 	public void start(Path folder, String version) {
 		feed = new PriceFeed(folder, version);
@@ -87,8 +92,25 @@ public final class LiveMoney {
 		return book.hasBazaar() && end - book.bazaarAt() <= SNAPSHOT_MAX_AGE;
 	}
 
-	// null = no prices at all yet
+	// null = no prices at all yet. saved entries only, cached
 	public ShaftValue value(JournalEntry entry) {
+		int now = changes.get();
+		if (now != valuesAt) {
+			values.clear();
+			valuesAt = now;
+		}
+		if (values.containsKey(entry)) return values.get(entry);
+		ShaftValue value = compute(entry);
+		values.put(entry, value);
+		return value;
+	}
+
+	// shaft still going, todays prices, not cached
+	public ShaftValue live(Shaft shaft) {
+		return compute(JournalEntry.of(shaft, 0, null, TextPatterns.defaults()));
+	}
+
+	private ShaftValue compute(JournalEntry entry) {
 		PriceBook book = book();
 		MoneySettings settings = settings();
 		boolean saved = usesSavedPrices(entry, settings);

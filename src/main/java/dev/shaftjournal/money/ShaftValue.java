@@ -21,7 +21,7 @@ import dev.shaftjournal.money.MoneySettings.GemTier;
 import dev.shaftjournal.money.MoneySettings.SellPrice;
 
 // rules in docs/money-design.md
-public record ShaftValue(List<Line> lines) {
+public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 	// key per corpse (research/01)
 	private static final Map<String, String> KEYS = Map.of("Umber", "Umber Key", "Tungsten", "Tungsten Key",
 			"Vanguard", "Skeleton Key");
@@ -53,6 +53,13 @@ public record ShaftValue(List<Line> lines) {
 
 	// coins null = no price, costs negative
 	public record Line(Part part, String item, double count, Double coins) {
+	}
+
+	// per looted corpse, key negative, unpriced = items w/o a price (counted as 0)
+	public record CorpseValue(String type, double loot, double key, int unpriced) {
+		public double net() {
+			return loot + key;
+		}
 	}
 
 	public interface Prices {
@@ -97,10 +104,24 @@ public record ShaftValue(List<Line> lines) {
 
 		Map<String, Long> loot = new LinkedHashMap<>();
 		Map<String, Long> keys = new LinkedHashMap<>();
+		List<CorpseValue> corpses = new ArrayList<>();
 		for (CorpseLoot corpse : entry.loots()) {
-			for (ItemCount item : corpse.items()) loot.merge(item.item(), item.count(), Long::sum);
+			double lootCoins = 0;
+			int unpriced = 0;
+			for (ItemCount item : corpse.items()) {
+				loot.merge(item.item(), item.count(), Long::sum);
+				Double coins = v.line(Part.CORPSES, item.item(), item.count()).coins();
+				if (coins == null) unpriced++;
+				else lootCoins += coins;
+			}
 			String key = KEYS.get(corpse.type());
-			if (key != null) keys.merge(key, 1L, Long::sum);
+			Double keyCost = null;
+			if (key != null) {
+				keys.merge(key, 1L, Long::sum);
+				keyCost = v.buy(ids.id(key));
+				if (keyCost == null) unpriced++;
+			}
+			corpses.add(new CorpseValue(corpse.type(), lootCoins, keyCost == null ? 0 : -keyCost, unpriced));
 		}
 		loot.forEach((item, count) -> lines.add(v.line(Part.CORPSES, item, count)));
 
@@ -124,7 +145,7 @@ public record ShaftValue(List<Line> lines) {
 			Double each = umber == null || sticks == null ? null : umber + CAMPFIRE_MATCH_STICKS * sticks;
 			lines.add(new Line(Part.CAMPFIRES, "Portable Campfire", campfires, each == null ? null : -each * campfires));
 		}
-		return new ShaftValue(List.copyOf(lines));
+		return new ShaftValue(List.copyOf(lines), List.copyOf(corpses));
 	}
 
 	// every id the value could use, both gem tiers, so settings can change later

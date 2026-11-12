@@ -55,7 +55,7 @@ public class ShaftJournal implements ClientModInitializer {
 	public static final LiveTracker TRACKER = new LiveTracker();
 	public static final LiveMoney MONEY = new LiveMoney();
 	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea, MONEY);
-	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL);
+	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL, MONEY);
 
 	private final ShaftRecorder recorder = RECORDER;
 

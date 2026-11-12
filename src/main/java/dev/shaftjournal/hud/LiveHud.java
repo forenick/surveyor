@@ -35,6 +35,8 @@ import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.journal.Journal;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.LiveJournal;
+import dev.shaftjournal.money.LiveMoney;
+import dev.shaftjournal.money.MoneyStats;
 import dev.shaftjournal.screen.ShaftNames;
 import dev.shaftjournal.util.DataFolder;
 import dev.shaftjournal.util.SafeWrite;
@@ -51,6 +53,7 @@ public final class LiveHud {
 
 	private final LiveTracker tracker;
 	private final LiveJournal journal;
+	private final LiveMoney money;
 	private HudLayout layout = HudLayout.defaults();
 	private HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
 	// new object per saved shaft, compared by identity
@@ -60,6 +63,10 @@ public final class LiveHud {
 	private JournalEntry totalsFirst;
 	private Totals allTime = Totals.NONE;
 	private Totals lastShaft;
+	private int moneyChanges = -1;
+	private Double sessionCoins;
+	private Double allTimeCoins;
+	private Double lastShaftCoins;
 	private List<Prepared> prepared;
 	private int preparedWidth;
 	private int preparedHeight;
@@ -82,9 +89,10 @@ public final class LiveHud {
 	private record Prepared(Box box, List<String> lines, HudRenderer.Bounds bounds) {
 	}
 
-	public LiveHud(LiveTracker tracker, LiveJournal journal) {
+	public LiveHud(LiveTracker tracker, LiveJournal journal, LiveMoney money) {
 		this.tracker = tracker;
 		this.journal = journal;
+		this.money = money;
 	}
 
 	public void start(Minecraft client) {
@@ -216,22 +224,33 @@ public final class LiveHud {
 		inMines = tracker.inMiningArea();
 		Journal.Session session = journal.activeSession(now);
 		TextPatterns patterns = TextPatterns.defaults();
-		if (session != totalsSession) {
+		// new prices or settings = every coin value again
+		boolean revalue = money.changes() != moneyChanges;
+		moneyChanges = money.changes();
+		if (session != totalsSession || revalue) {
 			totalsSession = session;
-			totals = SessionTotals.of(journal.sessionEntries(session), patterns);
+			List<JournalEntry> entries = journal.sessionEntries(session);
+			totals = SessionTotals.of(entries, patterns);
+			sessionCoins = MoneyStats.coins(entries, money::value);
 		}
-		if (journal.entryCount() != totalsEntries) {
+		if (journal.entryCount() != totalsEntries || revalue) {
 			// only new ones, all again if the file loaded in front of them
 			JournalEntry first = journal.firstEntry();
-			boolean again = first != totalsFirst;
+			boolean again = first != totalsFirst || revalue;
 			List<JournalEntry> added = journal.entries(again ? 0 : totalsEntries);
 			allTime = (again ? Totals.NONE : allTime).plus(Totals.of(added, patterns));
+			allTimeCoins = MoneyStats.plus(again ? null : allTimeCoins, MoneyStats.coins(added, money::value));
 			totalsFirst = first;
 			totalsEntries = journal.entryCount();
-			lastShaft = added.isEmpty() ? lastShaft : Totals.of(List.of(added.getLast()), patterns);
+			if (!added.isEmpty()) {
+				lastShaft = Totals.of(List.of(added.getLast()), patterns);
+				lastShaftCoins = MoneyStats.net(money.value(added.getLast()));
+			}
 		}
 		Totals thisShaft = shaft != null ? Totals.of(shaft, patterns) : lastShaft;
+		Double shaftCoins = shaft != null ? MoneyStats.net(money.live(shaft)) : lastShaftCoins;
 		data = HudData.live(totals, allTime, thisShaft, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults())
+				.money(new HudData.Money(shaftCoins, sessionCoins, allTimeCoins, allTime.shafts()))
 				.game(game(client, now));
 		prepared = null;
 	}

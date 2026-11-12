@@ -93,6 +93,28 @@ class ShaftValueTest {
 	}
 
 	@Test
+	void eachCorpseOnItsOwn() {
+		ShaftValue value = value(MoneySettings.DEFAULTS);
+		assertEquals(List.of("Lapis", "Tungsten"), value.corpses().stream().map(ShaftValue.CorpseValue::type).toList());
+		ShaftValue.CorpseValue lapis = value.corpses().get(0);
+		assertEquals((6_250 + 12_000) * TAX, lapis.loot(), 1e-6);
+		assertEquals(0, lapis.key(), "lapis needs no key");
+		ShaftValue.CorpseValue tungsten = value.corpses().get(1);
+		assertEquals(80_000 * TAX + 60_000_000, tungsten.loot(), 1e-6);
+		assertEquals(-2_800_000, tungsten.key(), 1e-6);
+		assertEquals(value.total(Part.CORPSES) + value.total(Part.KEYS), lapis.net() + tungsten.net(), 1e-6);
+		assertEquals(0, lapis.unpriced() + tungsten.unpriced());
+
+		Map<String, ItemPrice> noKey = new HashMap<>(PRICES);
+		noKey.remove("TUNGSTEN_KEY");
+		noKey.remove("GOBLIN_EGG");
+		ShaftValue missing = ShaftValue.of(entry(), noKey::get, MoneySettings.DEFAULTS, IDS, PATTERNS);
+		assertEquals(1, missing.corpses().get(0).unpriced(), "goblin eggs");
+		assertEquals(1, missing.corpses().get(1).unpriced(), "the key");
+		assertEquals(0, missing.corpses().get(1).key());
+	}
+
+	@Test
 	void settingsChangeTheValue() {
 		MoneySettings fine = MoneySettings.DEFAULTS.withGemTier(GemTier.FINE);
 		assertEquals(280_000 * TAX, value(fine).total(Part.MINED), 1e-6);

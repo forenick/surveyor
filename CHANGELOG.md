@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.15.0 (2026-11-12)
+Coins everywhere, slice 2 of the money tracker (design in `Docs/money-design.md`).
+- **Journal tables**: the Session table gets a Coins column per shaft, the Sessions table Coins and Coins / h per
+  session. Losses show in red, a shaft worth nothing as a gray 0. At GUI scale 4 the Session table now drops Powder
+  to make room (it's still in the tiles and the shaft view).
+- **Session tab** gets a Coins tile. Hover it for coins per shaft and per hour.
+- **Stats tab**: the all-time Coins total (hover for the average per shaft and per hour), coins per corpse type
+  ("Umber 12 +250k each", loot minus the key, hover for both), and the Coins / shaft and Coins / h records with an
+  arrow to that shaft or session.
+- **HUD values** in a new Money group: Coins (this shaft, session, per hour, all-time) and Coins per shaft (session,
+  all-time). Formats 1.2M, 1,204,310 or 1204310. "This shaft" counts live while you're inside. Colour rules for
+  coins take `1.5M`, `250k` or `2b`.
+- **Money preset** under + Preset: this shaft, session, per hour and per shaft in gold.
+- The journal redraws every tab when new prices arrive, not just the shaft view.
+
 ## 0.14.2 (2026-11-12)
 Code review fixes for 0.14.0 and 0.14.1.
 - **Crystals you didn't get don't count.** When `You have already obtained this Crystal!` follows the

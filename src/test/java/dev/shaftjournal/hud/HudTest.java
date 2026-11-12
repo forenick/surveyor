@@ -21,6 +21,7 @@ import dev.shaftjournal.hud.HudValue.Range;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalFile;
 import dev.shaftjournal.journal.JournalStats;
+import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.screen.ShaftNames;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -550,6 +551,54 @@ class HudTest {
 	}
 
 	@Test
+	void coinValues() throws Exception {
+		List<JournalEntry> entries = realJournal();
+		long end = entries.getLast().enteredAt() + entries.getLast().durationMillis();
+		HudData data = live(entries, end).money(new HudData.Money(-250_000.0, 12_000_000.0, 40_000_000.0, 20));
+		SessionSummary session = new SessionSummary(entries.getFirst().sessionId(), entries);
+		assertEquals(-250_000.0, data.get(HudValue.COINS, Range.SHAFT));
+		assertEquals(12_000_000.0, data.get(HudValue.COINS));
+		assertEquals(session.perHour(12_000_000, end), data.get(HudValue.COINS, Range.PER_HOUR));
+		assertEquals(12_000_000.0 / entries.size(), data.get(HudValue.COINS_PER_SHAFT));
+		assertEquals(2_000_000.0, data.get(HudValue.COINS_PER_SHAFT, Range.ALL_TIME));
+
+		HudData noPrices = live(entries, end).money(new HudData.Money(null, null, null, 20));
+		assertNull(noPrices.get(HudValue.COINS));
+		assertNull(noPrices.get(HudValue.COINS_PER_SHAFT));
+		Box box = new Box();
+		box.lines.add(new Line(HudValue.COINS));
+		assertEquals("§7Coins: §f-", HudBoxText.lines(box, noPrices, false).getFirst(), "no prices yet");
+		assertEquals("§7Coins: §f12.0M", HudBoxText.lines(box, data, false).getFirst());
+		box.lines.getFirst().format = 1;
+		assertEquals("§7Coins: §f12,000,000", HudBoxText.lines(box, data, false).getFirst());
+		box.lines.getFirst().range = Range.SHAFT;
+		box.lines.getFirst().format = 0;
+		assertEquals("§7Coins: §f-250.0k", HudBoxText.lines(box, data, false).getFirst());
+		assertEquals("12.0M", HudBoxText.tags("{coins}", data, false));
+		assertEquals("12000000", HudBoxText.tags("{coins:plain}", data, false));
+	}
+
+	@Test
+	void coinThresholds() {
+		assertEquals(List.of("0.0M", "#,##0", "0"), HudFormat.options(Kind.COINS));
+		assertEquals(1_500_000.0, HudFormat.parseThreshold(Kind.COINS, "1.5M"));
+		assertEquals(1_500_000.0, HudFormat.parseThreshold(Kind.COINS, "1,5m"));
+		assertEquals(250_000.0, HudFormat.parseThreshold(Kind.COINS, "250k"));
+		assertEquals(2_000_000_000.0, HudFormat.parseThreshold(Kind.COINS, "2b"));
+		assertEquals(-500_000.0, HudFormat.parseThreshold(Kind.COINS, "-500k"));
+		assertEquals(1_204_310.0, HudFormat.parseThreshold(Kind.COINS, "1,204,310"));
+		assertNull(HudFormat.parseThreshold(Kind.INTEGER, "1.5M"), "only coins take k, M and B");
+		assertNull(HudFormat.parseThreshold(Kind.COINS, "1.5x"));
+		assertEquals("2.4M", HudFormat.thresholdText(Kind.COINS, 2_400_000));
+		assertEquals("250k", HudFormat.thresholdText(Kind.COINS, 250_000));
+		assertEquals("-3M", HudFormat.thresholdText(Kind.COINS, -3_000_000));
+		assertEquals("2431000", HudFormat.thresholdText(Kind.COINS, 2_431_000), "not rounded away");
+		assertEquals("950", HudFormat.thresholdText(Kind.COINS, 950));
+		assertTrue(HudColors.comparable(HudValue.COINS, HudValue.COINS_PER_SHAFT));
+		assertFalse(HudColors.comparable(HudValue.COINS, HudValue.SESSION_POWDER), "coins only vs coins");
+	}
+
+	@Test
 	void totalsAddUp() {
 		assertEquals(new Totals(3, 30, 1.5), new Totals(1, 10, 0.5).plus(new Totals(2, 20, 1)));
 	}
@@ -641,7 +690,7 @@ class HudTest {
 	@Test
 	void presetsAddTheirLines() {
 		List<HudLayout.Preset> presets = HudLayout.presets();
-		assertEquals(List.of("Spawn", "Session", "Current shaft", "All-time totals", "Performance"),
+		assertEquals(List.of("Spawn", "Session", "Current shaft", "All-time totals", "Money", "Performance"),
 				presets.stream().map(HudLayout.Preset::name).toList());
 		HudLayout defaults = HudLayout.defaults();
 		assertEquals(defaults.boxes.get(1).id, presets.get(0).box().get().id);
@@ -649,7 +698,10 @@ class HudTest {
 		Box allTime = presets.get(3).box().get();
 		assertEquals(List.of("§e§lAll-time", "§7Shafts: §f412", "§7Powder: §f1,204,310", "§7Fine: §f412.8"),
 				HudBoxText.lines(allTime, HudData.EXAMPLE, true));
-		Box performance = presets.get(4).box().get();
+		Box money = presets.get(4).box().get();
+		assertEquals(List.of("§e§lMoney", "§7This shaft: §62.4M", "§7Session: §614.8M", "§7Per hour: §646.8M/h",
+				"§7Per shaft: §62.5M"), HudBoxText.lines(money, HudData.EXAMPLE, true));
+		Box performance = presets.get(5).box().get();
 		assertTrue(performance.visible(false, false), "shown everywhere");
 		assertEquals(List.of("§7FPS: §f144", "§7Ping: §f42ms", "§7TPS: §f19.9"),
 				HudBoxText.lines(performance, HudData.EXAMPLE, true));

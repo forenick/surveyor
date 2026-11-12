@@ -30,6 +30,7 @@ public final class HudData {
 	// real but empty (zeros before the first shaft), editor shows examples
 	private final Set<Key> placeholders = new HashSet<>();
 	private long now;
+	private SessionTotals session = SessionTotals.NONE;
 
 	public long now() {
 		return now;
@@ -118,6 +119,7 @@ public final class HudData {
 			long now, ShaftNames names) {
 		HudData data = new HudData();
 		data.now = now;
+		data.session = session;
 		Totals totals = session.totals();
 		data.put(HudValue.SESSION_SHAFTS, totals.shafts());
 		data.put(HudValue.SESSION_POWDER, totals.powder());
@@ -149,6 +151,24 @@ public final class HudData {
 			data.put(HudValue.SHAFT_CAMPFIRES, (long) shaft.campfiresPlaced().size());
 		}
 		return data;
+	}
+
+	// net coins, null = no prices yet. shaft = live or the last one
+	public record Money(Double shaft, Double session, Double allTime, long allTimeShafts) {
+	}
+
+	public HudData money(Money money) {
+		put(HudValue.COINS, Range.SHAFT, money.shaft());
+		put(HudValue.COINS, Range.SESSION, money.session());
+		put(HudValue.COINS, Range.ALL_TIME, money.allTime());
+		if (money.session() != null && session.shafts() > 0) {
+			put(HudValue.COINS_PER_SHAFT, Range.SESSION, money.session() / session.shafts());
+			if (session.summary() != null) put(HudValue.COINS, Range.PER_HOUR, session.summary().perHour(money.session(), now));
+		}
+		if (money.allTime() != null && money.allTimeShafts() > 0) {
+			put(HudValue.COINS_PER_SHAFT, Range.ALL_TIME, money.allTime() / money.allTimeShafts());
+		}
+		return this;
 	}
 
 	// null = not known right now
@@ -202,6 +222,12 @@ public final class HudData {
 				.put(HudValue.SHAFT_CORPSES, "2/4 Lapis, Umber")
 				.cold(-12)
 				.put(HudValue.SHAFT_CAMPFIRES, 1L)
+				.put(HudValue.COINS, Range.SHAFT, 2_431_000.0)
+				.put(HudValue.COINS, 14_820_000.0)
+				.put(HudValue.COINS, Range.PER_HOUR, 46_800_000.0)
+				.put(HudValue.COINS, Range.ALL_TIME, 612_300_000.0)
+				.put(HudValue.COINS_PER_SHAFT, 2_470_000.0)
+				.put(HudValue.COINS_PER_SHAFT, Range.ALL_TIME, 1_486_000.0)
 				.put(HudValue.FPS, 144L)
 				.put(HudValue.PING, 42L)
 				.put(HudValue.TPS, 19.9);

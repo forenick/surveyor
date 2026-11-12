@@ -1,0 +1,85 @@
+package dev.shaftjournal.money;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+import dev.shaftjournal.journal.JournalEntry;
+import dev.shaftjournal.journal.JournalStats;
+import dev.shaftjournal.journal.JournalStats.SessionSummary;
+import dev.shaftjournal.money.ShaftValue.CorpseValue;
+
+// values null = no prices at all yet
+public record MoneyStats(Double coins, int valued, Map<String, CorpseCoins> corpses, Best bestShaft, BestRate bestRate) {
+	public record CorpseCoins(int corpses, double loot, double keys, int unpriced) {
+		public double net() {
+			return loot + keys;
+		}
+
+		public double each() {
+			return net() / corpses;
+		}
+
+		CorpseCoins plus(CorpseValue corpse) {
+			return new CorpseCoins(corpses + 1, loot + corpse.loot(), keys + corpse.key(), unpriced + corpse.unpriced());
+		}
+	}
+
+	public record Best(JournalEntry entry, double coins) {
+	}
+
+	public record BestRate(SessionSummary session, double perHour) {
+	}
+
+	public Double perShaft() {
+		return coins == null || valued == 0 ? null : coins / valued;
+	}
+
+	public static Double net(ShaftValue value) {
+		return value == null ? null : value.net();
+	}
+
+	// null when none of them has a value
+	public static Double coins(List<JournalEntry> entries, Function<JournalEntry, ShaftValue> values) {
+		Double total = null;
+		for (JournalEntry entry : entries) total = plus(total, net(values.apply(entry)));
+		return total;
+	}
+
+	public static Double plus(Double a, Double b) {
+		if (a == null) return b;
+		return b == null ? a : a + b;
+	}
+
+	public static Double perHour(SessionSummary session, Function<JournalEntry, ShaftValue> values) {
+		Double coins = coins(session.entries(), values);
+		return coins == null ? null : session.perHour(coins, session.end());
+	}
+
+	public static MoneyStats of(List<JournalEntry> entries, List<SessionSummary> sessions,
+			Function<JournalEntry, ShaftValue> values) {
+		Double coins = null;
+		int valued = 0;
+		Map<String, CorpseCoins> corpses = new LinkedHashMap<>();
+		Best best = null;
+		for (JournalEntry entry : entries) {
+			ShaftValue value = values.apply(entry);
+			if (value == null) continue;
+			valued++;
+			coins = plus(coins, value.net());
+			for (CorpseValue corpse : value.corpses()) {
+				corpses.merge(corpse.type(), new CorpseCoins(1, corpse.loot(), corpse.key(), corpse.unpriced()),
+						(had, one) -> had.plus(corpse));
+			}
+			if (!value.lines().isEmpty() && (best == null || value.net() > best.coins())) best = new Best(entry, value.net());
+		}
+		BestRate bestRate = null;
+		for (SessionSummary session : sessions) {
+			if (session.shafts() < JournalStats.MIN_SHAFTS_FOR_RATE_RECORD) continue;
+			Double rate = perHour(session, values);
+			if (rate != null && (bestRate == null || rate > bestRate.perHour())) bestRate = new BestRate(session, rate);
+		}
+		return new MoneyStats(coins, valued, corpses, best, bestRate);
+	}
+}

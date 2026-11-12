@@ -187,6 +187,7 @@ public final class HudLayout {
 				new Preset("Session", "Shafts, shafts per hour, powder and Fine", HudLayout::sessionBox),
 				new Preset("Current shaft", "Time inside, corpses, cold and campfires", HudLayout::shaftBox),
 				new Preset("All-time totals", "Shafts, powder and Fine, all-time", HudLayout::allTimeBox),
+				new Preset("Money", "Coins this shaft, this session, per hour and per shaft", HudLayout::moneyBox),
 				new Preset("Performance", "FPS, ping and TPS", HudLayout::performanceBox));
 	}
 
@@ -226,6 +227,22 @@ public final class HudLayout {
 			box.lines.add(line);
 		}
 		return box;
+	}
+
+	private static Box moneyBox() {
+		Box box = box("money", "Money", true, true, Background.DARK, Align.LEFT, Anchor.END, 0, Anchor.MIDDLE, 0);
+		box.valueColor = "6";
+		box.lines.add(rangeLine(HudValue.COINS, "This shaft: ", Range.SHAFT));
+		box.lines.add(rangeLine(HudValue.COINS, "Session: ", Range.SESSION));
+		box.lines.add(rangeLine(HudValue.COINS, "Per hour: ", Range.PER_HOUR));
+		box.lines.add(rangeLine(HudValue.COINS_PER_SHAFT, "Per shaft: ", Range.SESSION));
+		return box;
+	}
+
+	private static Line rangeLine(HudValue value, String prefix, Range range) {
+		Line line = new Line(value, prefix, true, 0);
+		line.range = range;
+		return line;
 	}
 
 	private static Box performanceBox() {

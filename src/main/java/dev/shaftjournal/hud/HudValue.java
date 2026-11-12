@@ -16,6 +16,10 @@ public enum HudValue {
 	SHAFT_CORPSES("shaft_corpses", "Corpses", Group.SHAFT, Kind.TEXT, "Corpses: "),
 	SHAFT_COLD("shaft_cold", "Cold", Group.SHAFT, Kind.COLD, "Cold: "),
 	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Group.SHAFT, Kind.INTEGER, "Campfires: "),
+	// net, shaft = live while inside
+	COINS("coins", "Coins", Group.MONEY, Kind.COINS, "Coins: ", Range.values()),
+	COINS_PER_SHAFT("coins_per_shaft", "Coins per shaft", Group.MONEY, Kind.COINS, "Coins/shaft: ", Range.SESSION,
+			Range.ALL_TIME),
 	FPS("fps", "FPS", Group.GAME, Kind.INTEGER, "FPS: "),
 	PING("ping", "Ping", Group.GAME, Kind.INTEGER, "Ping: ", "ms"),
 	TPS("tps", "TPS", Group.GAME, Kind.DECIMAL, "TPS: "),
@@ -28,6 +32,7 @@ public enum HudValue {
 		SPAWN("Spawn"),
 		SESSION("Session"),
 		SHAFT("This shaft"),
+		MONEY("Money"),
 		GAME("Game");
 
 		private final String displayName;
@@ -77,6 +82,8 @@ public enum HudValue {
 		INTEGER,
 		DECIMAL,
 		COLD,
+		// Double, 1.2M
+		COINS,
 		TEXT
 	}
 
