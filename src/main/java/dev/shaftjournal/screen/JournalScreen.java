@@ -82,10 +82,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int STATS_RIGHT = 27;
 	private static final int AXIS_GAP = 3;
 
+	// inside 40 = "10m 00s", 32 wrapped "3m 20s" at gui scale 3
 	private static final List<Column> SHAFT_COLUMNS = List.of(
 			new Column("number", "#", 14, false, 4), new Column("shaft", "Shaft", 44, false, 0),
 			new Column("time", "Time", 32, false, 2), new Column("spawn", "Spawn", 66, false, 0),
-			new Column("inside", "Inside", 32, true, 1), new Column("corpses", "Corpses", 92, false, 0),
+			new Column("inside", "Inside", 40, true, 1), new Column("corpses", "Corpses", 92, false, 0),
 			new Column("powder", "Powder", 44, true, 0), new Column("gems", "Gems", 40, true, 3));
 	private static final List<Column> SESSION_COLUMNS = List.of(
 			new Column("date", "Date", 56, false, 0), new Column("start", "Start", 32, false, 3),

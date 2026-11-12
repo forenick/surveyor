@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.14.1 (2026-11-12)
+- **Inside times fit at GUI scale 3.** The Session table's Inside column was too narrow for times of a minute or
+  more, so "3m 20s" broke over two lines and ran into the rows around it. It's wide enough for "10m 00s" now. At
+  scale 3 the # column makes room for it; scales 2 and 4 look the same as before.
+
 ## 0.14.0 (2026-11-12)
 Coins, slice 1 of the money tracker (design in `Docs/money-design.md`, Nick's picks from 2026-11-12).
 - **Every shaft gets a coin value**: mined gems, other drops (mob drops and the like from your Sacks), corpse
