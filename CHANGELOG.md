@@ -4,6 +4,34 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.11.0 (2026-11-12)
+Edit HUD on one page, bigger buttons, and tooltips that fit. Built from `Docs/mockups/hud-one-page.html`.
+- **One page per box.** No more Lines and Box tabs: a box opens with its **Lines** on top and its **Box**
+  settings under them. Click "▾ Lines" or "▾ Box" to fold a section away (remembered while the editor is
+  open). **+ Add line** sits next to "Lines", so it's at the top even with many lines.
+- **Bigger buttons:** 16 px for buttons that do something (toolbar, Back, Remove, + Add line, Delete box…),
+  14 px for choices and line rows. Before, everything was 12 px, which looked squashed with resource packs
+  that have a thick button border.
+- **Colours are one button each** that shows the colour and opens a grid with bigger swatches and "Box
+  colour", instead of 16 tiny swatches in a row. The picked colour has a yellow outline. A colour rule now
+  fits on one row.
+- **Delete box** is red with an ✕ icon (vanilla's own sprite, so Caxton can't break it). Line **Remove** and
+  the rule ✕ use the same icon. **Reset** is now **Reset all**, set apart from Done.
+- **Tooltips** wrap and always stay on screen. The tag help behind **?** fits at 480×270, splits each tag's
+  options into "ranges · formats", and **clicking ?** keeps it open beside the panel while you type.
+- **Custom text** (was "Free text"): the section says "(ADVANCED)", the box reads "Type this line with codes",
+  and a short note explains what it's for before you tick it.
+- **Line page:** Range is a 2×2 grid and Range/Format/Colour have row names again, so "All-time" no longer
+  wraps onto its own row. The preview has no field border, so it doesn't look like a text field. Sections
+  have dividers and white headings.
+- **Line list:** rows show a "›" instead of a ✎ button (the whole row opens the line); custom-text lines get an
+  aqua ✎. Checkbox labels have a gap and can be clicked too.
+- **Dragging a line** near the top or bottom of the panel scrolls it, so lines can be moved past what's shown.
+- **Esc** closes a menu, then the pinned help, then goes back from a line or the line picker, and only then
+  closes the editor.
+- "Already in this box" ticks in the line picker are green instead of nearly invisible.
+- At 480×270 the toolbar drops its "Edit HUD" title when the panel needs the full height.
+
 ## 0.10.1 (2026-11-12)
 Code review fixes for the Edit HUD lines v2.
 - **Remove** no longer deletes more lines when Enter or Space is pressed after it. Clicked buttons and

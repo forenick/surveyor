@@ -34,6 +34,16 @@ import dev.shaftjournal.recorder.ShaftRecorder;
 import dev.shaftjournal.screen.JournalScreen;
 import dev.shaftjournal.util.DataFolder;
 
+/**
+ This is my first real Java project i'll make public. The code is probably ass in some places.
+ Author is @forenick
+
+ Yes, i did use AI to help me out in some places.
+
+ Fun Fact: Lobsters pee out of their faces. From right under their eyes. :o
+
+ **/
+
 public class ShaftJournal implements ClientModInitializer {
 	public static final String MOD_ID = "shaftjournal";
 	// not /st, thats hypixels /storage
