@@ -305,9 +305,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		if (selected == null) {
 			// short, fits 480 wide (1080p auto scale)
-			String[] hint = {"§7Drag a box to move it · hold Ctrl to place it freely · click it to edit",
-					"§7Scroll on the selected box to resize it · arrow keys nudge it",
-					"§7Changes save by themselves · Ctrl+Z undo · Ctrl+Shift+Z redo"};
+			String[] hint = {"§7Drag a box to move it, hold Ctrl to place it freely, click it to edit",
+					"§7Scroll on the selected box to resize it, arrow keys nudge it",
+					"§7Changes save by themselves. Ctrl+Z undo, Ctrl+Shift+Z redo"};
 			for (int i = 0; i < hint.length; i++) {
 				graphics.text(font, hint[i], (width - font.width(hint[i])) / 2, height - 64 + i * 11, 0xFFFFFFFF, true);
 			}
@@ -1418,7 +1418,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			return;
 		}
 		openMenu(anchor, m -> {
-			m.child(menuTitle(value.displayName() + (value.ranges().size() > 1 ? " · " + range.displayName() : "")));
+			m.child(menuTitle(value.displayName()));
 			// own examples, real values can look the same in every format
 			List<String> examples = HudFormat.options(value.kind());
 			for (int i = 0; i < formats; i++) {
@@ -1556,11 +1556,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				+ "§7Values: §f{value_id}§7, options after a colon: §f{session_powder:all_time:short}");
 		for (HudValue value : HudValue.values()) {
 			help.append(value == own ? "\n§e" : "\n§f").append('{').append(value.id()).append('}');
-			List<String> ranges = value.ranges().size() > 1 ? value.ranges().stream().map(HudValue.Range::tagName).toList() : List.of();
-			List<String> formats = HudFormat.names(value.kind());
-			String options = String.join(", ", ranges) + (!ranges.isEmpty() && !formats.isEmpty() ? " · " : "")
-					+ String.join(", ", formats);
-			if (!options.isEmpty()) help.append(" §8").append(options);
+			List<String> options = new ArrayList<>();
+			if (value.ranges().size() > 1) value.ranges().forEach(range -> options.add(range.tagName()));
+			options.addAll(HudFormat.names(value.kind()));
+			if (!options.isEmpty()) help.append(" §8").append(String.join(", ", options));
 		}
 		Component text = Component.literal(help.toString());
 		List<FormattedCharSequence> lines = List.of();

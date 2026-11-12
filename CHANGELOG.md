@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.12.2 (2026-11-12)
+No more dot separators in the editor (Nick doesn't want them anywhere).
+- The hint at the bottom of the editor uses commas.
+- The "+ Value ▾" format menu's title is just the value's name, without its range.
+- The custom text help lists each value's options with commas only.
+
 ## 0.12.1 (2026-11-12)
 - The line page's breadcrumb no longer shows the range ("· Session"), just the value's name. Nick doesn't
   want dot separators.
