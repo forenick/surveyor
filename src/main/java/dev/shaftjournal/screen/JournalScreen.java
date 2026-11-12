@@ -44,6 +44,12 @@ import dev.shaftjournal.journal.JournalStats.CorpseCount;
 import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.journal.LootSummary;
 import dev.shaftjournal.journal.SummaryText;
+import dev.shaftjournal.money.Coins;
+import dev.shaftjournal.money.MoneySettings;
+import dev.shaftjournal.money.MoneySettings.OldShafts;
+import dev.shaftjournal.money.ShaftValue;
+import dev.shaftjournal.money.ShaftValue.Line;
+import dev.shaftjournal.money.ShaftValue.Part;
 
 // mc font only so pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
@@ -314,6 +320,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<JournalEntry> shafts = sessions.get(sessionIndex).entries();
 		if (selected < 0 || selected >= shafts.size()) return;
 		JournalEntry entry = shafts.get(selected);
+		ShaftValue value = ShaftJournal.MONEY.value(entry);
 
 		String id = entry.shaftId() == null ? "Unknown shaft" : entry.shaftId();
 		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? "  §dCrystal" : "")));
@@ -322,6 +329,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		detail.child(keyValue("Exit", "§f" + SummaryText.exitName(entry.exit())));
 		detail.child(keyValue("Spawned in", entry.searchMillis() == null ? "§8not timed" : spawn(entry.searchMillis())));
 		detail.child(keyValue("Inside", "§f" + SummaryText.duration(entry.durationMillis())));
+		if (value != null && !value.lines().isEmpty()) detail.child(keyValue("Coins", coins(value.net())));
 		if (!entry.mayhemBuffs().isEmpty()) detail.child(keyValue("Mayhem", "§e" + String.join(", ", entry.mayhemBuffs())));
 		String powder = "§b" + number(JournalStats.powder(entry));
 		if (entry.corpsePowder() > 0 && entry.exitPowder() > 0) {
@@ -359,6 +367,62 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			detail.child(wrapped("§f≈" + decimal(entry.gems().fineEquivalent()) + " Fine " + entry.gems().gem()));
 			if (entry.pristineProcs() > 0) detail.child(wrapped("§8" + entry.pristineProcs() + " pristine procs"));
 		}
+		coinsSection(entry, value);
+	}
+
+	private void coinsSection(JournalEntry entry, ShaftValue value) {
+		detail.child(section("Coins"));
+		if (value == null) {
+			detail.child(wrapped("§8No prices yet. They load when you enter a shaft or open the journal."));
+			return;
+		}
+		if (value.lines().isEmpty()) {
+			detail.child(wrapped("§8Nothing worth coins"));
+			return;
+		}
+		for (Part part : Part.values()) {
+			List<Line> lines = value.lines().stream().filter(l -> l.part() == part).toList();
+			if (lines.isEmpty()) continue;
+			boolean priced = lines.stream().anyMatch(l -> l.coins() != null);
+			List<Component> tooltip = new ArrayList<>();
+			tooltip.add(Component.literal("§f" + part.displayName()));
+			for (Line line : lines) {
+				tooltip.add(Component.literal("§7" + count(line) + " " + line.item() + "  "
+						+ (line.coins() == null ? "§8no price" : coins(line.coins()))));
+			}
+			detail.child(tipRow(part.displayName(), priced ? coins(value.total(part)) : "§8no price", tooltip));
+		}
+		MoneySettings settings = ShaftJournal.MONEY.settings();
+		List<Component> how = List.of(Component.literal("§fHow coins are counted"),
+				Component.literal("§7Gems as " + (settings.gemTier() == MoneySettings.GemTier.FINE ? "Fine" : "Flawless")),
+				Component.literal("§7Sold by " + (settings.sellPrice() == MoneySettings.SellPrice.INSTA_SELL ? "insta-sell" : "sell offer")
+						+ ", " + settings.bazaarTax() + "% Bazaar tax"),
+				Component.literal("§7Keys and campfires at insta-buy"),
+				Component.literal("§8Change it in .minecraft/shaftjournal/config.json"));
+		FlowLayout net = tipRow("Net", coins(value.net()), how);
+		net.margins(Insets.top(2));
+		detail.child(net);
+		int unpriced = value.unpriced().size();
+		if (unpriced > 0) detail.child(wrapped("§c" + unpriced + (unpriced == 1 ? " item has" : " items have") + " no price"));
+		boolean saved = settings.oldShafts() == OldShafts.THAT_DAY && entry.prices() != null && !entry.prices().isEmpty();
+		long end = entry.enteredAt() + entry.durationMillis();
+		detail.child(wrapped("§8" + (saved ? "Prices from " + day(end) + " " + clock(end) : "Today's prices")));
+	}
+
+	private static FlowLayout tipRow(String key, String value, List<Component> tooltip) {
+		FlowLayout row = keyValue(key, value);
+		row.tooltip(tooltip);
+		row.children().forEach(child -> child.tooltip(tooltip));
+		return row;
+	}
+
+	private static String coins(double coins) {
+		return (Math.round(coins) < 0 ? "§c" : "§6") + Coins.signed(coins);
+	}
+
+	private static String count(Line line) {
+		if (line.part() == Part.MINED) return "≈" + decimal(line.count());
+		return number(Math.round(line.count()));
 	}
 
 	private static String lootTitle(List<CorpseLoot> loots) {

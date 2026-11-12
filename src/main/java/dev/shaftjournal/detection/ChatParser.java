@@ -9,6 +9,7 @@ import dev.shaftjournal.detection.ShaftEvent.CampfirePlaced;
 import dev.shaftjournal.detection.ShaftEvent.CampfireUsed;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
+import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -25,6 +26,7 @@ import dev.shaftjournal.detection.ShaftEvent.Warping;
 public final class ChatParser {
 	private final TextPatterns patterns;
 	private LootBlock loot;
+	private boolean crystalNext;
 
 	public ChatParser(TextPatterns patterns) {
 		this.patterns = patterns;
@@ -63,6 +65,14 @@ public final class ChatParser {
 			// other msgs can land in between, keep the block open
 		}
 
+		if (crystalNext) {
+			crystalNext = false;
+			if ((m = patterns.match("crystal.name", text)) != null) return new CrystalFound(m.group("item").strip());
+		}
+		if (patterns.matches("crystal.found", text)) {
+			crystalNext = true;
+			return null;
+		}
 		if ((m = patterns.match("pristine", text)) != null) {
 			return new Pristine(new ItemCount(m.group("item"), TextPatterns.number(m.group("count"))));
 		}

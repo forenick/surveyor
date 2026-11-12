@@ -1,0 +1,185 @@
+{
+ "success": true,
+ "lastUpdated": 1794516768998,
+ "products": {
+  "FINE_JASPER_GEM": {
+   "product_id": "FINE_JASPER_GEM",
+   "sell_summary": [
+    {
+     "amount": 1074,
+     "pricePerUnit": 47420.4,
+     "orders": 1
+    },
+    {
+     "amount": 37,
+     "pricePerUnit": 47419.0,
+     "orders": 1
+    }
+   ],
+   "buy_summary": [
+    {
+     "amount": 35,
+     "pricePerUnit": 50872.0,
+     "orders": 1
+    },
+    {
+     "amount": 176,
+     "pricePerUnit": 50872.2,
+     "orders": 1
+    }
+   ],
+   "quick_status": {
+    "productId": "FINE_JASPER_GEM",
+    "sellPrice": 47420.4,
+    "sellVolume": 14040,
+    "sellMovingWeek": 466660,
+    "sellOrders": 6,
+    "buyPrice": 50875.08768141593,
+    "buyVolume": 130832,
+    "buyMovingWeek": 208751,
+    "buyOrders": 301
+   }
+  },
+  "FLAWLESS_JASPER_GEM": {
+   "product_id": "FLAWLESS_JASPER_GEM",
+   "sell_summary": [
+    {
+     "amount": 10,
+     "pricePerUnit": 3829940.9,
+     "orders": 2
+    },
+    {
+     "amount": 6,
+     "pricePerUnit": 3829940.8,
+     "orders": 2
+    }
+   ],
+   "buy_summary": [
+    {
+     "amount": 12,
+     "pricePerUnit": 4063396.9,
+     "orders": 1
+    },
+    {
+     "amount": 23,
+     "pricePerUnit": 4063397.0,
+     "orders": 1
+    }
+   ],
+   "quick_status": {
+    "productId": "FLAWLESS_JASPER_GEM",
+    "sellPrice": 3766026.3500000006,
+    "sellVolume": 4083,
+    "sellMovingWeek": 4676,
+    "sellOrders": 396,
+    "buyPrice": 4063397.548666667,
+    "buyVolume": 6323,
+    "buyMovingWeek": 13518,
+    "buyOrders": 604
+   }
+  },
+  "UMBER_KEY": {
+   "product_id": "UMBER_KEY",
+   "sell_summary": [
+    {
+     "amount": 10,
+     "pricePerUnit": 2849147.9,
+     "orders": 1
+    },
+    {
+     "amount": 2,
+     "pricePerUnit": 2849147.8,
+     "orders": 1
+    }
+   ],
+   "buy_summary": [
+    {
+     "amount": 3,
+     "pricePerUnit": 3032698.4,
+     "orders": 1
+    },
+    {
+     "amount": 13,
+     "pricePerUnit": 3032698.5,
+     "orders": 1
+    }
+   ],
+   "quick_status": {
+    "productId": "UMBER_KEY",
+    "sellPrice": 2840972.371559633,
+    "sellVolume": 2612,
+    "sellMovingWeek": 7248,
+    "sellOrders": 52,
+    "buyPrice": 3032698.5,
+    "buyVolume": 487,
+    "buyMovingWeek": 30711,
+    "buyOrders": 36
+   }
+  },
+  "MATCH_STICKS": {
+   "product_id": "MATCH_STICKS",
+   "sell_summary": [
+    {
+     "amount": 10074,
+     "pricePerUnit": 28.4,
+     "orders": 1
+    },
+    {
+     "amount": 14878,
+     "pricePerUnit": 28.1,
+     "orders": 1
+    }
+   ],
+   "buy_summary": [
+    {
+     "amount": 294,
+     "pricePerUnit": 902.5,
+     "orders": 1
+    },
+    {
+     "amount": 3364,
+     "pricePerUnit": 902.6,
+     "orders": 2
+    }
+   ],
+   "quick_status": {
+    "productId": "MATCH_STICKS",
+    "sellPrice": 28.4,
+    "sellVolume": 352251,
+    "sellMovingWeek": 317290,
+    "sellOrders": 16,
+    "buyPrice": 902.5919628212139,
+    "buyVolume": 144368,
+    "buyMovingWeek": 56419,
+    "buyOrders": 151
+   }
+  },
+  "EMPTY_SIDE": {
+   "product_id": "EMPTY_SIDE",
+   "sell_summary": [],
+   "buy_summary": [
+    {
+     "amount": 294,
+     "pricePerUnit": 902.5,
+     "orders": 1
+    },
+    {
+     "amount": 3364,
+     "pricePerUnit": 902.6,
+     "orders": 2
+    }
+   ],
+   "quick_status": {
+    "productId": "MATCH_STICKS",
+    "sellPrice": 28.4,
+    "sellVolume": 352251,
+    "sellMovingWeek": 317290,
+    "sellOrders": 16,
+    "buyPrice": 902.5919628212139,
+    "buyVolume": 144368,
+    "buyMovingWeek": 56419,
+    "buyOrders": 151
+   }
+  }
+ }
+}

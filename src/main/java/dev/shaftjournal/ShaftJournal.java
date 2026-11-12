@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import dev.shaftjournal.detection.LiveTracker;
 import dev.shaftjournal.hud.LiveHud;
 import dev.shaftjournal.journal.LiveJournal;
+import dev.shaftjournal.money.LiveMoney;
 import dev.shaftjournal.recorder.ShaftRecorder;
 import dev.shaftjournal.screen.JournalScreen;
 import dev.shaftjournal.util.DataFolder;
@@ -52,7 +53,8 @@ public class ShaftJournal implements ClientModInitializer {
 
 	public static final ShaftRecorder RECORDER = new ShaftRecorder();
 	public static final LiveTracker TRACKER = new LiveTracker();
-	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea);
+	public static final LiveMoney MONEY = new LiveMoney();
+	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea, MONEY);
 	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL);
 
 	private final ShaftRecorder recorder = RECORDER;
@@ -71,6 +73,7 @@ public class ShaftJournal implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(TRACKER::onTick);
 		KeyMappingHelper.registerKeyMapping(JOURNAL_KEY);
 		ClientTickEvents.END_CLIENT_TICK.register(this::openJournalIfAsked);
+		ClientLifecycleEvents.CLIENT_STARTED.register(client -> MONEY.start(DataFolder.in(client.gameDirectory.toPath()), modVersion()));
 		ClientLifecycleEvents.CLIENT_STARTED.register(JOURNAL::start);
 		ClientLifecycleEvents.CLIENT_STARTED.register(HUD::start);
 		ClientTickEvents.END_CLIENT_TICK.register(HUD::onTick);
@@ -79,8 +82,10 @@ public class ShaftJournal implements ClientModInitializer {
 			recorder.stop();
 			JOURNAL.close();
 			HUD.close();
+			MONEY.close();
 		});
 		TRACKER.addListener(JOURNAL::onEvent);
+		TRACKER.addListener(MONEY::onEvent);
 		// own hits only, PASS = never changes the hit
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
 			if (level.isClientSide()) {
@@ -127,7 +132,13 @@ public class ShaftJournal implements ClientModInitializer {
 		while (JOURNAL_KEY.consumeClick()) openJournal = true;
 		if (!openJournal) return;
 		openJournal = false;
+		MONEY.refresh();
 		client.gui.setScreen(new JournalScreen(JOURNAL.entries()));
+	}
+
+	private static String modVersion() {
+		return FabricLoader.getInstance().getModContainer(MOD_ID)
+				.map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("dev");
 	}
 
 	private int startRecording(CommandContext<FabricClientCommandSource> context) {

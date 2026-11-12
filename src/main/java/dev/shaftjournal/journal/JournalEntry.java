@@ -8,10 +8,13 @@ import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
+import dev.shaftjournal.money.ItemPrice;
 
 // times epoch ms. new fields at the end, bump VERSION if a meaning changes
 // sessionId = session start time, campfiresAt relative to enteredAt
 // searchMillis null = not timed (someone elses portal or no block mined)
+// crystals, otherDrops, prices null in entries before 0.14.0
+// prices = by skyblock id at the end of the shaft, empty when there were none
 public record JournalEntry(
 		int version,
 		long sessionId,
@@ -32,7 +35,10 @@ public record JournalEntry(
 		Map<String, Long> pristineItems,
 		Map<String, Long> sacksAdded,
 		Map<String, Long> sacksRemoved,
-		GemYield gems) {
+		GemYield gems,
+		List<String> crystals,
+		Map<String, Long> otherDrops,
+		Map<String, ItemPrice> prices) {
 	public static final int VERSION = 1;
 
 	public static JournalEntry of(Shaft shaft, long sessionId, Long searchMillis, TextPatterns patterns) {
@@ -43,7 +49,22 @@ public record JournalEntry(
 				shaft.campfiresPlaced().stream().map(at -> at - shaft.enteredAt()).toList(),
 				shaft.cold(), shaft.scrapFound(), shaft.pristineProcs(),
 				new LinkedHashMap<>(shaft.pristineItems()), new LinkedHashMap<>(shaft.sacksAdded()), new LinkedHashMap<>(shaft.sacksRemoved()),
-				GemYield.of(shaft, patterns));
+				GemYield.of(shaft, patterns), List.copyOf(shaft.crystals()), otherDrops(shaft, patterns), null);
+	}
+
+	public JournalEntry withPrices(Map<String, ItemPrice> prices) {
+		return new JournalEntry(version, sessionId, shaftId, enteredAt, durationMillis, exit, exitPowder, searchMillis,
+				corpses, extraCorpses, loots, mayhemBuffs, campfiresAt, coldAtExit, scrapFound, pristineProcs,
+				pristineItems, sacksAdded, sacksRemoved, gems, crystals, otherDrops, prices);
+	}
+
+	// sacks minus corpse loot, supercrafts and the shafts own gem (thats GemYield)
+	static Map<String, Long> otherDrops(Shaft shaft, TextPatterns patterns) {
+		Map<String, Long> drops = new LinkedHashMap<>(shaft.sacksAdded());
+		shaft.notMinedInSacks().forEach((item, count) -> drops.merge(item, -count, Long::sum));
+		String type = shaft.id() == null ? null : shaft.id().type();
+		drops.entrySet().removeIf(e -> e.getValue() <= 0 || GemYield.isShaftGem(e.getKey(), type, patterns));
+		return drops;
 	}
 
 	public long corpsePowder() {

@@ -4,6 +4,28 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.14.0 (2026-11-12)
+Coins, slice 1 of the money tracker (design in `Docs/money-design.md`, Nick's picks from 2026-11-12).
+- **Every shaft gets a coin value**: mined gems, other drops (mob drops and the like from your Sacks), corpse
+  loot, Suspicious Scrap and the crystal of a `_C` shaft, minus keys and campfires.
+  - Gems count as Flawless (or Fine), sold by insta-sell (or sell offer), minus 1.125% Bazaar tax.
+  - Keys cost their insta-buy price, a campfire costs Refined Umber + 16 Match-Sticks at insta-buy.
+  - AH-only drops (Caged Wisp, Dead Man's Chestplate, ...) use the lowest BIN. Things with no market at all
+    (soulbound mob drops) use the NPC sell price.
+  - A crystal counts as Perfect minus 5 Flawless of its gem, or 0.
+- **Chat summary** gets a Coins line, f.e. `Coins +5.7M (gems 11.0M, corpses 103.6k, keys -2.8M, campfires -2.6M)`.
+- **Journal shaft view** shows Coins near the top and a Coins section with each part. Hover a part for its items.
+- **Prices load** from the Hypixel Bazaar, a lowest BIN list and Hypixel's item list when you enter a shaft or
+  open the journal, never on a timer. They're kept in `.minecraft/shaftjournal/prices.json` and `items.json`, so
+  coins work offline with the last prices. Nothing about you is sent.
+- **Each shaft saves the prices it was valued at**, so old shafts keep their coins when prices move. Shafts from
+  before 0.14.0 use today's prices.
+- **Settings** live in `.minecraft/shaftjournal/config.json` until there's a Settings screen: `sellPrice`
+  (`insta_sell`, `sell_offer`), `gemTier` (`flawless`, `fine`), `bazaarTax` (in %), `oldShafts` (`that_day`,
+  `today`) and `crystals` (`perfect_minus_flawless`, `zero`). Changes apply at the next shaft or journal open.
+- Not yet: coin columns, Stats coins and HUD money values (slice 2). A key saved by Resourceful still counts as
+  used, that message hasn't been recorded yet.
+
 ## 0.13.2 (2026-11-12)
 Checked at GUI scale 2 on 1080p (960×540), what most SkyBlock players use, plus scales 3 and 4.
 - **Journal tables use the width.** At scale 2 the Session and Sessions columns sat in the left half; now spare

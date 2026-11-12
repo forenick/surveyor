@@ -3,17 +3,24 @@ package dev.shaftjournal.journal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import dev.shaftjournal.detection.Corpse;
+import dev.shaftjournal.money.Coins;
+import dev.shaftjournal.money.ShaftValue;
+import dev.shaftjournal.money.ShaftValue.Part;
 
 public final class SummaryText {
 	private static final String RULE = "§8§m                                                  ";
+	private static final Map<Part, String> PART_NAMES = Map.of(Part.MINED, "gems", Part.OTHER, "other",
+			Part.CORPSES, "corpses", Part.SCRAP, "scrap", Part.CRYSTALS, "crystals", Part.KEYS, "keys",
+			Part.CAMPFIRES, "campfires");
 
 	private SummaryText() {
 	}
 
-	// session already incl entry, null = no session line
-	public static List<String> lines(JournalEntry entry, Journal.Session session) {
+	// session already incl entry, null = no session line. value null = no prices yet
+	public static List<String> lines(JournalEntry entry, Journal.Session session, ShaftValue value) {
 		List<String> lines = new ArrayList<>();
 		lines.add(RULE);
 		lines.add(" §b§l" + (entry.shaftId() == null ? "Mineshaft" : entry.shaftId())
@@ -34,6 +41,8 @@ public final class SummaryText {
 			lines.add(" §7Powder §f+" + number(powder) + parts);
 		}
 		if (!entry.campfiresAt().isEmpty()) lines.add(" §7Campfires §f" + entry.campfiresAt().size());
+		String coins = coins(value);
+		if (coins != null) lines.add(coins);
 
 		if (session != null) {
 			String line = " §7Session §f" + session.shafts() + (session.shafts() == 1 ? " shaft" : " shafts");
@@ -43,6 +52,23 @@ public final class SummaryText {
 		}
 		lines.add(RULE);
 		return lines;
+	}
+
+	static String coins(ShaftValue value) {
+		if (value == null) return " §7Coins §8no prices yet";
+		if (value.lines().isEmpty()) return null;
+		double net = value.net();
+		String line = " §7Coins " + (net < 0 ? "§c" : "§6") + Coins.signed(net);
+		List<String> parts = new ArrayList<>();
+		for (Part part : Part.values()) {
+			double total = value.total(part);
+			if (Math.round(total) != 0) parts.add(PART_NAMES.get(part) + " " + Coins.format(total));
+		}
+		// 1 part = same as the total
+		if (parts.size() > 1) line += " §8(" + String.join(", ", parts) + ")";
+		int unpriced = value.unpriced().size();
+		if (unpriced > 0) line += " §c" + unpriced + (unpriced == 1 ? " item" : " items") + " without a price";
+		return line;
 	}
 
 	static String corpses(List<Corpse> corpses) {

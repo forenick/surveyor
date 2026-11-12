@@ -61,6 +61,10 @@ public sealed interface ShaftEvent {
 	record ScrapFound() implements ShaftEvent {
 	}
 
+	// f.e. "Aquamarine Crystal"
+	record CrystalFound(String item) implements ShaftEvent {
+	}
+
 	record Supercraft(ItemCount result) implements ShaftEvent {
 	}
 }

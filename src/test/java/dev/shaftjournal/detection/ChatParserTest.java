@@ -9,6 +9,7 @@ import dev.shaftjournal.detection.ShaftEvent.CampfirePlaced;
 import dev.shaftjournal.detection.ShaftEvent.CampfireUsed;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
+import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -157,6 +158,21 @@ class ChatParserTest {
 		assertEquals(List.of(new CorpseLooted(new CorpseLoot("Lapis", false, List.of(
 				new ItemCount("Suspicious Scrap", 1),
 				new ItemCount("Flawed Aquamarine Gemstone", 40)), 4111))), events);
+	}
+
+	// recording 1, AQUA_C
+	@Test
+	void crystalFound() {
+		String purple = "§5§l" + "▬".repeat(64);
+		assertEquals(List.of(new CrystalFound("Aquamarine Crystal")), parseAll(
+				purple,
+				"§f                           §5§l✦ CRYSTAL FOUND",
+				"§f                            §9Aquamarine Crystal",
+				"",
+				"§f           §7Use this Crystal in the §6Dwarven Forge §7to make",
+				"§f                                 §7better items!",
+				purple,
+				"§cYou have already obtained this Crystal!"));
 	}
 
 	@Test

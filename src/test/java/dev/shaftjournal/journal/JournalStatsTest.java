@@ -127,6 +127,6 @@ class JournalStatsTest {
 
 	private static JournalEntry entry(long session, long entered, String id, Long search, long exitPowder, List<Corpse> corpses) {
 		return new JournalEntry(JournalEntry.VERSION, session, id, entered, 20_000, "BYE", exitPowder, search,
-				corpses, 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null);
+				corpses, 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, null, null, null);
 	}
 }

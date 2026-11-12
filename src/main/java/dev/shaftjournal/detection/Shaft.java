@@ -9,6 +9,7 @@ import java.util.Map;
 import dev.shaftjournal.detection.ShaftEvent.CampfirePlaced;
 import dev.shaftjournal.detection.ShaftEvent.CaveIn;
 import dev.shaftjournal.detection.ShaftEvent.CorpseLooted;
+import dev.shaftjournal.detection.ShaftEvent.CrystalFound;
 import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
@@ -43,6 +44,7 @@ public final class Shaft {
 	private final List<Long> campfiresPlaced = new ArrayList<>();
 	private long caveInAt = -1;
 	private int scrapFound;
+	private final List<String> crystals = new ArrayList<>();
 	private int pristineProcs;
 	private final Map<String, Long> pristineItems = new LinkedHashMap<>();
 	private final Map<String, Long> sacksAdded = new LinkedHashMap<>();
@@ -75,6 +77,7 @@ public final class Shaft {
 			case Supercraft craft -> add(notMinedPending, craft.result());
 			case CampfirePlaced placed -> campfiresPlaced.add(now);
 			case ScrapFound scrap -> scrapFound++;
+			case CrystalFound crystal -> crystals.add(crystal.item());
 			case Pristine pristine -> {
 				pristineProcs++;
 				add(pristineItems, pristine.gems());
@@ -159,6 +162,10 @@ public final class Shaft {
 
 	public int scrapFound() {
 		return scrapFound;
+	}
+
+	public List<String> crystals() {
+		return Collections.unmodifiableList(crystals);
 	}
 
 	public int pristineProcs() {

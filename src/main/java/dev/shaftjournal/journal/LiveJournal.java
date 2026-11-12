@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.shaftjournal.detection.ShaftEvent;
 import dev.shaftjournal.detection.TextPatterns;
+import dev.shaftjournal.money.LiveMoney;
 import dev.shaftjournal.util.DataFolder;
 
 // summary only goes to local chat, nothing sent to the server
@@ -18,12 +19,14 @@ public final class LiveJournal {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
 	private final Journal journal;
+	private final LiveMoney money;
 	// client thread only
 	private final List<JournalEntry> entries = new ArrayList<>();
 	private JournalFile file;
 
-	public LiveJournal(BooleanSupplier inMiningArea) {
+	public LiveJournal(BooleanSupplier inMiningArea, LiveMoney money) {
 		journal = new Journal(TextPatterns.defaults(), inMiningArea, this::onEntry);
+		this.money = money;
 	}
 
 	public void start(Minecraft client) {
@@ -93,11 +96,12 @@ public final class LiveJournal {
 		if (file != null) file.close();
 	}
 
-	private void onEntry(JournalEntry entry) {
+	private void onEntry(JournalEntry finished) {
+		JournalEntry entry = money.withPrices(finished);
 		entries.add(entry);
 		if (file != null) file.append(entry);
 		var chat = Minecraft.getInstance().gui.hud.getChat();
-		for (String line : SummaryText.lines(entry, journal.session())) {
+		for (String line : SummaryText.lines(entry, journal.session(), money.value(entry))) {
 			chat.addClientSystemMessage(Component.literal(line));
 		}
 	}

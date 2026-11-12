@@ -1,5 +1,6 @@
 package dev.shaftjournal.journal;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 
@@ -41,6 +42,12 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 		long flawed = Math.max(0, mined.flawed);
 		long tailRough = flawed > 0 ? Math.round(tail.flawed * (double) rough / flawed) : 0;
 		return new GemYield(gem, rough, flawed, Math.max(0, mined.fine), tailRough, tail.flawed);
+	}
+
+	public static boolean isShaftGem(String item, String type, TextPatterns patterns) {
+		if (type == null) return false;
+		Matcher m = patterns.match("gem.item", item);
+		return m != null && m.group("gem").toUpperCase(Locale.ROOT).startsWith(type);
 	}
 
 	private static final class Totals {

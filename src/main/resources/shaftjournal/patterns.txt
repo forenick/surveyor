@@ -46,10 +46,14 @@ pristine               ^PRISTINE! You found (?:\p{Co} )?(?<item>.+) x(?<count>[\
 # pickobulus breaks ~180 blocks w/o a block hit (research/08)
 ability.used           ^You used your (?<ability>.+) Pickaxe Ability!$
 scrap                  ^EXCAVATOR! You found a Suspicious Scrap!$
+# _C shaft crystal, name comes on the next line (recording 1)
+crystal.found          ^ +✦ CRYSTAL FOUND$
+crystal.name           ^ +(?<item>\w+ Crystal)$
 supercraft             ^You Supercrafted (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
 
 # icon already removed
 gem.item               ^(?<quality>Rough|Flawed|Fine) (?<gem>\w+) Gemstone$
+crystal.item           ^(?<gem>\w+) Crystal$
 
 # per item lines are in the hover text
 sacks                  ^\[Sacks\] .*\(Last (?<seconds>\d+)s\.\)$

@@ -26,6 +26,7 @@ class RecordingReplayTest {
 		assertEquals(1260, aqua.exitPowder());
 		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Tungsten", false)), aqua.corpses());
 		assertEquals(1, aqua.loots().size());
+		assertEquals(List.of("Aquamarine Crystal"), aqua.crystals());
 
 		Shaft jasper = shafts.get(1);
 		assertEquals(ExitReason.DEATH, jasper.exitReason());

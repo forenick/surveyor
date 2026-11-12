@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -206,10 +207,15 @@ class JournalTest {
 		assertNull(aqua.gems(), "Nick can't mine Aquamarine yet, so there are no Aquamarine gems");
 		assertEquals(5759 + 4791, aqua.corpsePowder());
 
-		String text = String.join("\n", SummaryText.lines(aqua, null));
+		String text = String.join("\n", SummaryText.lines(aqua, null, null));
 		assertTrue(text.contains("§b§lAQUA_C  §7inside §f14s"), text);
 		assertTrue(text.contains("§9Lapis 2/2§7, §fTungsten 0/1"), text);
 		assertTrue(text.contains("§7Powder §f+12,060 §8(corpses 10,550, exit 1,510)"), text);
+		assertTrue(text.contains("§7Coins §8no prices yet"), text);
+
+		// sacks minus the 1st corpse's onyx + citrine, the 2nd corpse came after the last sacks msg (research/07)
+		assertEquals(Map.of("Enchanted Glacite", 2L, "Flawed Sapphire Gemstone", 40L, "Flawed Amethyst Gemstone", 40L,
+				"Rough Amber Gemstone", 40L, "Rough Topaz Gemstone", 40L, "Rough Jade Gemstone", 40L), aqua.otherDrops());
 	}
 
 	// recording 4 (research/08), by hand
