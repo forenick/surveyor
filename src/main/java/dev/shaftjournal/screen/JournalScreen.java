@@ -31,6 +31,7 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import dev.shaftjournal.ShaftJournal;
 import dev.shaftjournal.detection.CorpseLoot;
@@ -91,9 +92,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			new Column("inside", "Inside", 0, true, 2), new Column("corpses", "Corpses", 0, false, 0),
 			new Column("powder", "Powder", 44, true, 1), new Column("gems", "Gems", 40, true, 4),
 			new Column("coins", "Coins", 0, true, 0));
-	// session rows show their start time under the days date
+	// by day: start time goes under the days date, no start column
 	private static final List<Column> SESSION_COLUMNS = List.of(
-			new Column("date", "Date", 56, false, 0), new Column("length", "Length", 44, true, 4), new Column("shafts", "Shafts", 36, true, 0),
+			new Column("date", "Date", 56, false, 0), new Column("start", "Start", 32, false, 5),
+			new Column("length", "Length", 44, true, 4), new Column("shafts", "Shafts", 36, true, 0),
 			new Column("spawn", "Avg spawn", 78, false, 0), new Column("rate", "Per hour", 46, true, 3),
 			new Column("powder", "Powder", 58, true, 0), new Column("lapis", "Lapis", 36, true, 6),
 			new Column("coins", "Coins", 0, true, 0), new Column("coinRate", "Coins / h", 0, true, 2));
@@ -103,6 +105,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private final ItemIcons icons = new ItemIcons();
 	private final ShaftNames shaftNames = ShaftNames.defaults();
 	private Tab tab;
+	// an older session opened from overview or stats, tab stays where it came from
+	private boolean viewing;
+	private final boolean current;
+	private final boolean started;
+	private boolean byDay = ShaftJournal.MONEY.byDay();
 	private int sessionIndex;
 	private int selected;
 	private FlowLayout root;
@@ -117,9 +124,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		this.entries = List.copyOf(entries);
 		this.sessions = JournalStats.sessions(this.entries);
 		selectLastShaft();
-		// session tab only while that session is still going
+		// session tab = only the one still going
 		Journal.Session active = ShaftJournal.JOURNAL.activeSession(System.currentTimeMillis());
-		tab = active != null && !sessions.isEmpty() && sessions.getFirst().id() == active.id() ? Tab.SESSION : Tab.OVERVIEW;
+		current = active != null && !sessions.isEmpty() && sessions.getFirst().id() == active.id();
+		started = active != null && !current;
+		tab = current ? Tab.SESSION : Tab.OVERVIEW;
 	}
 
 	@Override
@@ -171,19 +180,25 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			content.child(panelWith(label("§7No shafts yet. Each shaft shows up here after you leave it."),
 					Sizing.fill(100), Sizing.content()));
 		} else {
-			switch (tab) {
+			if (viewing) buildSessionTab(content);
+			else switch (tab) {
 				case OVERVIEW -> buildOverviewTab(content);
-				case SESSION -> buildSessionTab(content);
+				case SESSION -> {
+					if (current) buildSessionTab(content);
+					else noSession(content);
+				}
 				case STATS -> buildStatsTab(content);
 			}
 		}
 		root.child(content);
 		FlowLayout footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		footer.gap(16);
-		switch (tab) {
+		if (viewing) {
+			footer.child(label("§8Click a shaft for details"));
+			footer.child(label("§8< > other sessions"));
+		} else switch (tab) {
 			case SESSION -> {
-				footer.child(label("§8Click a shaft for details"));
-				footer.child(label("§8< > earlier sessions"));
+				if (current) footer.child(label("§8Click a shaft for details"));
 			}
 			case OVERVIEW -> footer.child(label("§8Click a session to open it"));
 			case STATS -> {
@@ -212,10 +227,28 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		nav.horizontalAlignment(HorizontalAlignment.RIGHT);
 		nav.verticalAlignment(VerticalAlignment.CENTER);
 		nav.gap(4);
-		if (tab == Tab.SESSION && !sessions.isEmpty()) {
+		if (viewing) {
+			SessionSummary shown = sessions.get(sessionIndex);
+			// 480 wide: no "<", so the date still fits
+			String backText = navRoom("< Back") >= font.width(day(shown.start())) ? "< Back" : "Back";
+			ButtonComponent back = UIComponents.button(Component.literal(backText), b -> {
+				viewing = false;
+				rebuild();
+			});
+			back.horizontalSizing(Sizing.fixed(font.width(backText) + 12));
+			back.margins(Insets.right(4));
+			nav.child(back);
 			nav.child(button("<", sessionIndex < sessions.size() - 1, () -> showSession(sessionIndex + 1)));
-			nav.child(label("§f" + sessionRange(sessions.get(sessionIndex), navRoom())));
+			nav.child(label("§f" + sessionRange(shown, navRoom(backText))));
 			nav.child(button(">", sessionIndex > 0, () -> showSession(sessionIndex - 1)));
+		} else if (tab == Tab.SESSION && current) {
+			nav.child(label("§f" + sessionRange(sessions.getFirst(), navRoom(null))));
+		} else if (tab == Tab.OVERVIEW && !sessions.isEmpty()) {
+			nav.child(new IconButton(Component.literal("§fBy day"), byDay ? CHECK_ICON : CROSS_ICON, 8, 8, b -> {
+				byDay = !byDay;
+				ShaftJournal.MONEY.setByDay(byDay);
+				rebuild();
+			}));
 		}
 		bar.child(nav);
 		ButtonComponent editHud = UIComponents.button(Component.literal("Edit HUD"),
@@ -228,14 +261,34 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private ButtonComponent tabButton(String name, Tab target) {
 		Component text = Component.literal((tab == target ? "§e" : "§f") + name);
-		java.util.function.Consumer<ButtonComponent> open = b -> {
-			tab = target;
-			rebuild();
+		Identifier icon = switch (target) {
+			case OVERVIEW -> OVERVIEW_ICON;
+			case SESSION -> SESSION_ICON;
+			case STATS -> STATS_ICON;
 		};
-		if (target == Tab.STATS) return new IconButton(text, STATS_ICON, 9, 8, open);
-		ButtonComponent button = UIComponents.button(text, open);
-		button.horizontalSizing(Sizing.content(6));
-		return button;
+		return new IconButton(text, icon, 9, 8, b -> {
+			viewing = false;
+			tab = target;
+			if (target == Tab.SESSION) {
+				sessionIndex = 0;
+				selectLastShaft();
+			}
+			rebuild();
+		});
+	}
+
+	private void noSession(FlowLayout content) {
+		FlowLayout panel = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+		panel.gap(4);
+		if (started) {
+			panel.child(wrapped("§7Your session has started."));
+			panel.child(wrapped("§8Each shaft shows up here after you leave it."));
+		} else {
+			panel.child(wrapped("§7No session going right now."));
+			panel.child(wrapped("§8A session starts with your next shaft and ends after " + Journal.SESSION_GAP_MILLIS / 60_000
+					+ " minutes without one. Older sessions are in the Overview."));
+		}
+		content.child(panelWith(panel, Sizing.fill(100), Sizing.content()));
 	}
 
 	private ButtonComponent button(String text, boolean active, Runnable action) {
@@ -248,7 +301,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private void showSession(int index) {
 		sessionIndex = index;
 		selectLastShaft();
-		tab = Tab.SESSION;
+		viewing = true;
 		rebuild();
 	}
 
@@ -258,7 +311,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			if (index >= 0) {
 				sessionIndex = i;
 				selected = index;
-				tab = Tab.SESSION;
+				viewing = true;
 				rebuild();
 				return;
 			}
@@ -532,23 +585,27 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<String> rateTexts = new ArrayList<>(coinRates.stream().map(JournalScreen::rateText).toList());
 		for (Day day : days) {
 			coinTexts.add(coinText(day.coins()));
-			rateTexts.add(rateText(day.perHour()));
+			rateTexts.add(dayRate(day));
 		}
-		List<Column> measured = measured(SESSION_COLUMNS, "coins", coinTexts);
+		List<Column> measured = measured(SESSION_COLUMNS.stream().filter(c -> !byDay || !c.key().equals("start")).toList(),
+				"coins", coinTexts);
 		measured = measured(measured, "coinRate", rateTexts);
 		List<Column> columns = fit(measured, width - 2 * PADDING - TABLE_CHROME);
 		FlowLayout rows = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		for (Day day : days) {
-			FlowLayout dayRow = dayRow(columns, day);
-			if (!rows.children().isEmpty()) dayRow.margins(Insets.top(4));
-			rows.child(dayRow);
+			if (byDay) {
+				FlowLayout dayRow = dayRow(columns, day);
+				if (!rows.children().isEmpty()) dayRow.margins(Insets.top(DAY_GAP));
+				rows.child(dayRow);
+			}
 			for (int i : day.sessions()) {
 				SessionSummary session = sessions.get(i);
 				Double rate = session.shaftsPerHour();
 				FlowLayout row = row(i);
 				for (Column column : columns) {
 					row.child(switch (column.key()) {
-						case "date" -> indented(column, "§7" + clock(session.start()));
+						case "date" -> byDay ? indented(column, "§7" + clock(session.start())) : cell(column, "§f" + day(session.start()));
+						case "start" -> cell(column, "§7" + clock(session.start()));
 						case "length" -> cell(column, "§f" + SummaryText.duration(session.lengthMillis()));
 						case "shafts" -> cell(column, "§f" + session.shafts());
 						case "spawn" -> barCell(column, session.averageSearchMillis(), slowest);
@@ -585,7 +642,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 				case "spawn" -> cell(column, "§7" + count + (count == 1 ? " session" : " sessions"));
 				case "powder" -> cell(column, "§b" + number(day.powder()));
 				case "coins" -> cell(column, coinText(day.coins()));
-				case "coinRate" -> cell(column, rateText(day.perHour()));
+				case "coinRate" -> cell(column, dayRate(day));
 				default -> cell(column, "");
 			});
 		}
@@ -597,6 +654,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		label.horizontalSizing(Sizing.fixed(Math.max(0, column.total() - INDENT)));
 		label.margins(Insets.left(INDENT));
 		return label;
+	}
+
+	private static String dayRate(Day day) {
+		return rateText(day.perHour()) + (day.perHour() == null ? "" : " §8(avg)");
 	}
 
 	// gray so only the totals are gold
@@ -750,6 +811,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final net.minecraft.resources.Identifier STATS_ICON =
 			net.minecraft.resources.Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/stats_icon.png");
 	private static final int INDENT = 6;
+	// display choice
+	private static final int DAY_GAP = 8;
+	private static final Identifier OVERVIEW_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/overview_icon.png");
+	private static final Identifier SESSION_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/session_icon.png");
+	private static final Identifier CHECK_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/check_icon.png");
+	private static final Identifier CROSS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/cross_icon.png");
 	private static final net.minecraft.resources.Identifier OPEN_ARROW =
 			net.minecraft.resources.Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/open_arrow.png");
 	private static final int RECENT_SESSIONS = 5;
@@ -971,7 +1038,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private Surface rowSurface(int index, boolean hovered) {
-		if (tab == Tab.SESSION && index == selected) return ROW_SELECTED;
+		if ((viewing || tab == Tab.SESSION) && index == selected) return ROW_SELECTED;
 		if (hovered) return ROW_HOVER;
 		return index % 2 == 1 ? ROW_EVEN : Surface.BLANK;
 	}
@@ -1160,11 +1227,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	// top bar minus everything but the date: padding, title, tabs, arrows, edit hud, gaps
-	private int navRoom() {
+	private int navRoom(String back) {
 		int used = 2 * PADDING + 8 + font.width("Shaft Journal") + 10 + font.width("Edit HUD") + 18 + 2 * 16 + 5 * 4 + 2 * 4;
-		for (String tab : List.of("Overview", "Session", "Stats")) used += font.width(tab) + 12;
-		// stats icon + gap
-		used += 9 + 3;
+		// tab icons + gap
+		for (String tab : List.of("Overview", "Session", "Stats")) used += font.width(tab) + 12 + 9 + 3;
+		if (back != null) used += font.width(back) + 12 + 4 + 4;
 		return width - used;
 	}
 

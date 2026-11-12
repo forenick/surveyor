@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.17.0 (2026-11-12)
+Journal changes from Nick's feedback on 0.16.0.
+- **Session tab shows only the session you're in.** With no session going it says so (and that older sessions are in
+  the Overview).
+- **Older sessions open from the Overview** (or a Stats record arrow) with a **Back** button to where you came from,
+  plus < > to step through sessions. The tab you came from stays highlighted.
+- **By day toggle** next to Edit HUD on the Overview: a green check when sessions are grouped by day, a red cross
+  for one plain row per session. On by default, and remembered in `config.json` (`"journal": {"byDay": true}`).
+- **More room between days**, and the day row's Coins / h says `(avg)`.
+- **Icons on every tab**: a calendar for Overview and a pickaxe for Session, next to the Stats chart.
+
 ## 0.16.0 (2026-11-12)
 Journal changes from Nick's feedback on 0.15.0.
 - **Overview tab** (was Sessions) comes first. It groups your sessions by day: each day gets a row with its total

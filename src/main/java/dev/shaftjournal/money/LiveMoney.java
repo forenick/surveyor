@@ -69,6 +69,17 @@ public final class LiveMoney {
 		return changes.get();
 	}
 
+	// journal setting, lives in config.json too
+	public boolean byDay() {
+		return config == null || config.byDay();
+	}
+
+	public void setByDay(boolean value) {
+		if (config == null) return;
+		config.byDay(value);
+		run(() -> config.saveByDay(value));
+	}
+
 	public MoneySettings settings() {
 		return config == null ? MoneySettings.DEFAULTS : config.settings();
 	}
