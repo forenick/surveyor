@@ -4,6 +4,19 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.11.1 (2026-11-12)
+Edit HUD: Nick's tweaks after trying 0.11.0.
+- The side panel always runs the **full height of the screen**, so it doesn't jump around with its content.
+  The toolbar sits beside it and no longer covers the box you're editing.
+- **No more folding** of the Lines and Box sections.
+- **Box section:** Size sits above Background; the three Show in places are stacked under each other, lined
+  up with the controls above; Labels and Values colours are on their own rows.
+- **Custom text** turns on and off with a **✎ Turn on / Turn off** button next to its heading instead of a
+  checkbox, and the note under it is gone (the button's tooltip explains it). **Start again from the line** is
+  now **↻ Reset**. Both icons are drawn as pixels, so every font shows them the same.
+- The line page no longer has its own **Show this line** box; the checkbox in the line list does that.
+- **+ Add colour rule** is now **+ Colour rule**.
+
 ## 0.11.0 (2026-11-12)
 Edit HUD on one page, bigger buttons, and tooltips that fit. Built from `Docs/mockups/hud-one-page.html`.
 - **One page per box.** No more Lines and Box tabs: a box opens with its **Lines** on top and its **Box**
