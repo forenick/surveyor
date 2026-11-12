@@ -37,11 +37,11 @@ import net.minecraft.world.InteractionResult;
 
 public class ShaftJournal implements ClientModInitializer {
 	public static final String MOD_ID = "shaftjournal";
-	/** {@code /shaftjournal} and the short {@code /sj}. Hypixel's {@code /st} is /storage, so not that. */
+	// /shaftjournal and short /sj. not /st bc thats hypixels /storage
 	private static final List<String> COMMAND_NAMES = List.of(MOD_ID, "sj");
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
-	/** Chat, action bar and titles are fed into these by {@code ClientPacketListenerMixin}. */
+	// ClientPacketListenerMixin feeds chat, action bar and titles into these
 	public static final ShaftRecorder RECORDER = new ShaftRecorder();
 	public static final LiveTracker TRACKER = new LiveTracker();
 	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea);
@@ -49,11 +49,11 @@ public class ShaftJournal implements ClientModInitializer {
 
 	private final ShaftRecorder recorder = RECORDER;
 
-	/** Opens the journal screen. Unbound by default; it only opens the mod's own screen. */
+	// opens the journal. unbound by default (only opens our own screen, nothing else)
 	private static final KeyMapping JOURNAL_KEY = new KeyMapping("key.shaftjournal.journal", InputConstants.Type.KEYSYM,
 			InputConstants.UNKNOWN.getValue(), KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main")));
 
-	/** Set by the command; opened on the next tick, after the chat screen has closed. */
+	// the command sets this, then it opens next tick once the chat screen is closed
 	private boolean openJournal;
 
 	@Override
@@ -66,7 +66,7 @@ public class ShaftJournal implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STARTED.register(JOURNAL::start);
 		ClientLifecycleEvents.CLIENT_STARTED.register(HUD::start);
 		ClientTickEvents.END_CLIENT_TICK.register(HUD::onTick);
-		// Drawn under the chat, so chat messages stay readable over a box.
+		// drawn under the chat so u can still read chat over a box
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(MOD_ID, "hud"), HUD::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			recorder.stop();
@@ -74,7 +74,7 @@ public class ShaftJournal implements ClientModInitializer {
 			HUD.close();
 		});
 		TRACKER.addListener(JOURNAL::onEvent);
-		// Only watches the player's own block hits; PASS leaves the hit itself untouched.
+		// only watches ur own block hits, PASS means we dont change the hit at all
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
 			if (level.isClientSide()) {
 				JOURNAL.onBlockHit();
@@ -83,13 +83,13 @@ public class ShaftJournal implements ClientModInitializer {
 			return InteractionResult.PASS;
 		});
 
-		// Client-side commands are handled locally and never sent to the server.
+		// client side commands, handled locally and never sent to the server
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> {
 			for (String name : COMMAND_NAMES) dispatcher.register(command(name));
 		});
 	}
 
-	/** The command tree, the same under every name. On its own it opens the journal. */
+	// same command tree for every name. just /sj on its own opens the journal
 	private LiteralArgumentBuilder<FabricClientCommandSource> command(String name) {
 		return ClientCommands.literal(name)
 				.executes(this::openJournal)
@@ -109,7 +109,7 @@ public class ShaftJournal implements ClientModInitializer {
 		return 1;
 	}
 
-	/** Before the rename the mod kept its journal and recordings in {@code .minecraft/shafttools}. */
+	// before the rename the journal and recordings lived in .minecraft/shafttools
 	private static void moveOldDataFolder() {
 		Path gameDir = FabricLoader.getInstance().getGameDir();
 		try {

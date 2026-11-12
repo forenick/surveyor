@@ -17,7 +17,7 @@ import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.ItemCount;
 import dev.shaftjournal.detection.TextPatterns;
 
-/** Uses Nick's real journal from 2026-11-11 (recording 4's six shafts, saved by 0.2.0). */
+// uses Nick's real journal from 2026-11-11 (the 6 shafts from recording 4, saved by 0.2.0)
 class JournalStatsTest {
 	private static List<JournalEntry> realJournal() throws IOException, URISyntaxException {
 		Path path = Path.of(JournalStatsTest.class.getResource("/journal-2026-11-11.jsonl").toURI());
@@ -30,10 +30,10 @@ class JournalStatsTest {
 		assertEquals(1, sessions.size());
 		JournalStats.SessionSummary session = sessions.getFirst();
 		assertEquals(6, session.shafts());
-		// Corpses 14,527 + 10,861 + 4,684 + 5,574, plus exits 1,000 + 1,000 + 1,760 + 1,520 + 1,250 + 1,260.
+		// corpses 14,527 + 10,861 + 4,684 + 5,574, plus exits 1,000 + 1,000 + 1,760 + 1,520 + 1,250 + 1,260
 		assertEquals(43_436, session.powder());
 		assertEquals(7, session.looted("Lapis"));
-		// 17:16:29 (first block hit) to leaving ONYX_1 12.6 s after 17:34:51.
+		// 17:16:29 (first block hit) until leaving ONYX_1 12.6 s after 17:34:51
 		assertEquals(18 * 60 + 34, session.lengthMillis() / 1000);
 		assertEquals(19.4, session.shaftsPerHour(), 0.05);
 	}
@@ -43,7 +43,7 @@ class JournalStatsTest {
 		JournalEntry amethyst = realJournal().get(2);
 		assertEquals("AMET_1", amethyst.shaftId());
 		LootSummary loot = LootSummary.of(amethyst.loots(), TextPatterns.defaults());
-		// 80 + 60 + 20 Flawed = 2 Fine, plus 2 Fine Aquamarine.
+		// 80 + 60 + 20 Flawed = 2 Fine, plus 2 Fine Aquamarine
 		assertEquals(4.0, loot.gems().fine(), 1e-9);
 		assertEquals(new ItemCount("Flawed Peridot Gemstone", 80), loot.gems().parts().getFirst());
 		assertEquals(4, loot.gems().parts().size());
@@ -90,25 +90,25 @@ class JournalStatsTest {
 		assertEquals("JADE_C", stats.mostPowder().entry().shaftId());
 		assertEquals(3, stats.mostLapis().value());
 		assertEquals("AMET_1", stats.mostLapis().entry().shaftId());
-		// The real file still has 0.2.0's times; PERI_1 (8.9 s) is the fastest.
+		// the real file still has the 0.2.0 times, PERI_1 (8.9 s) is the fastest
 		assertEquals("PERI_1", stats.fastest().shaftId());
-		// AQUA_C (real) and JADE_C (added): two types with a crystal, listed by shaft count.
+		// AQUA_C (real) and JADE_C (added) are two types w/ a crystal, sorted by shaft count
 		assertEquals(Map.of("1", 1, "C", 1), stats.types().get("JADE"));
 		assertEquals(Map.of("C", 1), stats.types().get("AQUA"));
 		assertEquals(7, stats.typedShafts());
 		assertEquals(List.of("JADE", "PERI", "AMET", "TITA", "AQUA", "ONYX"), List.copyOf(stats.types().keySet()));
-		// Lapis in AMET_1, TITA_1, AQUA_C, ONYX_1 and JADE_C; Umber in PERI_1, JADE_1, TITA_1, ONYX_1.
+		// Lapis in AMET_1, TITA_1, AQUA_C, ONYX_1 and JADE_C. Umber in PERI_1, JADE_1, TITA_1, ONYX_1
 		assertEquals(5, stats.shaftsWithCorpse().get("Lapis"));
 		assertEquals(4, stats.shaftsWithCorpse().get("Umber"));
 		assertEquals(9, stats.corpsesSeen().get("Lapis"));
 		assertEquals(List.of("Lapis", "Umber", "Tungsten", "Vanguard"), List.copyOf(stats.corpsesSeen().keySet()));
-		// The one-minute session is too short for a rate, so the real session is the best.
+		// the 1 min session is too short for a rate, so the real session wins
 		assertEquals(realJournal().getFirst().sessionId(), stats.bestRate().id());
-		// The added session has one timed spawn, too few for a record; the real one has six.
+		// the added session only has 1 timed spawn, too few for a record. the real one has 6
 		assertEquals(realJournal().getFirst().sessionId(), stats.fastestSession().id());
 		assertEquals(6, stats.mostShafts().shafts());
 		assertNull(stats.mostGems());
-		// Newest session first: the added JADE_C (30 s) alone, then all seven shafts.
+		// newest session first, so the added JADE_C (30 s) alone, then all 7 shafts
 		List<JournalStats.SessionSummary> sessions = JournalStats.sessions(entries);
 		assertEquals(30_000L, JournalStats.recentAverage(sessions, 1));
 		assertEquals(JournalStats.averageSearch(entries), JournalStats.recentAverage(sessions, 5));
@@ -119,7 +119,7 @@ class JournalStatsTest {
 	void shortLuckySessionsDontHoldTheRateRecord() throws Exception {
 		List<JournalEntry> entries = new ArrayList<>(realJournal());
 		long later = 1_794_500_000_000L;
-		// Four shafts in 6 minutes is 40/h, faster than the real session's 19.4/h, but too few shafts.
+		// 4 shafts in 6 min is 40/h, faster than the real session's 19.4/h, but thats too few shafts
 		for (int i = 0; i < 4; i++) {
 			entries.add(entry(later, later + 60_000 + i * 90_000L, "JADE_1", 30_000L, 1_000, List.of()));
 		}

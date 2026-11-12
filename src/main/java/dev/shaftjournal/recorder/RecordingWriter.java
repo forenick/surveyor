@@ -12,10 +12,8 @@ import java.util.concurrent.TimeUnit;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
-/**
- * Writes one JSON object per line to a local file. All disk I/O happens on a background
- * thread so recording never stalls the game.
- */
+// writes one json object per line to a local file. all the disk stuff runs on a background
+// thread so recording never lags the game
 final class RecordingWriter implements AutoCloseable {
 	private static final Gson GSON = new Gson();
 

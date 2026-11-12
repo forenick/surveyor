@@ -1,5 +1,5 @@
 package dev.shaftjournal.detection;
 
-/** A shaft ID from the scoreboard, e.g. {@code JADE_1}: a 4-letter type and a variant (1, 2, C or L). */
+// shaft id from the scoreboard, f.e. JADE_1. 4 letter type + a variant (1, 2, C or L)
 public record ShaftId(String id, String type, String variant) {
 }

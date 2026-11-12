@@ -6,14 +6,14 @@ import java.util.Locale;
 
 import dev.shaftjournal.detection.Corpse;
 
-/** The chat summary shown after leaving a shaft, as "§"-coded lines. */
+// the chat summary after leaving a shaft, as "§" coded lines
 public final class SummaryText {
 	private static final String RULE = "§8§m                                                  ";
 
 	private SummaryText() {
 	}
 
-	/** {@code session} already includes {@code entry}; null to leave the session line out. */
+	// session already includes entry. pass null to leave the session line out
 	public static List<String> lines(JournalEntry entry, Journal.Session session) {
 		List<String> lines = new ArrayList<>();
 		lines.add(RULE);
@@ -46,7 +46,7 @@ public final class SummaryText {
 		return lines;
 	}
 
-	/** E.g. "Lapis 2/2, Tungsten 0/1": looted out of total, per type, in tab list order. */
+	// f.e. "Lapis 2/2, Tungsten 0/1", looted out of total per type, in tab list order
 	static String corpses(List<Corpse> corpses) {
 		List<String> parts = new ArrayList<>();
 		JournalStats.corpseCounts(corpses).forEach((type, count) ->
@@ -61,7 +61,7 @@ public final class SummaryText {
 		};
 	}
 
-	/** How the shaft was left, for display: "Took the exit", "Warped out", "Froze" or "Unknown". */
+	// how u left the shaft, for display ("Took the exit", "Warped out", "Froze" or "Unknown")
 	public static String exitName(String exit) {
 		return switch (exit) {
 			case "BYE" -> "Took the exit";
@@ -71,7 +71,7 @@ public final class SummaryText {
 		};
 	}
 
-	/** E.g. "45s", "12m 27s", "1h 03m". */
+	// f.e. "45s", "12m 27s", "1h 03m"
 	public static String duration(long millis) {
 		long seconds = Math.max(0, millis) / 1000;
 		if (seconds < 60) return seconds + "s";
@@ -79,12 +79,12 @@ public final class SummaryText {
 		return String.format(Locale.ROOT, "%dh %02dm", seconds / 3600, seconds % 3600 / 60);
 	}
 
-	/** E.g. "12,060". */
+	// f.e. "12,060"
 	public static String number(long value) {
 		return String.format(Locale.ROOT, "%,d", value);
 	}
 
-	/** One decimal, e.g. "19.4". */
+	// one decimal, f.e. "19.4"
 	public static String decimal(double value) {
 		return String.format(Locale.ROOT, "%.1f", value);
 	}

@@ -11,19 +11,13 @@ import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.ItemCount;
 import dev.shaftjournal.detection.TextPatterns;
 
-/**
- * A shaft's corpse loot for display: every Rough, Flawed and Fine gem (any gem type) merged into
- * one group counted in Fine, and every other item summed by name. Flawless and better gems are
- * ordinary items, so they keep their own entry (Nick's choice, 2026-11-11).
- *
- * @param gems  null when the loot had no gems below Flawless
- * @param items the other items, largest count first
- */
+// a shafts corpse loot for display. every Rough, Flawed and Fine gem (any type) gets merged into one
+// group counted in Fine, every other item is summed by name. Flawless and up are just normal items
+// so they keep their own entry (my call, 2026-11-11)
+// gems is null when the loot had no gems below Flawless, items are the rest, biggest count first
 public record LootSummary(GemGroup gems, List<ItemCount> items) {
-	/**
-	 * @param fine  the gems converted to Fine at {@link GemYield#RECIPE}:1 per step
-	 * @param parts each gem item and its count, largest count first
-	 */
+	// fine = the gems turned into Fine at GemYield.RECIPE:1 per step
+	// parts = each gem item and its count, biggest count first
 	public record GemGroup(double fine, List<ItemCount> parts) {
 	}
 

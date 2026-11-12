@@ -34,7 +34,7 @@ class SkyblockItemsTest {
 		assertEquals(new Info("GOBLIN_EGG", "hypixel_skyblock:item/x", false), parsed.get("Goblin Egg"));
 	}
 
-	/** Every loot item name in the real journal fixture has an entry, so its icon can be textured. */
+	// every loot item in the real journal fixture needs an entry, so its icon can get textured
 	@Test
 	void coversRecordedLoot() throws Exception {
 		Path journal = Path.of("src/test/resources/journal-2026-11-11.jsonl");

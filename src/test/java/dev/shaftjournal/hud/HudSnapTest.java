@@ -13,7 +13,7 @@ import dev.shaftjournal.hud.HudSnap.Guide;
 import dev.shaftjournal.hud.HudSnap.Rect;
 import dev.shaftjournal.hud.HudSnap.Result;
 
-/** Screen 480×270 (1080p at auto GUI scale), margin 4, as approved by Nick. */
+// screen 480x270 (1080p at auto gui scale), margin 4, like Nick approved
 class HudSnapTest {
 	private static final int W = 480;
 	private static final int H = 270;
@@ -94,8 +94,8 @@ class HudSnapTest {
 		assertEquals(48, r.y(), "4 px under the box");
 		assertEquals(30, r.x());
 		assertNull(r.anchorY(), "a stacked box gets its anchor from where it is");
-		// The boxes overlap from x 30 to 84, so the marker sits at 57. No room left of the boxes, so the
-		// label goes right of both (they end at 90), level with the gap.
+		// the boxes overlap from x 30 to 84 so the marker sits at 57. no room left of the boxes so the
+		// label goes right of both (they end at 90), level with the gap
 		assertEquals(List.of(new Guide(57, 44, 1, 4, "4", 92, 42)), r.guides());
 	}
 
@@ -117,7 +117,7 @@ class HudSnapTest {
 
 	@Test
 	void skipsSpotsPastTheMargin() {
-		// Next to the box at 400..440 would put this 40 px box at 444..484, past the right margin (476).
+		// next to the box at 400..440 would put this 40 px box at 444..484, thats past the right margin (476)
 		Result r = snap(rect(446, 100, 40, 20), rect(400, 85, 40, 40));
 		assertEquals(446, r.x());
 		assertTrue(r.guides().isEmpty(), "no guide pointing at a spot the box can't reach");
@@ -134,7 +134,7 @@ class HudSnapTest {
 
 	@Test
 	void theClosestTargetWins() {
-		// Left edge 3 px from the margin, middle 1 px from the other box's middle.
+		// left edge 3 px from the margin, middle 1 px from the other box's middle
 		Result r = snap(rect(7, 100, 50, 20), rect(13, 200, 40, 20));
 		assertEquals(8, r.x());
 		assertNull(r.anchorX(), "middles lined up, but the other box is anchored by its left edge");

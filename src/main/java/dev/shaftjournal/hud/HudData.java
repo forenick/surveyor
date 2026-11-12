@@ -19,51 +19,45 @@ import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.journal.LootSummary;
 import dev.shaftjournal.screen.ShaftNames;
 
-/**
- * One moment's values for the HUD, by {@link HudValue} and, for countable values, {@link Range}.
- * A missing value is null. Plain Java.
- */
+// one moment's values for the HUD, by HudValue and (for countable ones) Range.
+// missing value = null. plain java
 public final class HudData {
-	/** What the editor shows for values that aren't known right now (the mockup's numbers). */
+	// what the editor shows for values we dont know right now (the numbers from the mockup)
 	public static final HudData EXAMPLE = example();
 
-	/** A value in one range; the range is null for values without ranges. */
+	// a value in one range. range is null for values that dont have ranges
 	private record Key(HudValue value, Range range) {
 	}
 
 	private final Map<Key, Object> values = new HashMap<>();
-	/** Values that are real but say nothing yet (a session's zeros before its first shaft); the editor shows examples. */
+	// values that are real but dont say anything yet (a session's zeros before the first shaft), the editor shows examples for these
 	private final Set<Key> placeholders = new HashSet<>();
 
-	/** The value in its default range. */
 	public Object get(HudValue value) {
 		return get(value, value.defaultRange());
 	}
 
-	/** @param range ignored for values without ranges; null means the default range */
+	// range is ignored for values without ranges, null = the default range
 	public Object get(HudValue value, Range range) {
 		return values.get(key(value, range));
 	}
 
-	/** This value, or the example when it's missing or only a placeholder. */
+	// this value, or the example when its missing or only a placeholder
 	public Object getOrExample(HudValue value, Range range) {
 		Key key = key(value, range);
 		Object v = values.get(key);
 		return v != null && !placeholders.contains(key) ? v : EXAMPLE.values.get(key);
 	}
 
-	/**
-	 * The value as a number for colour rules, or null when it's missing or not a number.
-	 *
-	 * @param example the editor: missing values and placeholders give the example's number
-	 */
+	// the value as a number for colour rules, null when its missing or not a number
+	// example = in the editor, so missing values and placeholders give the example's number
 	public Double number(HudValue value, Range range, boolean example) {
 		Key key = key(value, range);
 		HudData from = example && (values.get(key) == null || placeholders.contains(key)) ? EXAMPLE : this;
 		return from.values.get(key) instanceof Number n ? n.doubleValue() : null;
 	}
 
-	/** Leaves out ranges the value doesn't have, so a hand-edited file can't ask for one. */
+	// drops ranges the value doesnt have, so a hand edited file cant ask for one
 	private static Key key(HudValue value, Range range) {
 		return new Key(value, value.hasRange(range) ? range : value.defaultRange());
 	}
@@ -77,7 +71,7 @@ public final class HudData {
 		return this;
 	}
 
-	/** Shafts, powder and Fine from corpses added up over some shafts. */
+	// shafts, powder and Fine from corpses added up over some shafts
 	public record Totals(long shafts, long powder, double fine) {
 		public static final Totals NONE = new Totals(0, 0, 0);
 
@@ -95,7 +89,7 @@ public final class HudData {
 			return new Totals(entries.size(), powder, fine);
 		}
 
-		/** The shaft the player is in, so far: corpse loot, plus the powder for leaving once it's known. */
+		// the shaft ur in so far. corpse loot, plus the powder for leaving once we know it
 		public static Totals of(Shaft shaft, TextPatterns patterns) {
 			return new Totals(1, JournalStats.powder(shaft.loots(), shaft.exitPowder()), fine(shaft.loots(), patterns));
 		}
@@ -106,12 +100,9 @@ public final class HudData {
 		}
 	}
 
-	/**
-	 * A session's totals. They only change when a shaft is saved, so the HUD keeps them between
-	 * refreshes instead of adding up every shaft again.
-	 *
-	 * @param summary null before the first shaft
-	 */
+	// a session's totals. these only change when a shaft gets saved, so the HUD keeps them between
+	// refreshes instead of adding up every shaft again
+	// summary is null before the first shaft
 	public record SessionTotals(Totals totals, SessionSummary summary) {
 		public static final SessionTotals NONE = new SessionTotals(Totals.NONE, null);
 
@@ -119,26 +110,22 @@ public final class HudData {
 			return totals.shafts();
 		}
 
-		/** Null before a spawn was timed. */
+		// null until a spawn got timed
 		public Long averageSpawn() {
 			return summary == null ? null : summary.averageSearchMillis();
 		}
 
-		/** @param entries the finished shafts of one session, in order */
+		// entries = the finished shafts of one session, in order
 		public static SessionTotals of(List<JournalEntry> entries, TextPatterns patterns) {
 			if (entries.isEmpty()) return NONE;
 			return new SessionTotals(Totals.of(entries, patterns), new SessionSummary(entries.getFirst().sessionId(), entries));
 		}
 	}
 
-	/**
-	 * @param session    the current session's totals
-	 * @param allTime    every saved shaft's totals
-	 * @param thisShaft  the shaft the player is in so far, else the last saved shaft; null when there's none
-	 * @param spawnTimer the running or last timed spawn, in milliseconds; null when none
-	 * @param shaft      the shaft the player is in, or null
-	 * @param now        the same clock as the shaft's times
-	 */
+	// session = current session's totals, allTime = every saved shaft's totals
+	// thisShaft = the shaft ur in so far, else the last saved one, null if there's none
+	// spawnTimer = the running or last timed spawn in ms, null if none
+	// shaft = the shaft ur in or null, now = same clock as the shaft's times
 	public static HudData live(SessionTotals session, Totals allTime, Totals thisShaft, Long spawnTimer, Shaft shaft,
 			long now, ShaftNames names) {
 		HudData data = new HudData();
@@ -146,7 +133,7 @@ public final class HudData {
 		data.put(HudValue.SESSION_SHAFTS, totals.shafts());
 		data.put(HudValue.SESSION_POWDER, totals.powder());
 		data.put(HudValue.SESSION_CORPSE_FINE, totals.fine());
-		// The HUD shows 0 shafts, but the editor previews the whole box with examples instead of mixing them in.
+		// the HUD shows 0 shafts, but the editor previews the whole box w/ examples instead of mixing them in
 		if (session.summary() == null) data.placeholders(Range.SESSION);
 		data.put(HudValue.SESSION_SHAFTS, Range.ALL_TIME, allTime.shafts());
 		data.put(HudValue.SESSION_POWDER, Range.ALL_TIME, allTime.powder());
@@ -158,7 +145,7 @@ public final class HudData {
 		}
 		data.put(HudValue.AVERAGE_SPAWN, session.averageSpawn());
 		if (session.summary() != null) {
-			// Counted up to now, so the rates drop while a search drags on.
+			// counted up to now, so the rates drop while a search drags on
 			SessionSummary summary = session.summary();
 			data.put(HudValue.SHAFTS_PER_HOUR, summary.shaftsPerHour(now));
 			Double powderPerHour = summary.perHour(totals.powder(), now);
@@ -176,14 +163,14 @@ public final class HudData {
 		return data;
 	}
 
-	/** Marks every value in this range as a placeholder. */
+	// marks every value in this range as a placeholder
 	private void placeholders(Range range) {
 		for (HudValue value : HudValue.values()) {
 			if (value.hasRange(range)) placeholders.add(key(value, range));
 		}
 	}
 
-	/** "2/4 Lapis, Umber": looted out of all, then the types present. Null before the tab list shows them. */
+	// "2/4 Lapis, Umber" = looted out of all, then the types there. null before the tab list shows them
 	static String corpses(List<Corpse> corpses) {
 		if (corpses.isEmpty()) return null;
 		long looted = corpses.stream().filter(Corpse::looted).count();
@@ -217,7 +204,7 @@ public final class HudData {
 				.put(HudValue.SHAFT_CAMPFIRES, 1L);
 	}
 
-	/** Package-private for tests. */
+	// package private for tests
 	HudData cold(int cold) {
 		return put(HudValue.SHAFT_COLD, (long) cold);
 	}

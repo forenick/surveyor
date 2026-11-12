@@ -7,9 +7,9 @@ import java.util.regex.Pattern;
 
 import dev.shaftjournal.hud.HudValue.Kind;
 
-/** The number formats a line can pick, per {@link Kind}. Plain Java. */
+// the number formats a line can pick, per Kind. plain java
 public final class HudFormat {
-	/** Shown when a value isn't known yet, e.g. shafts per hour in the first minutes. */
+	// shown when we dont know a value yet, f.e. shafts per hour in the first few minutes
 	public static final String MISSING = "-";
 
 	private static final List<String> TIME = List.of("1:42", "1m 42s", "102s");
@@ -17,19 +17,19 @@ public final class HudFormat {
 	private static final List<String> DECIMAL = List.of("19.4", "19", "19.42");
 	private static final List<String> COLD = List.of("-12❄");
 	private static final List<String> TEXT = List.of("Text");
-	/** The formats' names in free-text tags, e.g. {session_powder:short}; same order as the examples above. */
+	// the format names in free text tags, f.e. {session_powder:short}. same order as the examples above
 	private static final List<String> TIME_NAMES = List.of("clock", "minutes", "seconds");
 	private static final List<String> INTEGER_NAMES = List.of("comma", "short", "plain");
 	private static final List<String> DECIMAL_NAMES = List.of("tenths", "whole", "hundredths");
-	/** A time threshold as minutes:seconds, e.g. "1:30" or "-0:30". */
+	// a time threshold as minutes:seconds, f.e. "1:30" or "-0:30"
 	private static final Pattern CLOCK = Pattern.compile("(-?)(\\d+):(\\d{2})");
-	/** Commas between groups of three digits, as the HUD shows numbers: "43,436". */
+	// commas between groups of 3 digits, like the HUD shows numbers ("43,436")
 	private static final Pattern GROUPED = Pattern.compile("-?\\d{1,3}(,\\d{3})+(\\.\\d+)?");
 
 	private HudFormat() {
 	}
 
-	/** The choices for this kind, each shown as an example. */
+	// the choices for this kind, each one shown as an example
 	public static List<String> options(Kind kind) {
 		return switch (kind) {
 			case TIME -> TIME;
@@ -40,7 +40,7 @@ public final class HudFormat {
 		};
 	}
 
-	/** The tag names of this kind's formats; COLD and TEXT have none. */
+	// tag names of this kind's formats. COLD and TEXT dont have any
 	public static List<String> names(Kind kind) {
 		return switch (kind) {
 			case TIME -> TIME_NAMES;
@@ -50,13 +50,9 @@ public final class HudFormat {
 		};
 	}
 
-	/**
-	 * A colour threshold as typed: a time as "1:30" or seconds ("90"), anything else as a number.
-	 * Commas between groups of three digits are thousands ("43,436"); a single other comma is a
-	 * decimal point ("2,5").
-	 *
-	 * @return the threshold in the value's unit (seconds for times), or null when it can't be read
-	 */
+	// a colour threshold as typed. times as "1:30" or seconds ("90"), anything else as a number.
+	// commas between groups of 3 digits are thousands ("43,436"), a single other comma is a decimal point ("2,5")
+	// gives the threshold in the value's unit (seconds for times), or null if it cant be read
 	public static Double parseThreshold(Kind kind, String text) {
 		String t = text.strip();
 		try {
@@ -71,22 +67,22 @@ public final class HudFormat {
 			}
 			if (GROUPED.matcher(t).matches()) t = t.replace(",", "");
 			else if (t.indexOf(',') == t.lastIndexOf(',') && t.indexOf('.') < 0) t = t.replace(',', '.');
-			// Only digits, one point and a leading minus: no "1e5", "NaN" or "1d".
+			// only digits, one point and a minus in front. no "1e5", "NaN" or "1d"
 			if (!t.matches("-?(\\d+\\.?\\d*|\\.\\d+)")) return null;
 			return Double.parseDouble(t);
 		} catch (NumberFormatException e) {
-			// Digits too long for a long.
+			// too many digits for a long
 			return null;
 		}
 	}
 
-	/** A threshold as the editor shows it: times as "1:30", numbers without a needless ".0". */
+	// a threshold like the editor shows it. times as "1:30", numbers without a pointless ".0"
 	public static String thresholdText(Kind kind, double value) {
 		if (kind == Kind.TIME && value == Math.rint(value) && value >= 0) return time((long) value, 0);
 		return value == Math.rint(value) && Math.abs(value) < 1e15 ? Long.toString((long) value) : Double.toString(value);
 	}
 
-	/** Formats a value; an unknown format index falls back to the first. */
+	// formats a value. unknown format index falls back to the first one
 	public static String format(Kind kind, int format, Object value) {
 		if (value == null) return MISSING;
 		int f = format < 0 || format >= options(kind).size() ? 0 : format;
@@ -109,7 +105,7 @@ public final class HudFormat {
 
 	private static String integer(long value, int format) {
 		return switch (format) {
-			// 999,950 and up round to 1.0M, not 1000.0k.
+			// 999,950 and up rounds to 1.0M, not 1000.0k
 			case 1 -> Math.abs(value) >= 999_950 ? one(value / 1e6) + "M"
 					: Math.abs(value) >= 1_000 ? one(value / 1e3) + "k" : Long.toString(value);
 			case 2 -> Long.toString(value);

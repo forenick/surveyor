@@ -42,7 +42,7 @@ class JournalTest {
 		assertEquals("JADE_1", entries.get(0).shaftId());
 		assertEquals(new Journal.Session(0, 1, 1, MINUTE), journal.session());
 
-		// The timer restarts at the first hit after the shaft, not when leaving it.
+		// timer restarts at the first hit after the shaft, not when u leave it
 		at(2 * MINUTE).hit(true);
 		at(2 * MINUTE + 20_000).hit(true);
 		at(2 * MINUTE + 40_000).chat(WOW);
@@ -55,7 +55,7 @@ class JournalTest {
 	void gapsOverFortySecondsOnlyCountFortySeconds() {
 		at(0).hit(true);
 		at(10_000).hit(true);
-		at(110_000).hit(true); // 100 s break: only 40 s count
+		at(110_000).hit(true); // 100 s break, only 40 s count
 		at(120_000).chat(WOW);
 		visitShaft(123_000, "JADE_1");
 		assertEquals(60_000, entries.get(0).searchMillis());
@@ -87,9 +87,9 @@ class JournalTest {
 	void aPortalLeftUnenteredIsNotTimedForTheNextShaft() {
 		at(0).hit(true);
 		at(20_000).chat(WOW);
-		at(70_000).hit(true); // over 40 s later: a new search, the found portal is abandoned
+		at(70_000).hit(true); // over 40 s later = new search, the found portal got abandoned
 		assertEquals(0, journal.spawnTimerMillis(70_000));
-		visitShaft(80_000, "JADE_1"); // someone else's portal, no WOW
+		visitShaft(80_000, "JADE_1"); // someone elses portal, no WOW
 		assertNull(entries.get(0).searchMillis());
 	}
 
@@ -121,7 +121,7 @@ class JournalTest {
 		visitShaft(15_000, "JADE_1");
 		assertEquals(10_000, entries.get(0).searchMillis());
 
-		// A portal that isn't entered within 40 s counts as skipped.
+		// a portal u dont enter within 40 s counts as skipped
 		at(MINUTE).hit(true);
 		at(MINUTE + 5_000).chat(WOW);
 		at(MINUTE + 50_000).hit(true);
@@ -182,7 +182,7 @@ class JournalTest {
 		assertEquals(entries, file.read());
 	}
 
-	/** Jade shaft from recording 2, checked by hand in Docs/research/06: 379.1 Fine reported, ~385 in total. */
+	// Jade shaft from recording 2, checked by hand in Docs/research/06. 379.1 Fine reported, ~385 in total
 	@Test
 	void jadeShaftGems() throws IOException {
 		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-08_22-41-09.jsonl");
@@ -212,7 +212,7 @@ class JournalTest {
 		assertTrue(text.contains("§7Powder §f+12,060 §8(corpses 10,550, exit 1,510)"), text);
 	}
 
-	/** Recording 4 (Docs/research/08): spawn times with the 40 s pause rule, checked by hand. */
+	// recording 4 (Docs/research/08), spawn times w/ the 40 s pause rule, checked by hand
 	@Test
 	void recording4SpawnTimes() throws IOException {
 		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-11_17-16-21.jsonl");
@@ -238,7 +238,7 @@ class JournalTest {
 	}
 
 	private void replay(Path recording) throws IOException {
-		// Recordings have no block hits, so spawns are never timed here.
+		// recordings have no block hits so spawns never get timed here
 		for (ShaftEvent event : RecordingReplay.replay(recording)) journal.onEvent(event, 0);
 	}
 

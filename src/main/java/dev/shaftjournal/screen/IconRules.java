@@ -6,18 +6,16 @@ import java.util.regex.Pattern;
 
 import dev.shaftjournal.util.Resources;
 
-/**
- * Picks a vanilla stand-in icon for a SkyBlock item name, used when no texture is available, from {@code shaftjournal/item_icons.txt}.
- * Plain Java so it can be tested; {@link ItemIcons} turns the result into an item stack.
- */
+// picks a vanilla stand-in icon for a SkyBlock item name from shaftjournal/item_icons.txt, for when
+// theres no texture. plain Java so it can be tested, ItemIcons turns the result into an item stack
 public final class IconRules {
-	/** A comment: '#' after whitespace, to the end of the line. */
+	// a comment is '#' after whitespace, up to the end of the line
 	private static final Pattern COMMENT = Pattern.compile("\\s#.*$");
 
 	private static IconRules defaults;
 
 	private record Rule(Pattern pattern, String item) {
-		/** {@code *} matches any text; everything else matches literally. */
+		// * matches any text, everything else matches as is
 		static Rule of(String pattern, String item) {
 			return new Rule(Pattern.compile(Pattern.quote(pattern).replace("*", "\\E.*\\Q")), item);
 		}
@@ -47,7 +45,7 @@ public final class IconRules {
 		fallback = defaultItem;
 	}
 
-	/** The rules bundled with the mod, read once. */
+	// the rules that come with the mod, read once
 	public static synchronized IconRules defaults() {
 		if (defaults == null) {
 			List<String> lines = Resources.lines("/shaftjournal/item_icons.txt");
@@ -56,7 +54,7 @@ public final class IconRules {
 		return defaults;
 	}
 
-	/** The Minecraft item ID to draw for this item name. */
+	// Minecraft item id to draw for this item name
 	public String itemId(String name) {
 		for (Rule rule : rules) {
 			if (rule.matches(name)) return rule.item();

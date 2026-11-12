@@ -1,12 +1,12 @@
-# SkyBlock items that corpse loot can show, so journal icons look like the real item.
-# Source: NotEnoughUpdates-REPO (MIT), items/<ID>.json, commit f315a139 (2026-11-09):
-# the SkyBlock ID, the "ItemModel" from Hypixel's own resource pack, and whether it glints (ench:[]).
-# Names are the display names without colour codes or Hypixel's icon prefix.
-# Format: <item name> = <SKYBLOCK_ID> <hypixel model or -> [glint]
+# SkyBlock items that can drop from corpses, so the journal icons look like the real item
+# source: NotEnoughUpdates-REPO (MIT), items/<ID>.json, commit f315a139 (2026-11-09):
+# the SkyBlock id, the "ItemModel" from Hypixel's own resource pack, and if it glints (ench:[])
+# names are the display names w/o color codes or Hypixel's icon prefix
+# format: <item name> = <SKYBLOCK_ID> <hypixel model or -> [glint]
 #
-# Every icon carries custom_data {id:<SKYBLOCK_ID>}, which is what Firmament and Catharsis texture
-# packs key on. The Hypixel model is used only while Hypixel's pack is loaded; otherwise the
-# stand-in from item_icons.txt shows.
+# every icon gets custom_data {id:<SKYBLOCK_ID>}, thats what Firmament and Catharsis texture packs
+# look for. the Hypixel model only gets used while Hypixel's pack is loaded, otherwise the
+# stand-in from item_icons.txt shows
 Rough Ruby Gemstone        = ROUGH_RUBY_GEM         hypixel_skyblock:item/collections/gemstone/ruby/rough_ruby_gem
 Flawed Ruby Gemstone       = FLAWED_RUBY_GEM        hypixel_skyblock:item/collections/gemstone/ruby/flawed_ruby_gem
 Fine Ruby Gemstone         = FINE_RUBY_GEM          hypixel_skyblock:item/collections/gemstone/ruby/fine_ruby_gem

@@ -21,10 +21,8 @@ public final class TextUtil {
 	private TextUtil() {
 	}
 
-	/**
-	 * Flattens a component into a legacy "§"-coded string, the format Hypixel still thinks in.
-	 * Hex colors that don't match a legacy color are written as "§#RRGGBB".
-	 */
+	// flattens a component into an old school § coded string, hypixel still thinks in those.
+	// hex colors that dont match a legacy color get written as "§#RRGGBB"
 	public static String toLegacy(Component component) {
 		StringBuilder out = new StringBuilder();
 		component.visit((style, text) -> {
@@ -36,10 +34,8 @@ public final class TextUtil {
 		return out.toString();
 	}
 
-	/**
-	 * Returns the hover texts attached to any part of the component, in order and without
-	 * duplicates. Hypixel puts details here, e.g. the per-item breakdown of "[Sacks]" messages.
-	 */
+	// hover texts on any part of the component, in order, no dupes. hypixel puts details in there,
+	// f.e. the per item breakdown of "[Sacks]" msgs
 	public static List<String> hoverTexts(Component component) {
 		Set<HoverEvent> seen = new LinkedHashSet<>();
 		component.visit((style, text) -> {

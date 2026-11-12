@@ -19,17 +19,15 @@ import dev.shaftjournal.detection.ShaftEvent.ScrapFound;
 import dev.shaftjournal.detection.ShaftEvent.Supercraft;
 import dev.shaftjournal.detection.ShaftEvent.Warping;
 
-/**
- * What happened during one visit to a shaft. Times are in the caller's clock (milliseconds).
- * Only {@link ShaftTracker} changes it; once {@link #exitReason()} is set it is final.
- */
+// everything that happened in one shaft visit. times are in the callers clock (ms).
+// only ShaftTracker changes it, once exitReason is set its final
 public final class Shaft {
 	public enum ExitReason {
-		/** Left through the exit with a "BYE!" bonus. */
+		// left through the exit w/ a "BYE!" bonus
 		BYE,
 		WARP,
 		DEATH,
-		/** The world changed without a known leaving message. */
+		// world changed but we never saw a leave msg we know
 		UNKNOWN
 	}
 
@@ -54,7 +52,7 @@ public final class Shaft {
 	private final Map<String, Long> sacksRemoved = new LinkedHashMap<>();
 	private long lastSacksAt = -1;
 	private final Map<String, Long> pristineSinceSacks = new LinkedHashMap<>();
-	// Corpse loot and Supercraft output also land in the sacks; pending until a Sacks message reports them.
+	// corpse loot and supercraft output also go in the sacks, they sit here until a Sacks msg reports them
 	private final Map<String, Long> notMinedPending = new LinkedHashMap<>();
 	private final Map<String, Long> notMinedInSacks = new LinkedHashMap<>();
 
@@ -107,47 +105,47 @@ public final class Shaft {
 		totals.merge(item.item(), item.count(), Long::sum);
 	}
 
-	/** The world change into the shaft; the cold timer starts here. */
+	// world change into the shaft, cold timer starts here
 	public long enteredAt() {
 		return enteredAt;
 	}
 
-	/** The world change out of the shaft, or -1 while still inside. */
+	// world change out of the shaft, -1 while still inside
 	public long leftAt() {
 		return leftAt;
 	}
 
-	/** Time spent inside, or -1 while still inside. */
+	// -1 while still inside
 	public long durationMillis() {
 		return leftAt < 0 ? -1 : leftAt - enteredAt;
 	}
 
-	/** Null while still inside. */
+	// null while still inside
 	public ExitReason exitReason() {
 		return exitReason;
 	}
 
-	/** Null until the scoreboard shows it. */
+	// null until the scoreboard shows it
 	public ShaftId id() {
 		return id;
 	}
 
-	/** Glacite Powder from the "BYE!" bonus; 0 for any other exit. */
+	// Glacite Powder from the "BYE!" bonus, 0 for any other exit
 	public long exitPowder() {
 		return pendingExit == ExitReason.BYE ? exitPowder : 0;
 	}
 
-	/** The last Cold value seen on the scoreboard, or null. */
+	// last Cold seen on the scoreboard, or null
 	public Integer cold() {
 		return cold;
 	}
 
-	/** The last non-empty state of the tab list corpse widget. */
+	// last non empty state of the tab list corpse widget
 	public List<Corpse> corpses() {
 		return corpses;
 	}
 
-	/** Corpses added by "MORE!" messages; they also appear in {@link #corpses()}. */
+	// corpses from "MORE!" msgs, these show up in corpses() too
 	public int extraCorpses() {
 		return extraCorpses;
 	}
@@ -160,12 +158,12 @@ public final class Shaft {
 		return Collections.unmodifiableList(mayhemBuffs);
 	}
 
-	/** Times a Portable Campfire was placed. */
+	// timestamps of each Portable Campfire placed
 	public List<Long> campfiresPlaced() {
 		return Collections.unmodifiableList(campfiresPlaced);
 	}
 
-	/** Time of the cave-in message, or -1. */
+	// time of the cave in msg, or -1
 	public long caveInAt() {
 		return caveInAt;
 	}
@@ -178,12 +176,12 @@ public final class Shaft {
 		return pristineProcs;
 	}
 
-	/** Items from "PRISTINE!" messages. Silent Gemstone Spread procs are missing; use {@link #sacksAdded()}. */
+	// items from "PRISTINE!" msgs. misses the silent gemstone spread procs, use sacksAdded() for real totals
 	public Map<String, Long> pristineItems() {
 		return Collections.unmodifiableMap(pristineItems);
 	}
 
-	/** Items from "[Sacks]" hover lines while inside. The last few seconds before leaving are never reported. */
+	// items from "[Sacks]" hover lines while inside. the last few secs before leaving never get reported
 	public Map<String, Long> sacksAdded() {
 		return Collections.unmodifiableMap(sacksAdded);
 	}
@@ -192,23 +190,19 @@ public final class Shaft {
 		return Collections.unmodifiableMap(sacksRemoved);
 	}
 
-	/**
-	 * Items from "PRISTINE!" messages after the last "[Sacks]" message: the start of the unreported
-	 * tail. Everything when there was no Sacks message.
-	 */
+	// "PRISTINE!" items after the last "[Sacks]" msg, so the start of the unreported tail.
+	// if there was no Sacks msg at all its everything
 	public Map<String, Long> pristineSinceSacks() {
 		return Collections.unmodifiableMap(pristineSinceSacks);
 	}
 
-	/**
-	 * Corpse loot and Supercraft output that a "[Sacks]" message has already reported, so it is
-	 * part of {@link #sacksAdded()} but wasn't mined.
-	 */
+	// corpse loot and supercraft output a "[Sacks]" msg already reported. its in sacksAdded() but
+	// wasnt mined
 	public Map<String, Long> notMinedInSacks() {
 		return Collections.unmodifiableMap(notMinedInSacks);
 	}
 
-	/** Time of the last "[Sacks]" message inside, or -1. */
+	// time of the last "[Sacks]" msg inside, or -1
 	public long lastSacksAt() {
 		return lastSacksAt;
 	}

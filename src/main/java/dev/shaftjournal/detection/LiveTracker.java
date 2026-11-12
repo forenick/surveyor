@@ -15,11 +15,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
 
-/**
- * Feeds the live game into a {@link ShaftTracker}: the only class in this package that touches
- * Minecraft. It reads the same data at the same rate as the recorder, so replaying a recording
- * behaves like playing. Events go to the log and to the listeners.
- */
+// feeds the live game into a ShaftTracker. only class in this package that touches Minecraft.
+// reads the same data at the same rate as the recorder, so replaying a recording acts like playing.
+// events go to the log and the listeners
 public final class LiveTracker {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal Detection");
 
@@ -28,22 +26,22 @@ public final class LiveTracker {
 	private ClientLevel lastLevel;
 	private int tick;
 
-	/** Also gets every event, right after it is logged. */
+	// gets every event too, right after its logged
 	public void addListener(Consumer<ShaftEvent> listener) {
 		listeners.add(listener);
 	}
 
-	/** See {@link ShaftTracker#inMiningArea()}. */
+	// see ShaftTracker.inMiningArea
 	public boolean inMiningArea() {
 		return tracker.inMiningArea();
 	}
 
-	/** The shaft the player is in, or null. Call on the client thread. */
+	// shaft ur in, or null. call it on the client thread
 	public Shaft currentShaft() {
 		return tracker.current();
 	}
 
-	/** Called for every chat and action-bar message, before other mods can hide or change it. */
+	// gets every chat and action bar msg, before other mods can hide or change it
 	public void onGameMessage(Component message, boolean overlay) {
 		if (overlay) return;
 		tracker.onChat(System.currentTimeMillis(), TextUtil.toLegacy(message), TextUtil.hoverTexts(message));

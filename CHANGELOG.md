@@ -4,6 +4,9 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.9.2 (2026-11-12)
+Comments rewritten in a shorter, casual style. No changes to how the mod works.
+
 ## 0.9.1 (2026-11-12)
 Code review fixes for HUD slices 2 and 3.
 - **Colour rules on free-text lines** follow the range in the text: with `{session_powder:all_time}`, the rule

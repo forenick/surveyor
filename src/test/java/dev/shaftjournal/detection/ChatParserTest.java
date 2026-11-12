@@ -23,7 +23,7 @@ import dev.shaftjournal.detection.ShaftEvent.ScrapFound;
 import dev.shaftjournal.detection.ShaftEvent.Supercraft;
 import dev.shaftjournal.detection.ShaftEvent.Warping;
 
-/** Fixtures are real lines from the recordings in {@code Recordings/}. */
+// fixtures are real lines from the recordings in Recordings/
 class ChatParserTest {
 	private static final String BAR = "§a§l" + "▬".repeat(64);
 

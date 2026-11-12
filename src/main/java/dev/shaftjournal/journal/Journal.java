@@ -11,33 +11,26 @@ import dev.shaftjournal.detection.ShaftEvent.ShaftEntered;
 import dev.shaftjournal.detection.ShaftEvent.ShaftLeft;
 import dev.shaftjournal.detection.TextPatterns;
 
-/**
- * Turns finished shafts into {@link JournalEntry}s, and keeps the session and the spawn timer.
- *
- * <p>Spawn timer: counts mining time in the mining area, from the first mining after the previous
- * shaft (or the session start) to "WOW! You found a Glacite Mineshaft portal!". Mining is a block
- * hit or a pickaxe ability such as Pickobulus. A gap longer than {@link #PAUSE_MILLIS} without
- * mining only counts for its first {@code PAUSE_MILLIS}, so breaks don't inflate the time. Only
- * the finder gets "WOW!", so other players' portals ("MINESHAFT! ... spawned nearby" alone) aren't
- * timed. The time is stored on the shaft entered next.
- *
- * <p>Session: ends after {@link #SESSION_GAP_MILLIS} without mining or shaft activity, or on
- * {@link #newSession}. A timer running across a session break is dropped.
- */
+// turns finished shafts into JournalEntrys, and keeps the session and spawn timer
+// spawn timer: counts mining time in the mining area, from the first mining after the last shaft
+// (or session start) up to "WOW! You found a Glacite Mineshaft portal!". mining = a block hit or
+// a pickaxe ability like Pickobulus. a gap longer than PAUSE_MILLIS w/o mining only counts for its
+// first PAUSE_MILLIS so breaks dont blow up the time. only the finder gets "WOW!", so other
+// peoples portals ("MINESHAFT! ... spawned nearby" alone) arent timed. the time goes on the next
+// shaft u enter
+// session ends after SESSION_GAP_MILLIS w/o mining or shaft stuff, or on newSession. a timer
+// running across a session break gets dropped
 public final class Journal {
-	/** No activity for this long ends the session. A usability default, not a game number. */
+	// no activity for this long ends the session. just a default that felt ok, not a game number
 	public static final long SESSION_GAP_MILLIS = 15 * 60_000L;
 
-	/**
-	 * Longer gaps without mining are a break for the spawn timer. Nick's choice (2026-11-11): just
-	 * above his 32 s Pickobulus cooldown, so a Pickobulus-only rhythm still counts (Docs/research/08).
-	 * Also how long a found portal may go unentered before the next mining starts a new timer.
-	 */
+	// longer gaps w/o mining count as a break for the spawn timer. i picked this (2026-11-11), just
+	// above my 32 s Pickobulus cooldown so only using Pickobulus still counts (Docs/research/08).
+	// also how long a found portal can sit unentered before the next mining starts a new timer
 	public static final long PAUSE_MILLIS = 40_000L;
 
-	/** Totals for one session. */
 	public record Session(long id, int shafts, int timedSpawns, long searchMillis) {
-		/** Null until a spawn has been timed. */
+		// null until a spawn got timed
 		public Long averageSearchMillis() {
 			return timedSpawns == 0 ? null : searchMillis / timedSpawns;
 		}
@@ -66,23 +59,19 @@ public final class Journal {
 		this.listener = listener;
 	}
 
-	/** The current session, or null before any activity. */
+	// null before any activity
 	public Session session() {
 		return session;
 	}
 
-	/**
-	 * The current session, or null when there is none or it has run out: the session only ends at
-	 * the next activity, but after {@link #SESSION_GAP_MILLIS} it is already over for display.
-	 */
+	// null when there is none or it ran out. the session only really ends at the next activity,
+	// but after SESSION_GAP_MILLIS its already over for display
 	public Session activeSession(long now) {
 		return session == null || now - lastActivity > SESSION_GAP_MILLIS ? null : session;
 	}
 
-	/**
-	 * Continues the last saved session after a restart, as if the game had stayed open. Entries
-	 * are in file order. Does nothing once a session is running.
-	 */
+	// carries on the last saved session after a restart, like the game stayed open. entries are in
+	// file order. does nothing once a session is running
 	public void resume(List<JournalEntry> entries) {
 		if (entries.isEmpty() || session != null) return;
 		JournalEntry last = entries.getLast();
@@ -94,24 +83,21 @@ public final class Journal {
 		lastActivity = last.enteredAt() + last.durationMillis();
 	}
 
-	/** True while the spawn timer is running. */
 	public boolean searchRunning() {
 		return searching;
 	}
 
-	/**
-	 * What the HUD's spawn timer shows: while searching, the time so far (a break counts for at most
-	 * {@link #PAUSE_MILLIS}, as when the shaft is found); after "WOW!", the timed spawn until that
-	 * shaft is left; otherwise null. Also null once the session has run out, because the next
-	 * activity starts a new session and drops that timer.
-	 */
+	// what the HUD spawn timer shows. while searching its the time so far (a break counts for max
+	// PAUSE_MILLIS, same as when the shaft is found). after "WOW!" its the timed spawn until u leave
+	// that shaft, otherwise null. also null once the session ran out, bc the next activity starts a
+	// new session and drops that timer anyway
 	public Long spawnTimerMillis(long now) {
 		if (activeSession(now) == null) return null;
 		if (searching) return searchMillis + Math.max(0, Math.min(now - lastMiningAt, PAUSE_MILLIS));
 		return timedSearch;
 	}
 
-	/** The player started or kept hitting a block. */
+	// player started or kept hitting a block
 	public void onBlockHit(long now) {
 		mining(now);
 	}
@@ -153,14 +139,14 @@ public final class Journal {
 	private void mining(long now) {
 		touch(now);
 		if (!inMiningArea.getAsBoolean()) return;
-		// Mining between finding a portal and entering it belongs to neither search.
+		// mining between finding a portal and entering it doesnt belong to either search
 		if (portalFoundAt >= 0 && now - portalFoundAt <= PAUSE_MILLIS) return;
 		if (searching) {
 			searchMillis += Math.min(now - lastMiningAt, PAUSE_MILLIS);
 		} else {
 			searching = true;
 			searchMillis = 0;
-			// A portal found earlier and not entered in time doesn't belong to the next shaft.
+			// a portal found earlier and not entered in time isnt part of the next shaft
 			timedSearch = null;
 		}
 		lastMiningAt = now;

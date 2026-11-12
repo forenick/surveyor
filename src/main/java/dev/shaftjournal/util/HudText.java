@@ -13,12 +13,12 @@ import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 
-/** Reads the sidebar and tab list as "§"-coded lines, in the order the player sees them. */
+// reads the sidebar and tab list as § coded lines, in the same order u see them
 public final class HudText {
 	private HudText() {
 	}
 
-	/** The sidebar title followed by its lines, top to bottom; empty when there is no sidebar. */
+	// sidebar title then its lines top to bottom, empty if theres no sidebar
 	public static List<String> scoreboardLines(Scoreboard scoreboard) {
 		Objective objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR);
 		List<String> lines = new ArrayList<>();
@@ -36,7 +36,7 @@ public final class HudText {
 		return lines;
 	}
 
-	/** The tab list entries in display order; empty when not connected. */
+	// tab list entries in display order, empty when not connected
 	public static List<String> tabListLines(Minecraft client) {
 		ClientPacketListener connection = client.getConnection();
 		if (connection == null) return List.of();

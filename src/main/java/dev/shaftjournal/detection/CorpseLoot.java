@@ -2,9 +2,7 @@ package dev.shaftjournal.detection;
 
 import java.util.List;
 
-/**
- * One "CORPSE LOOT!" chat block. The type is capitalised like the tab list ("Lapis"), and the
- * Glacite Powder line is split out of the items into {@code powder}.
- */
+// one "CORPSE LOOT!" chat block. type is capitalised like in the tab list ("Lapis"), and the
+// Glacite Powder line gets pulled out of items into powder
 public record CorpseLoot(String type, boolean bonusDrop, List<ItemCount> items, long powder) {
 }

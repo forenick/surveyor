@@ -9,7 +9,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-/** Scoreboard and tab list parsing. Fixtures are real snapshots from the recordings. */
+// scoreboard + tab list parsing. fixtures are real snapshots from the recordings
 class HudParserTest {
 	private static final List<String> SHAFT_SCOREBOARD = List.of(
 			"§e§lSKYBLOCK",

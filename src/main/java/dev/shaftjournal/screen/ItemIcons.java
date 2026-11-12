@@ -14,15 +14,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 
-/**
- * Item stacks for the journal's loot icons. Only used while a screen is open, never at class load.
- *
- * <p>A known SkyBlock item gets its SkyBlock ID in {@code custom_data}, the same place Hypixel puts
- * it, so texture mods (Firmament, Catharsis) give it the player's pack texture. While Hypixel's own
- * resource pack is loaded it also gets Hypixel's model; otherwise the vanilla stand-in shows.
- */
+// item stacks for the journals loot icons. only used while a screen is open, never at class load
+// a known SkyBlock item gets its SkyBlock id in custom_data, same spot Hypixel puts it, so texture
+// mods (Firmament, Catharsis) give it ur pack texture. if Hypixels own resource pack is loaded it
+// also gets Hypixels model, otherwise u see the vanilla stand-in
 final class ItemIcons {
-	/** One cache per screen, so a resource pack loaded or unloaded since is picked up next time. */
+	// one cache per screen, so a resource pack u loaded or unloaded since gets picked up next time
 	private final Map<String, ItemStack> cache = new HashMap<>();
 	private final IconRules standIns = IconRules.defaults();
 	private final SkyblockItems items = SkyblockItems.defaults();
@@ -45,7 +42,7 @@ final class ItemIcons {
 		return stack;
 	}
 
-	/** False when no loaded resource pack has this model, e.g. Hypixel's pack was declined. */
+	// false when no loaded pack has this model, f.e. u declined Hypixels pack
 	private static boolean isLoaded(Identifier model) {
 		return !(Minecraft.getInstance().getModelManager().getItemModel(model) instanceof MissingItemModel);
 	}

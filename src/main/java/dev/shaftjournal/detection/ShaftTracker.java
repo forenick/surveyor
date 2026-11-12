@@ -8,14 +8,11 @@ import dev.shaftjournal.detection.ShaftEvent.CorpsesChanged;
 import dev.shaftjournal.detection.ShaftEvent.ShaftEntered;
 import dev.shaftjournal.detection.ShaftEvent.ShaftLeft;
 
-/**
- * Follows the player in and out of shafts and reports every recognised event to a listener.
- * Fed with the same data the recorder writes, so a recording can be replayed through it.
- *
- * <p>Every world change starts a candidate {@link Shaft}. It becomes the current shaft as soon
- * as the tab list says "Area: Mineshaft" or the scoreboard shows a shaft ID, so messages that
- * arrive between the world change and those signals still count.
- */
+// follows u in and out of shafts and sends every event it knows to a listener.
+// gets the same data the recorder writes, so u can replay a recording through it
+// every world change starts a candidate Shaft. it becomes the current shaft once the tab list
+// says "Area: Mineshaft" or the scoreboard shows a shaft id, so msgs that come in between the
+// world change and that still count
 public final class ShaftTracker {
 	private final ChatParser chat;
 	private final ScoreboardParser scoreboard;
@@ -34,12 +31,12 @@ public final class ShaftTracker {
 		this.listener = listener;
 	}
 
-	/** True while the tab list says the player is in the Dwarven Mines; false right after a world change. */
+	// true while the tab list says ur in the Dwarven Mines, false right after a world change
 	public boolean inMiningArea() {
 		return inMiningArea;
 	}
 
-	/** The shaft the player is in, or null. */
+	// shaft ur in, or null
 	public Shaft current() {
 		return shaft != null && shaft.confirmed ? shaft : null;
 	}
@@ -72,7 +69,7 @@ public final class ShaftTracker {
 				listener.accept(new ShaftEntered(candidate));
 			}
 		}
-		// The Cold line can be missing for a moment; keep the last value instead of forgetting it.
+		// Cold line can be gone for a sec, so keep the last value instead of forgetting it
 		Integer newCold = scoreboard.cold(lines);
 		if (newCold != null && !newCold.equals(cold)) {
 			cold = newCold;
@@ -83,9 +80,9 @@ public final class ShaftTracker {
 
 	public void onTabList(long now, List<String> lines) {
 		if (tabList.inMineshaft(lines)) candidate(now).confirmed = true;
-		// An empty tab list (e.g. while loading) says nothing about where we are.
+		// empty tab list (f.e. while loading) tells us nothing about where we are
 		if (!lines.isEmpty()) inMiningArea = tabList.inMiningArea(lines);
-		// The widget is missing for the first seconds in a shaft; an empty list means "not shown".
+		// widget isnt there for the first few secs in a shaft, empty list just means "not shown"
 		List<Corpse> newCorpses = tabList.corpses(lines);
 		if (!newCorpses.isEmpty() && !newCorpses.equals(corpses)) {
 			corpses = newCorpses;
@@ -94,7 +91,7 @@ public final class ShaftTracker {
 		}
 	}
 
-	/** The current world's candidate; created here if tracking started without a world change. */
+	// candidate for the current world. made here if tracking started w/o a world change
 	private Shaft candidate(long now) {
 		if (shaft == null) shaft = new Shaft(now);
 		return shaft;

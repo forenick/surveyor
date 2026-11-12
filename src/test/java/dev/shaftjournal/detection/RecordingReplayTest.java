@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import dev.shaftjournal.detection.Shaft.ExitReason;
 import dev.shaftjournal.detection.ShaftEvent.ShaftLeft;
 
-/** Replays Nick's recordings and checks the results worked out by hand in Docs/research/05 and 06. */
+// replays Nick's recordings and checks the numbers worked out by hand in Docs/research/05 and 06
 class RecordingReplayTest {
 	@Test
 	void recording1() throws IOException {
@@ -45,8 +45,8 @@ class RecordingReplayTest {
 				"TOPA_1", "TOPA_1", "LITT_L", "ONYX_1", "AQUA_1", "RUBY_2", "JADE_1"), ids(shafts));
 		assertEquals(ExitReason.WARP, shafts.get(2).exitReason());
 
-		// Docs/research/06 section 3: 45 corpses in 15 shafts. It says 4 "MORE!" shafts, but the
-		// recording has 5 (JADE_1, RUBY_2, TOPA_1, TOPA_1, JADE_1).
+		// Docs/research/06 section 3 says 45 corpses in 15 shafts. it says 4 "MORE!" shafts but the
+		// recording has 5 (JADE_1, RUBY_2, TOPA_1, TOPA_1, JADE_1)
 		assertEquals(45, shafts.stream().mapToInt(shaft -> shaft.corpses().size()).sum());
 		assertEquals(5, shafts.stream().filter(shaft -> shaft.extraCorpses() > 0).count());
 
@@ -56,13 +56,13 @@ class RecordingReplayTest {
 		assertEquals(135_434, jade.sacksAdded().get("Rough Jade Gemstone"));
 		assertEquals(28_635, jade.sacksAdded().get("Flawed Jade Gemstone"));
 		assertEquals(1836, Math.round(jade.lastSacksAt() / 1000.0));
-		// Whole shaft, including the unreported tail after the last Sacks message. Docs/research/06
-		// gives 25,462 for 614 messages, but those 614 messages add up to 25,870.
+		// whole shaft, including the unreported tail after the last Sacks msg. Docs/research/06
+		// says 25,462 for 614 msgs, but those 614 msgs actually add up to 25,870
 		assertEquals(25_870, jade.pristineItems().get("Flawed Jade Gemstone"));
 		assertEquals(614, jade.pristineProcs());
 	}
 
-	/** Recording 3 (2026-11-11): two quick skips, checked against the live log from the same session. */
+	// recording 3 (2026-11-11), two quick skips, checked against the live log from that same session
 	@Test
 	void recording3() throws IOException {
 		List<Shaft> shafts = shafts("2026-11-11_14-13-53.jsonl");

@@ -35,13 +35,11 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
-/**
- * The in-game HUD: keeps the layout ({@code .minecraft/shaftjournal/hud.json}), refreshes the
- * values a few times a second and draws the visible boxes. Only draws; it never sends anything.
- */
+// the in-game HUD. keeps the layout (.minecraft/shaftjournal/hud.json), refreshes the values a few
+// times a second and draws the visible boxes. only draws, never sends anything
 public final class LiveHud {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
-	/** Values refresh every this many ticks: often enough for a seconds timer. */
+	// values refresh every this many ticks, often enough for a seconds timer
 	private static final int REFRESH_TICKS = 4;
 	private static final DateTimeFormatter BACKUP_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 	private static final String DEFAULT_JSON = HudLayout.defaults().toJson();
@@ -50,31 +48,29 @@ public final class LiveHud {
 	private final LiveJournal journal;
 	private HudLayout layout = HudLayout.defaults();
 	private HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
-	/** The session {@link #totals} were added up for; a new object whenever a shaft is saved. */
+	// the session that totals got added up for. its a new object every time a shaft gets saved
 	private Journal.Session totalsSession;
 	private SessionTotals totals = SessionTotals.NONE;
-	/** How many saved shafts {@link #allTime} and {@link #lastShaft} were added up from, and the first of them. */
+	// how many saved shafts allTime and lastShaft were added up from, and the first one of them
 	private int totalsEntries;
 	private JournalEntry totalsFirst;
 	private Totals allTime = Totals.NONE;
-	/** The last saved shaft, or null before the first. */
+	// the last saved shaft, null before the first
 	private Totals lastShaft;
-	/** The visible boxes, ready to draw at {@link #preparedWidth} × {@link #preparedHeight}; null when stale. */
+	// the visible boxes ready to draw at preparedWidth × preparedHeight, null when stale
 	private List<Prepared> prepared;
 	private int preparedWidth;
 	private int preparedHeight;
-	/**
-	 * Reads and writes {@code hud.json} one at a time, in order: the read always comes before the
-	 * first save, and an older save can't land after a newer one.
-	 */
+	// reads and writes hud.json one at a time, in order. the read always comes before the first save,
+	// and an older save cant land after a newer one
 	private final ExecutorService io = Executors.newSingleThreadExecutor(task -> {
 		Thread thread = new Thread(task, "ShaftJournal HUD");
 		thread.setDaemon(true);
 		return thread;
 	});
-	/** The file has been read (or found missing or unreadable). Client thread. */
+	// the file got read (or turned out missing or unreadable). client thread
 	private boolean loaded;
-	/** The file exists but couldn't be read, so the first save keeps a copy of it first. I/O thread only. */
+	// the file exists but couldnt be read, so the first save makes a copy of it first. I/O thread only
 	private boolean backupBeforeSave;
 	private boolean inMines;
 	private boolean inShaft;
@@ -89,7 +85,7 @@ public final class LiveHud {
 		this.journal = journal;
 	}
 
-	/** Reads the saved layout off the render thread; the defaults show until it's loaded. */
+	// reads the saved layout off the render thread, the defaults show until its loaded
 	public void start(Minecraft client) {
 		file = DataFolder.in(client.gameDirectory.toPath()).resolve("hud.json");
 		CompletableFuture.supplyAsync(this::read, io).thenAccept(read -> client.execute(() -> loaded(read)));
@@ -98,29 +94,29 @@ public final class LiveHud {
 	private void loaded(HudLayout read) {
 		loaded = true;
 		if (read == null) return;
-		// Changed in the editor before the file came in: those changes win (and were saved after this read).
+		// changed in the editor before the file came in. those changes win (and got saved after this read)
 		if (!unchanged()) {
 			LOGGER.warn("Loaded {} after the HUD was changed in the editor; keeping the changes", file);
 			return;
 		}
-		// The editor notices the new layout and drops its selection.
+		// the editor sees the new layout and drops its selection
 		layout = read;
 		prepared = null;
 	}
 
-	/** True while the layout is still the defaults: nothing to keep or save. */
+	// true while the layout is still the defaults, so nothing to keep or save
 	private boolean unchanged() {
 		return layout.toJson().equals(DEFAULT_JSON);
 	}
 
-	/** I/O thread. */
+	// I/O thread
 	private HudLayout read() {
 		if (!Files.exists(file)) return null;
 		String json;
 		try {
 			json = Files.readString(file, StandardCharsets.UTF_8);
 		} catch (IOException e) {
-			// It may be fine and only locked for a moment, so it stays; the first save copies it first.
+			// might be fine and just locked for a sec, so it stays. the first save copies it first
 			backupBeforeSave = true;
 			LOGGER.warn("Could not read {}, using the default HUD", file, e);
 			return null;
@@ -128,7 +124,7 @@ public final class LiveHud {
 		try {
 			return HudLayout.fromJson(json);
 		} catch (JsonParseException e) {
-			// Keep the broken file, or the next save would replace a hand edit with the defaults.
+			// keep the broken file, or the next save would overwrite a hand edit with the defaults
 			try {
 				Path backup = Files.move(file, backupPath());
 				LOGGER.warn("Could not read {}, moved it to {} and using the default HUD", file, backup, e);
@@ -140,15 +136,15 @@ public final class LiveHud {
 		}
 	}
 
-	/** A new name for each backup, so a second broken file doesn't replace the first one's backup. */
+	// a new name for every backup, so a second broken file doesnt overwrite the first one's backup
 	private Path backupPath() {
 		return file.resolveSibling("hud.json." + LocalDateTime.now().format(BACKUP_TIME) + ".bad");
 	}
 
-	/** Writes the layout off the render thread. Call on the client thread after changing it. */
+	// writes the layout off the render thread. call it on the client thread after changing it
 	public void save() {
 		prepared = null;
-		// The file is still being read and nothing changed: writing the defaults now would replace it.
+		// file is still being read and nothing changed, writing the defaults now would overwrite it
 		if (file == null || (!loaded && unchanged())) return;
 		String json = layout.toJson();
 		Runnable write = () -> {
@@ -168,12 +164,12 @@ public final class LiveHud {
 		try {
 			io.execute(write);
 		} catch (RejectedExecutionException e) {
-			// The game is closing and the I/O thread has stopped (the editor was still open): write it here.
+			// game is closing and the I/O thread already stopped (editor was still open), so write it here
 			write.run();
 		}
 	}
 
-	/** Lets queued saves finish. Call when the game closes. */
+	// lets queued saves finish. call when the game closes
 	public void close() {
 		io.shutdown();
 		try {
@@ -183,12 +179,12 @@ public final class LiveHud {
 		}
 	}
 
-	/** The layout the editor changes in place. Client thread only. */
+	// the layout the editor changes in place. client thread only
 	public HudLayout layout() {
 		return layout;
 	}
 
-	/** Swaps in another layout, e.g. an undo step. Client thread only; call {@link #save()} after. */
+	// swaps in another layout, f.e. an undo step. client thread only, call save() after
 	public void setLayout(HudLayout layout) {
 		this.layout = layout;
 		prepared = null;
@@ -215,7 +211,7 @@ public final class LiveHud {
 			totals = SessionTotals.of(journal.sessionEntries(session), patterns);
 		}
 		if (journal.entryCount() != totalsEntries) {
-			// Only the new shafts are added. When the file has just loaded in front of them, it's all again.
+			// only the new shafts get added. if the file just loaded in front of them its all of them again
 			JournalEntry first = journal.firstEntry();
 			boolean again = first != totalsFirst;
 			List<JournalEntry> added = journal.entries(again ? 0 : totalsEntries);
@@ -224,7 +220,7 @@ public final class LiveHud {
 			totalsEntries = journal.entryCount();
 			lastShaft = added.isEmpty() ? lastShaft : Totals.of(List.of(added.getLast()), patterns);
 		}
-		// This shaft: the one the player is in, else the last one, so it can be read while searching.
+		// this shaft = the one ur in, else the last one, so u can still read it while searching
 		Totals thisShaft = shaft != null ? Totals.of(shaft, patterns) : lastShaft;
 		data = HudData.live(totals, allTime, thisShaft, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults());
 		prepared = null;
@@ -232,11 +228,11 @@ public final class LiveHud {
 
 	public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
 		Minecraft client = Minecraft.getInstance();
-		// F1 hides the HUD; the editor draws the boxes itself.
+		// F1 hides the HUD. the editor draws the boxes itself
 		if (client.gui.hud.isHidden() || client.gui.screen() instanceof EditHudScreen) return;
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
-		// The text only changes when the values refresh, so it's built then, not every frame.
+		// text only changes when the values refresh, so build it then and not every frame
 		if (prepared == null || width != preparedWidth || height != preparedHeight) {
 			prepared = prepare(client, width, height);
 			preparedWidth = width;

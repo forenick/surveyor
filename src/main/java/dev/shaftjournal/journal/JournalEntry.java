@@ -9,18 +9,15 @@ import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
 
-/**
- * One finished shaft visit as stored in the journal file. Times are epoch milliseconds, durations
- * milliseconds. Add fields at the end and bump {@link #VERSION} when the meaning of one changes.
- *
- * @param sessionId     start time of the session this shaft belongs to
- * @param shaftId       e.g. "JADE_1"; null if the scoreboard never showed it
- * @param exit          a {@link Shaft.ExitReason} name
- * @param searchMillis  from the first block mined to "WOW! You found a Glacite Mineshaft portal!";
- *                      null when the spawn wasn't timed (someone else's portal, or no block was mined)
- * @param campfiresAt   when each campfire was placed, relative to entering
- * @param gems          null when no gems of the shaft's type were found
- */
+// one finished shaft visit as saved in the journal file. times are epoch ms, durations ms too.
+// add new fields at the end and bump VERSION when the meaning of one changes
+// sessionId = start time of the session this shaft is in
+// shaftId f.e. "JADE_1", null if the scoreboard never showed it
+// exit is a Shaft.ExitReason name
+// searchMillis goes from the first block mined to "WOW! You found a Glacite Mineshaft portal!",
+// null when the spawn wasnt timed (someone elses portal, or no block mined)
+// campfiresAt = when each campfire got placed, relative to entering
+// gems is null when no gems of the shafts type were found
 public record JournalEntry(
 		int version,
 		long sessionId,
@@ -55,7 +52,7 @@ public record JournalEntry(
 				GemYield.of(shaft, patterns));
 	}
 
-	/** Glacite Powder from corpses (the loot blocks). */
+	// Glacite Powder from corpses (the loot blocks)
 	public long corpsePowder() {
 		return loots.stream().mapToLong(CorpseLoot::powder).sum();
 	}

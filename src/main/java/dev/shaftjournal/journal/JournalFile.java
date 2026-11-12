@@ -20,10 +20,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 
-/**
- * The journal on disk: one {@link JournalEntry} per line, appended as shafts finish, so a crash
- * loses at most the shaft in progress. All file access runs on one background thread.
- */
+// the journal on disk. one JournalEntry per line, appended when a shaft finishes so a crash only
+// loses the shaft ur in. all file stuff runs on one background thread
 public final class JournalFile {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
@@ -43,7 +41,7 @@ public final class JournalFile {
 		return file;
 	}
 
-	/** Reads every entry in file order, on the background thread. */
+	// reads every entry in file order, on the background thread
 	public CompletableFuture<List<JournalEntry>> load() {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
@@ -67,7 +65,7 @@ public final class JournalFile {
 		});
 	}
 
-	/** Finishes pending writes. Call when the game closes. */
+	// finishes pending writes, call this when the game closes
 	public void close() {
 		io.shutdown();
 		try {
@@ -77,7 +75,7 @@ public final class JournalFile {
 		}
 	}
 
-	/** Reads every entry in file order on the calling thread. Unreadable lines are skipped and logged. */
+	// same but on the calling thread. broken lines get skipped and logged
 	List<JournalEntry> read() throws IOException {
 		List<JournalEntry> entries = new ArrayList<>();
 		if (!Files.exists(file)) return entries;

@@ -6,28 +6,23 @@ import java.util.regex.Matcher;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
 
-/**
- * The gems of the shaft's own type that were mined in it, in items.
- *
- * <p>Source: the "[Sacks]" Added hover lines, minus corpse loot and Supercraft output that also
- * went into the sacks (Docs/research/06 and 07). The last seconds before leaving are never
- * reported in Sacks, so the tail is estimated: Flawed from the PRISTINE messages after the last
- * Sacks message, and Rough from that Flawed at the shaft's own measured Rough:Flawed ratio.
- * Silent Gemstone Spread procs in the tail are missing, so the tail is a slight undercount.
- * Mob drops of the same gem would count as mined (seen once, Docs/research/07).
- *
- * @param gem e.g. "Jade"
- */
+// gems of the shafts own type mined in it, in items
+// from the "[Sacks]" Added hover lines, minus corpse loot and Supercraft output that also went
+// into sacks (Docs/research/06 and 07). the last few secs before leaving never show in Sacks so the
+// tail is estimated. Flawed from PRISTINE msgs after the last Sacks msg, Rough from that Flawed at
+// the shafts own Rough:Flawed ratio. silent Gemstone Spread procs in the tail are missing (slight undercount)
+// mob drops of the same gem count as mined (seen once, Docs/research/07)
+// gem is f.e. "Jade"
 public record GemYield(String gem, long rough, long flawed, long fine, long tailRough, long tailFlawed) {
-	/** 80 Rough make 1 Flawed and 80 Flawed make 1 Fine (standard recipes, Docs/research/05). */
+	// 80 Rough = 1 Flawed, 80 Flawed = 1 Fine (normal recipes, Docs/research/05)
 	public static final int RECIPE = 80;
 
-	/** Everything, including the estimated tail, as Fine. */
+	// everything incl the estimated tail, as Fine
 	public double fineEquivalent() {
 		return toFine(rough + tailRough, flawed + tailFlawed, fine);
 	}
 
-	/** Only what the Sacks messages reported, as Fine. */
+	// only what the Sacks msgs reported, as Fine
 	public double reportedFine() {
 		return toFine(rough, flawed, fine);
 	}
@@ -36,7 +31,7 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 		return rough / (double) (RECIPE * RECIPE) + flawed / (double) RECIPE + fine;
 	}
 
-	/** Null when the shaft has no ID yet or no gems of its type were found (e.g. TITA_1). */
+	// null if the shaft has no id yet or no gems of its type were found (f.e. TITA_1)
 	public static GemYield of(Shaft shaft, TextPatterns patterns) {
 		if (shaft.id() == null) return null;
 		String type = shaft.id().type();

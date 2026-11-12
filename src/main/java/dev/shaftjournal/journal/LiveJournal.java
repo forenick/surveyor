@@ -13,16 +13,14 @@ import dev.shaftjournal.util.DataFolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 
-/**
- * Connects the {@link Journal} to the game: the only class in this package that touches
- * Minecraft. Saves each finished shaft and shows its summary in chat. The summary is added to
- * the local chat only; nothing is sent to the server.
- */
+// hooks the Journal up to the game, the only class in here that touches Minecraft. saves each
+// finished shaft and shows its summary in chat. the summary only goes into ur local chat,
+// nothing gets sent to the server
 public final class LiveJournal {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
 	private final Journal journal;
-	/** Every saved entry, in file order. Only touched on the client thread. */
+	// every saved entry in file order. only touch this on the client thread
 	private final List<JournalEntry> entries = new ArrayList<>();
 	private JournalFile file;
 
@@ -30,7 +28,7 @@ public final class LiveJournal {
 		journal = new Journal(TextPatterns.defaults(), inMiningArea, this::onEntry);
 	}
 
-	/** Opens the journal file and continues the last session if it is recent enough. */
+	// opens the journal file and carries on the last session if its recent enough
 	public void start(Minecraft client) {
 		file = new JournalFile(DataFolder.in(client.gameDirectory.toPath()).resolve("journal.jsonl"));
 		file.load().thenAccept(entries -> client.execute(() -> {
@@ -46,7 +44,7 @@ public final class LiveJournal {
 		logTimerStart(wasRunning);
 	}
 
-	/** The player started or kept hitting a block. */
+	// player started or kept hitting a block
 	public void onBlockHit() {
 		boolean wasRunning = journal.searchRunning();
 		journal.onBlockHit(System.currentTimeMillis());
@@ -57,35 +55,33 @@ public final class LiveJournal {
 		if (!wasRunning && journal.searchRunning()) LOGGER.info("Spawn timer started");
 	}
 
-	/** How many entries are saved; it only grows, so a change means new entries. Call on the client thread. */
+	// how many entries are saved. only ever goes up, so a change means new entries. client thread only
 	public int entryCount() {
 		return entries.size();
 	}
 
-	/** A copy of every saved entry, in file order. Call on the client thread. */
+	// copy of every saved entry in file order. client thread only
 	public List<JournalEntry> entries() {
 		return List.copyOf(entries);
 	}
 
-	/** A copy of the entries from this index on. Call on the client thread. */
+	// copy of the entries from this index on. client thread only
 	public List<JournalEntry> entries(int from) {
 		return List.copyOf(entries.subList(from, entries.size()));
 	}
 
-	/**
-	 * The oldest entry, or null. It changes when the journal file loads, as its entries go in front of
-	 * any saved since the game started. Call on the client thread.
-	 */
+	// oldest entry or null. it changes when the journal file loads, bc those entries go in front of
+	// any saved since the game started. client thread only
 	public JournalEntry firstEntry() {
 		return entries.isEmpty() ? null : entries.getFirst();
 	}
 
-	/** See {@link Journal#activeSession}. A new object whenever the session or its totals change. */
+	// see Journal.activeSession. new object whenever the session or its totals change
 	public Journal.Session activeSession(long now) {
 		return journal.activeSession(now);
 	}
 
-	/** The finished shafts of this session, in order; empty for null or before the first one. */
+	// finished shafts of this session in order. empty for null or before the first one
 	public List<JournalEntry> sessionEntries(Journal.Session session) {
 		if (session == null) return List.of();
 		int first = entries.size();
@@ -93,7 +89,7 @@ public final class LiveJournal {
 		return List.copyOf(entries.subList(first, entries.size()));
 	}
 
-	/** See {@link Journal#spawnTimerMillis}. */
+	// see Journal.spawnTimerMillis
 	public Long spawnTimerMillis(long now) {
 		return journal.spawnTimerMillis(now);
 	}

@@ -11,13 +11,9 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 
-/**
- * Observes chat, action bar and title packets the moment they reach the client thread, before
- * any other mod can hide or rewrite them. Read-only: never cancels or alters a packet.
- *
- * <p>Injecting right after {@code ensureRunningOnSameThread} (rather than at HEAD) makes sure
- * each packet is seen once, on the client thread.
- */
+// sees chat, action bar and title packets as soon as they hit the client thread, before other
+// mods can hide or change them. read only, never cancels or edits a packet
+// injecting after ensureRunningOnSameThread (not HEAD) so we see each packet once, on the client thread
 @Mixin(value = ClientPacketListener.class, priority = 500)
 public abstract class ClientPacketListenerMixin {
 	private static final String ENSURE_THREAD =

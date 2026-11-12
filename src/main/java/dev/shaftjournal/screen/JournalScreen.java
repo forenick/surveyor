@@ -44,16 +44,13 @@ import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.network.chat.Component;
 
-/**
- * The journal screen (mockup v2, approved by Nick on 2026-11-11): the Session tab (one session's
- * shafts and the selected shaft's details), the Sessions tab (every session) and the Stats tab
- * (all-time stats). It only reads the saved journal. All text goes through Minecraft's own font,
- * so resource-pack fonts apply.
- */
+// the journal screen (mockup v2, i approved it 2026-11-11). Session tab = one sessions shafts +
+// details of the picked shaft, Sessions tab = every session, Stats tab = all time stats. only reads
+// the saved journal. all text uses Minecrafts own font so resource pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private enum Tab { SESSION, SESSIONS, STATS }
 
-	/** A table column. Columns with a higher {@code dropOrder} are hidden first when the table is too narrow; 0 never. */
+	// a table column. higher dropOrder gets hidden first when the table is too narrow, 0 = never
 	private record Column(String key, String title, int width, boolean right, int dropOrder) {
 	}
 
@@ -65,16 +62,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Color GREEN = Color.ofArgb(0xCC55FF55);
 	private static final int ROW_HEIGHT = 12;
 	private static final int SPAWN_BAR = 26;
-	/** Padding around the whole screen. */
+	// padding around the whole screen
 	private static final int PADDING = 8;
-	/** Space between panels. */
+	// space between panels
 	private static final int GAP = 5;
-	/** Padding inside the detail panel and the Stats columns. */
+	// padding inside the detail panel and the Stats columns
 	private static final int COLUMN_PADDING = 6;
-	/** Widths of the Stats tab's left and right columns, in percent; the middle one takes the rest. */
+	// Stats tab left and right column widths in %, the middle one gets the rest
 	private static final int STATS_LEFT = 32;
 	private static final int STATS_RIGHT = 27;
-	/** Space between the chart's axis and its plot. */
+	// space between the chart axis and the plot
 	private static final int AXIS_GAP = 3;
 
 	private static final List<Column> SHAFT_COLUMNS = List.of(
@@ -96,13 +93,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private int sessionIndex;
 	private int selected;
 	private FlowLayout root;
-	/** The screen size the layout was built for; pixel sizes are computed from it. */
+	// screen size the layout was built for, pixel sizes get worked out from it
 	private int builtWidth;
 	private int builtHeight;
 	private FlowLayout detail;
 	private final List<FlowLayout> shaftRows = new ArrayList<>();
 
-	/** @param entries every saved journal entry, in file order */
+	// entries = every saved journal entry, in file order
 	public JournalScreen(List<JournalEntry> entries) {
 		super(Component.literal("Shaft Journal"));
 		this.entries = List.copyOf(entries);
@@ -129,7 +126,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		rebuild();
 	}
 
-	/** owo only calls build() once, so rebuild when the window or GUI scale changes. */
+	// owo only calls build() once, so rebuild when the window or GUI scale changes
 	@Override
 	protected void init() {
 		super.init();
@@ -229,7 +226,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		rebuild();
 	}
 
-	/** Opens the session that holds this shaft, with the shaft selected. */
+	// opens the session this shaft is in, w/ the shaft selected
 	private void openShaft(JournalEntry entry) {
 		for (int i = 0; i < sessions.size(); i++) {
 			int index = sessions.get(i).entries().indexOf(entry);
@@ -350,7 +347,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 				List<Component> tooltip = new ArrayList<>();
 				tooltip.add(Component.literal("§fGemstones §7≈ " + fine(loot.gems().fine()) + " Fine"));
 				for (ItemCount part : loot.gems().parts()) tooltip.add(Component.literal("§7" + number(part.count()) + " " + part.item()));
-				// The icon is the most common gem in the group.
+				// icon is the most common gem in the group
 				grid.child(slot(loot.gems().parts().getFirst().item(), compact(loot.gems().fine()), tooltip));
 			}
 			for (ItemCount item : loot.items()) {
@@ -443,7 +440,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(keyValue("Coins", SOON));
 		totals.child(section("Corpses looted"));
 		for (String type : stats.corpsesSeen().keySet()) {
-			// Coin value of the loot comes with prices.
+			// coin value of the loot comes later w/ prices
 			totals.child(keyValue(type, corpseColor(type) + stats.looted().getOrDefault(type, 0) + " §e(soon)"));
 		}
 		totals.child(section("Personal bests"));
@@ -479,7 +476,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
 		if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
 			long difference = recent - stats.averageSearchMillis();
-			// Durations show whole seconds, so a gap under a second is "same", not "0s faster/slower".
+			// durations only show whole secs, so under a second apart is "same" and not "0s faster/slower"
 			String change = Math.abs(difference) < 1000 ? " §7(same)"
 					: difference < 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
 					: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
@@ -525,10 +522,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			net.minecraft.resources.Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/open_arrow.png");
 	private static final int RECENT_SESSIONS = 5;
 
-	/**
-	 * A personal-best row: the value and an arrow that opens the shaft or session it belongs to.
-	 * Without a record yet, shows a dash.
-	 */
+	// a personal best row, the value + an arrow that opens the shaft or session it belongs to.
+	// shows a dash if theres no record yet
 	private FlowLayout record(String key, String value, Runnable open, String target) {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		row.gap(4);
@@ -538,7 +533,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		row.child(keyLabel);
 		row.child(label(value == null ? "§8-" : value));
 		if (open != null) {
-			// A 3x5 icon inside padding, so the click area is bigger than the icon.
+			// 3x5 icon w/ padding around it so the click area is bigger than the icon
 			FlowLayout arrow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
 			arrow.padding(Insets.of(2, 2, 2, 1));
 			arrow.margins(Insets.top(-1));
@@ -558,7 +553,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return "session from " + day(session.start()) + " " + clock(session.start());
 	}
 
-	/** Spawn-time axis steps; the smallest that gives at most four lines is used. */
+	// spawn time axis steps, it uses the smallest one that gives max 4 lines
 	private static final long[] AXIS_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
 
 	private FlowLayout chart(List<SessionSummary> oldestFirst, Long average) {
@@ -569,7 +564,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			return wrapper;
 		}
 		int chartHeight = Math.clamp(height / 3, 50, 110);
-		// Rounded up, so the slowest bar never reaches past the top line.
+		// rounded up so the slowest bar never goes past the top line
 		long slowestSeconds = Math.max(1, (timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) + 999) / 1000);
 		long step = AXIS_STEPS[AXIS_STEPS.length - 1];
 		for (long candidate : AXIS_STEPS) {
@@ -585,7 +580,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		axisWidth += 2;
 
-		// The middle column's width, minus the axis; older sessions drop off the left when they don't fit.
+		// middle column width minus the axis. older sessions drop off the left if they dont fit
 		int plotWidth = Math.max(60, width - 2 * PADDING - 2 * GAP - width * STATS_LEFT / 100 - width * STATS_RIGHT / 100
 				- 2 * COLUMN_PADDING - axisWidth - AXIS_GAP);
 		int barWidth = Math.clamp((plotWidth - 2) / timed.size() - 2, 3, 12);
@@ -637,7 +632,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		chart.child(plot);
 		wrapper.child(chart);
 
-		// Dates under the first and last bar.
+		// dates under the first and last bar
 		StackLayout dates = UIContainers.stack(Sizing.fill(100), Sizing.fixed(10));
 		LabelComponent first = label("§8" + day(timed.getFirst().start()));
 		first.positioning(Positioning.absolute(axisWidth + AXIS_GAP + 2, 1));
@@ -665,7 +660,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return line;
 	}
 
-	/** "0", "30s", "1m", "1m 30s". */
+	// "0", "30s", "1m", "1m 30s"
 	private static String axisLabel(long seconds) {
 		if (seconds == 0) return "0";
 		if (seconds < 60) return seconds + "s";
@@ -695,13 +690,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	// ---- building blocks ----
 
-	/** Table padding, row padding and the scrollbar, around the columns. */
+	// table padding, row padding and the scrollbar around the columns
 	private static final int TABLE_CHROME = 10 + 4 + 4;
 
-	/** Space between table columns. */
+	// space between table columns
 	private static final int COLUMN_GAP = 6;
 
-	/** Drops columns, highest drop order first, until the rest fit in {@code available} pixels. */
+	// drops columns (highest drop order first) until the rest fit in available pixels
 	private static List<Column> fit(List<Column> columns, int available) {
 		List<Column> visible = new ArrayList<>(columns);
 		while (visible.stream().mapToInt(Column::width).sum() + COLUMN_GAP * (visible.size() - 1) > available) {
@@ -784,7 +779,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return tile;
 	}
 
-	/** Bold has to come after the color code: a color code turns bold off again. */
+	// bold has to go after the color code, bc a color code turns bold off again
 	private static String bold(String value) {
 		return value.startsWith("§") && value.length() >= 2 ? value.substring(0, 2) + "§l" + value.substring(2) : "§l" + value;
 	}
@@ -844,7 +839,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return new SafeLabel(Component.literal(text));
 	}
 
-	/** A label that wraps to its parent's width instead of running past it. */
+	// label that wraps to the parents width instead of running past it
 	private static LabelComponent wrapped(String text) {
 		LabelComponent label = label(text);
 		label.horizontalSizing(Sizing.fill(100));
@@ -934,12 +929,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return SummaryText.decimal(value);
 	}
 
-	/** Fine counts: one decimal, or "<0.1" for amounts one decimal would show as 0.0. */
+	// Fine counts, one decimal, or "<0.1" for stuff that would show as 0.0
 	private static String fine(double value) {
 		return value > 0 && value < 0.05 ? "<0.1" : decimal(value);
 	}
 
-	/** Slot counts: whole numbers as is, small fractions with one decimal (9.95 and up round to 10). */
+	// slot counts. whole numbers as is, small fractions w/ one decimal (9.95 and up rounds to 10)
 	private static String compact(double value) {
 		if (value >= 9.95 || value == Math.rint(value)) return number(Math.round(value));
 		return fine(value);
