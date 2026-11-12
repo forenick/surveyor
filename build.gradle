@@ -1,5 +1,6 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'com.diffplug.spotless' version '8.10.4'
 }
 
 base {
@@ -15,12 +16,10 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	// owo bundles its own libs (jar-in-jar) so we dont need its maven deps
+	// owo jar-in-jars its own libs
 	implementation("io.wispforest:owo-lib:${project.owo_version}") { transitive = false }
 
-	// owo injects its endec interfaces into Minecraft classes (f.e. CompoundTag), so code that uses
-	// those classes needs endec to compile and tests that touch them need it at runtime. in game owo
-	// ships endec itself
+	// owo injects endec into mc classes, owo ships it in game
 	compileOnly "io.wispforest:endec:0.1.12"
 	testRuntimeOnly "io.wispforest:endec:0.1.12"
 
@@ -50,4 +49,16 @@ java {
 
 test {
 	useJUnitPlatform()
+}
+
+// build fails until spotlessApply
+spotless {
+	java {
+		target 'src/*/java/**/*.java'
+		removeUnusedImports()
+		importOrder('java|javax', '', 'dev.shaftjournal', '\\#')
+		trimTrailingWhitespace()
+		endWithNewline()
+		formatAnnotations()
+	}
 }

@@ -14,12 +14,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 
-// item stacks for the journals loot icons. only used while a screen is open, never at class load
-// a known SkyBlock item gets its SkyBlock id in custom_data, same spot Hypixel puts it, so texture
-// mods (Firmament, Catharsis) give it ur pack texture. if Hypixels own resource pack is loaded it
-// also gets Hypixels model, otherwise u see the vanilla stand-in
+// screen only, never at class load
+// skyblock id in custom_data like hypixel, so texture mods (firmament, catharsis) find it
 final class ItemIcons {
-	// one cache per screen, so a resource pack u loaded or unloaded since gets picked up next time
+	// per screen so pack changes get picked up
 	private final Map<String, ItemStack> cache = new HashMap<>();
 	private final IconRules standIns = IconRules.defaults();
 	private final SkyblockItems items = SkyblockItems.defaults();
@@ -42,7 +40,6 @@ final class ItemIcons {
 		return stack;
 	}
 
-	// false when no loaded pack has this model, f.e. u declined Hypixels pack
 	private static boolean isLoaded(Identifier model) {
 		return !(Minecraft.getInstance().getModelManager().getItemModel(model) instanceof MissingItemModel);
 	}

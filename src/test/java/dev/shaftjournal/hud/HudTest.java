@@ -1,20 +1,11 @@
 package dev.shaftjournal.hud;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.junit.jupiter.api.Test;
-
 import com.google.gson.JsonParseException;
+import org.junit.jupiter.api.Test;
 
 import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.RecordingReplay;
@@ -31,6 +22,13 @@ import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalFile;
 import dev.shaftjournal.journal.JournalStats;
 import dev.shaftjournal.screen.ShaftNames;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class HudTest {
 	@Test
@@ -124,7 +122,6 @@ class HudTest {
 
 	@Test
 	void anchorsPlaceBoxesFromTheirEdge() {
-		// 60 px box on a 480 px screen
 		assertEquals(4, Anchor.START.start(0, 60, 480));
 		assertEquals(416, Anchor.END.start(0, 60, 480), "right edge on the margin");
 		assertEquals(210, Anchor.MIDDLE.start(0, 60, 480));
@@ -132,7 +129,6 @@ class HudTest {
 		for (Anchor anchor : Anchor.values()) {
 			assertEquals(100, anchor.start(anchor.offset(100, 60, 480), 60, 480), anchor + " round trip");
 		}
-		// the anchored edge stays put when the text gets wider
 		assertEquals(416 + 60, Anchor.END.start(0, 60, 480) + 60);
 		assertEquals(386 + 90, Anchor.END.start(0, 90, 480) + 90);
 		assertEquals(Anchor.START, Anchor.forPosition(10, 60, 480));
@@ -215,7 +211,7 @@ class HudTest {
 				new Corpse("Lapis", true), new Corpse("Umber", false))));
 	}
 
-	// Nick's real session from 2026-11-11, same numbers the journal screen shows
+	// nicks real session 2026-11-11
 	@Test
 	void sessionValuesFromTheRealJournal() throws Exception {
 		List<JournalEntry> entries = realJournal();
@@ -223,10 +219,10 @@ class HudTest {
 		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS));
 		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER));
 		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, data.get(HudValue.SHAFTS_PER_HOUR)));
-		// (8,889 + 55,940 + 38,186 + 193,848 + 283,594 + 185,948) / 6 ms
+		// (8,889+55,940+38,186+193,848+283,594+185,948) / 6 ms
 		assertEquals("2:07", HudFormat.format(Kind.TIME, 0, data.get(HudValue.AVERAGE_SPAWN)));
 		assertNull(data.get(HudValue.SHAFT_TIME));
-		// the rate counts the time since the last shaft too, so same 6 shafts over twice the time
+		// rate counts time since last shaft too, 2x time = half rate
 		long start = entries.getFirst().sessionId();
 		long length = new JournalStats.SessionSummary(start, entries).lengthMillis();
 		HudData later = live(entries, start + 2 * length);
@@ -243,7 +239,6 @@ class HudTest {
 		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER, Range.ALL_TIME));
 		JournalEntry last = entries.getLast();
 		assertEquals(JournalStats.powder(last), data.get(HudValue.SESSION_POWDER, Range.SHAFT), "the last shaft outside one");
-		// same session length but as shafts per hour, 6 shafts at 19.4/h
 		double hours = 6 / (Double) data.get(HudValue.SHAFTS_PER_HOUR);
 		assertEquals(Math.round(43_436 / hours), data.get(HudValue.SESSION_POWDER, Range.PER_HOUR));
 		assertEquals((Double) data.get(HudValue.SESSION_CORPSE_FINE) / hours,
@@ -287,7 +282,6 @@ class HudTest {
 		return entries;
 	}
 
-	// values for these entries as one session thats also the whole journal, while outside a shaft
 	private static HudData live(List<JournalEntry> entries, long now) {
 		TextPatterns patterns = TextPatterns.defaults();
 		return HudData.live(SessionTotals.of(entries, patterns), Totals.of(entries, patterns),
@@ -449,7 +443,7 @@ class HudTest {
 		assertEquals(new Totals(3, 30, 1.5), new Totals(1, 10, 0.5).plus(new Totals(2, 20, 1)));
 	}
 
-	// the "Shaft" range while inside matches the saved entry once u leave. recording 3
+	// recording 3
 	@Test
 	void shaftTotalsMatchTheSavedEntry() throws Exception {
 		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-11_14-13-53.jsonl");

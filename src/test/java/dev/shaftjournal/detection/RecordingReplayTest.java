@@ -1,9 +1,5 @@
 package dev.shaftjournal.detection;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,7 +10,11 @@ import org.junit.jupiter.api.Test;
 import dev.shaftjournal.detection.Shaft.ExitReason;
 import dev.shaftjournal.detection.ShaftEvent.ShaftLeft;
 
-// replays Nick's recordings and checks the numbers worked out by hand in Docs/research/05 and 06
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+// hand-worked numbers from research/05 + 06
 class RecordingReplayTest {
 	@Test
 	void recording1() throws IOException {
@@ -45,8 +45,7 @@ class RecordingReplayTest {
 				"TOPA_1", "TOPA_1", "LITT_L", "ONYX_1", "AQUA_1", "RUBY_2", "JADE_1"), ids(shafts));
 		assertEquals(ExitReason.WARP, shafts.get(2).exitReason());
 
-		// Docs/research/06 section 3 says 45 corpses in 15 shafts. it says 4 "MORE!" shafts but the
-		// recording has 5 (JADE_1, RUBY_2, TOPA_1, TOPA_1, JADE_1)
+		// research/06 says 4 MORE! shafts, recording has 5
 		assertEquals(45, shafts.stream().mapToInt(shaft -> shaft.corpses().size()).sum());
 		assertEquals(5, shafts.stream().filter(shaft -> shaft.extraCorpses() > 0).count());
 
@@ -56,13 +55,12 @@ class RecordingReplayTest {
 		assertEquals(135_434, jade.sacksAdded().get("Rough Jade Gemstone"));
 		assertEquals(28_635, jade.sacksAdded().get("Flawed Jade Gemstone"));
 		assertEquals(1836, Math.round(jade.lastSacksAt() / 1000.0));
-		// whole shaft, including the unreported tail after the last Sacks msg. Docs/research/06
-		// says 25,462 for 614 msgs, but those 614 msgs actually add up to 25,870
+		// incl unreported tail. research/06 says 25,462 but its 614 msgs add to 25,870
 		assertEquals(25_870, jade.pristineItems().get("Flawed Jade Gemstone"));
 		assertEquals(614, jade.pristineProcs());
 	}
 
-	// recording 3 (2026-11-11), two quick skips, checked against the live log from that same session
+	// recording 3 (2026-11-11), checked vs live log
 	@Test
 	void recording3() throws IOException {
 		List<Shaft> shafts = shafts("2026-11-11_14-13-53.jsonl");

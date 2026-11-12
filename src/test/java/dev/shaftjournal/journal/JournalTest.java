@@ -1,10 +1,5 @@
 package dev.shaftjournal.journal;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +13,11 @@ import dev.shaftjournal.detection.RecordingReplay;
 import dev.shaftjournal.detection.ShaftEvent;
 import dev.shaftjournal.detection.ShaftTracker;
 import dev.shaftjournal.detection.TextPatterns;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class JournalTest {
 	private static final long MINUTE = 60_000;
@@ -42,7 +42,7 @@ class JournalTest {
 		assertEquals("JADE_1", entries.get(0).shaftId());
 		assertEquals(new Journal.Session(0, 1, 1, MINUTE), journal.session());
 
-		// timer restarts at the first hit after the shaft, not when u leave it
+		// timer restarts at first hit after shaft, not on leave
 		at(2 * MINUTE).hit(true);
 		at(2 * MINUTE + 20_000).hit(true);
 		at(2 * MINUTE + 40_000).chat(WOW);
@@ -55,7 +55,7 @@ class JournalTest {
 	void gapsOverFortySecondsOnlyCountFortySeconds() {
 		at(0).hit(true);
 		at(10_000).hit(true);
-		at(110_000).hit(true); // 100 s break, only 40 s count
+		at(110_000).hit(true);
 		at(120_000).chat(WOW);
 		visitShaft(123_000, "JADE_1");
 		assertEquals(60_000, entries.get(0).searchMillis());
@@ -87,7 +87,7 @@ class JournalTest {
 	void aPortalLeftUnenteredIsNotTimedForTheNextShaft() {
 		at(0).hit(true);
 		at(20_000).chat(WOW);
-		at(70_000).hit(true); // over 40 s later = new search, the found portal got abandoned
+		at(70_000).hit(true); // >40 s later = new search, portal abandoned
 		assertEquals(0, journal.spawnTimerMillis(70_000));
 		visitShaft(80_000, "JADE_1"); // someone elses portal, no WOW
 		assertNull(entries.get(0).searchMillis());
@@ -121,7 +121,7 @@ class JournalTest {
 		visitShaft(15_000, "JADE_1");
 		assertEquals(10_000, entries.get(0).searchMillis());
 
-		// a portal u dont enter within 40 s counts as skipped
+		// portal not entered within 40 s = skipped
 		at(MINUTE).hit(true);
 		at(MINUTE + 5_000).chat(WOW);
 		at(MINUTE + 50_000).hit(true);
@@ -182,7 +182,7 @@ class JournalTest {
 		assertEquals(entries, file.read());
 	}
 
-	// Jade shaft from recording 2, checked by hand in Docs/research/06. 379.1 Fine reported, ~385 in total
+	// recording 2, by hand in research/06: 379.1 Fine reported, ~385 total
 	@Test
 	void jadeShaftGems() throws IOException {
 		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-08_22-41-09.jsonl");
@@ -212,7 +212,7 @@ class JournalTest {
 		assertTrue(text.contains("§7Powder §f+12,060 §8(corpses 10,550, exit 1,510)"), text);
 	}
 
-	// recording 4 (Docs/research/08), spawn times w/ the 40 s pause rule, checked by hand
+	// recording 4 (research/08), by hand
 	@Test
 	void recording4SpawnTimes() throws IOException {
 		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-11_17-16-21.jsonl");
@@ -238,7 +238,7 @@ class JournalTest {
 	}
 
 	private void replay(Path recording) throws IOException {
-		// recordings have no block hits so spawns never get timed here
+		// recordings have no block hits, spawns never timed
 		for (ShaftEvent event : RecordingReplay.replay(recording)) journal.onEvent(event, 0);
 	}
 

@@ -1,15 +1,14 @@
 package dev.shaftjournal.util;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import java.util.List;
-
-import org.junit.jupiter.api.Test;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TextUtilTest {
 	@Test

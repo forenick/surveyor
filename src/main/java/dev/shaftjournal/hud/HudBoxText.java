@@ -9,19 +9,15 @@ import dev.shaftjournal.hud.HudLayout.Box;
 import dev.shaftjournal.hud.HudLayout.Line;
 import dev.shaftjournal.hud.HudValue.Range;
 
-// turns a box + the current values into §-coded lines, title first. plain java
 public final class HudBoxText {
 	private static final String TITLE_STYLE = "§e§l";
-	// {value_id} or {value_id:option:option}, the options pick a range and a number format
 	private static final Pattern TAG = Pattern.compile("\\{([a-z_]+)((?::[a-z_]+)*)}");
-	// bold, italic, underline, strikethrough. obfuscated (&k) left out on purpose
+	// &k left out on purpose
 	private static final String STYLES = "lonm";
 
 	private HudBoxText() {
 	}
 
-	// example is true in the editor, then missing values show their example instead of "-"
-	// gives back nothing when the box has nothing to show
 	public static List<String> lines(Box box, HudData data, boolean example) {
 		List<String> lines = new ArrayList<>();
 		if (box.showTitle) {
@@ -43,7 +39,6 @@ public final class HudBoxText {
 		return lines;
 	}
 
-	// swaps every tag in a title for its value, or nothing while its missing
 	static String tags(String text, HudData data, boolean example) {
 		if (text.indexOf('{') < 0) return text;
 		Matcher matcher = TAG.matcher(text);
@@ -61,10 +56,7 @@ public final class HudBoxText {
 		return out.toString();
 	}
 
-	// a free text line. & codes turn into § codes and tags into values. plain text starts in the box's label
-	// colour and &r goes back to it. when a colour rule fires, the line's own value (in its ruleRange) gets
-	// that colour and the text after it keeps the colour it had. tags w/ an unknown value or option stay as typed
-	// rule = the colour code a rule gives the line's value, or null
+	// &r = back to label colour, unknown tags stay as typed
 	static String free(Box box, Line line, String rule, HudData data, boolean example) {
 		String text = line.text;
 		StringBuilder out = new StringBuilder("§").append(box.labelColor);
@@ -78,7 +70,7 @@ public final class HudBoxText {
 			if (c == '&' && i + 1 < text.length()) {
 				char code = Character.toLowerCase(text.charAt(i + 1));
 				if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r') {
-					// a colour ends the styles before it, same as in Minecraft
+					// colour resets styles, like vanilla
 					color = code == 'r' ? box.labelColor : String.valueOf(code);
 					styles.setLength(0);
 					out.append(code == 'r' ? "§r" : "").append('§').append(color);
@@ -109,8 +101,7 @@ public final class HudBoxText {
 		return out.toString();
 	}
 
-	// the range a line's colour rules look at. free text lines set their range in the text, so its the range
-	// of the first tag of the line's own value. if there's none (or its a basic line) its the line's range
+	// free text: range of the first tag w/ the lines own value
 	public static Range ruleRange(Line line) {
 		HudValue value = line.hudValue();
 		if (!line.advanced || line.text == null || value == null) return line.range;
@@ -122,7 +113,6 @@ public final class HudBoxText {
 		return line.range;
 	}
 
-	// the free text a line starts with when u switch it over, looks the same as the basic version
 	public static String basicText(Box box, Line line) {
 		HudValue value = line.hudValue();
 		return "&" + box.labelColor + (box.labelBold ? "&l" : "") + line.prefix
@@ -135,7 +125,6 @@ public final class HudBoxText {
 		return out.toString();
 	}
 
-	// the value like a line shows it. rates get "/h" but the dash for a missing one doesnt
 	static String text(HudValue value, Range range, int format, HudData data, boolean example) {
 		return formatted(value, range, format, value(value, range, data, example));
 	}
@@ -144,14 +133,12 @@ public final class HudBoxText {
 		return example ? data.getOrExample(value, range) : data.get(value, range);
 	}
 
-	// v is null while the value is missing
 	private static String formatted(HudValue value, Range range, int format, Object v) {
 		String text = HudFormat.format(value.kind(), format, v);
 		return v != null && range == Range.PER_HOUR ? text + "/h" : text;
 	}
 
 	record Tag(HudValue value, Range range, int format) {
-		// null when the value or an option is unknown, so the tag shows as typed
 		static Tag parse(String id, String options) {
 			HudValue value = HudValue.byId(id);
 			if (value == null) return null;
@@ -168,7 +155,6 @@ public final class HudBoxText {
 			return new Tag(value, range, format);
 		}
 
-		// the tag for this value, without the options that are just the defaults
 		static String of(HudValue value, Range range, int format) {
 			StringBuilder tag = new StringBuilder("{").append(value.id());
 			if (range != null && range != value.defaultRange()) tag.append(':').append(range.tagName());

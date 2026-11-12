@@ -1,8 +1,5 @@
 package dev.shaftjournal.detection;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +20,10 @@ import dev.shaftjournal.detection.ShaftEvent.ScrapFound;
 import dev.shaftjournal.detection.ShaftEvent.Supercraft;
 import dev.shaftjournal.detection.ShaftEvent.Warping;
 
-// fixtures are real lines from the recordings in Recordings/
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+// fixtures = real lines from Recordings/
 class ChatParserTest {
 	private static final String BAR = "§a§l" + "▬".repeat(64);
 

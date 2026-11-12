@@ -1,15 +1,15 @@
 package dev.shaftjournal.detection;
 
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-
-// scoreboard + tab list parsing. fixtures are real snapshots from the recordings
+// fixtures = real snapshots from recordings
 class HudParserTest {
 	private static final List<String> SHAFT_SCOREBOARD = List.of(
 			"§e§lSKYBLOCK",

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 
-// reads the tab list as § coded lines, in the order they show
 public final class TabListParser {
 	private final TextPatterns patterns;
 
@@ -16,12 +15,11 @@ public final class TabListParser {
 		return lines.stream().anyMatch(line -> patterns.matches("tab.mineshaft_area", TextPatterns.clean(line)));
 	}
 
-	// in the Dwarven Mines (glacite tunnels count too), thats where shafts spawn
+	// glacite tunnels count too
 	public boolean inMiningArea(List<String> lines) {
 		return lines.stream().anyMatch(line -> patterns.matches("tab.mining_area", TextPatterns.clean(line)));
 	}
 
-	// the "Frozen Corpses:" widget, empty list when its not shown
 	public List<Corpse> corpses(List<String> lines) {
 		List<Corpse> corpses = new ArrayList<>();
 		boolean inWidget = false;

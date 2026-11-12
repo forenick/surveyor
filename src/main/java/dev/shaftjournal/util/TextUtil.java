@@ -21,8 +21,7 @@ public final class TextUtil {
 	private TextUtil() {
 	}
 
-	// flattens a component into an old school § coded string, hypixel still thinks in those.
-	// hex colors that dont match a legacy color get written as "§#RRGGBB"
+	// non legacy hex colors become "§#RRGGBB"
 	public static String toLegacy(Component component) {
 		StringBuilder out = new StringBuilder();
 		component.visit((style, text) -> {
@@ -34,8 +33,6 @@ public final class TextUtil {
 		return out.toString();
 	}
 
-	// hover texts on any part of the component, in order, no dupes. hypixel puts details in there,
-	// f.e. the per item breakdown of "[Sacks]" msgs
 	public static List<String> hoverTexts(Component component) {
 		Set<HoverEvent> seen = new LinkedHashSet<>();
 		component.visit((style, text) -> {

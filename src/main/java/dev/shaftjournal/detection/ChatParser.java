@@ -13,16 +13,15 @@ import dev.shaftjournal.detection.ShaftEvent.ExitBonus;
 import dev.shaftjournal.detection.ShaftEvent.ExtraCorpses;
 import dev.shaftjournal.detection.ShaftEvent.FrozeToDeath;
 import dev.shaftjournal.detection.ShaftEvent.MayhemBuff;
+import dev.shaftjournal.detection.ShaftEvent.PickaxeAbility;
 import dev.shaftjournal.detection.ShaftEvent.PortalSpawned;
 import dev.shaftjournal.detection.ShaftEvent.Pristine;
 import dev.shaftjournal.detection.ShaftEvent.SacksChanged;
-import dev.shaftjournal.detection.ShaftEvent.PickaxeAbility;
 import dev.shaftjournal.detection.ShaftEvent.ScrapFound;
 import dev.shaftjournal.detection.ShaftEvent.Supercraft;
 import dev.shaftjournal.detection.ShaftEvent.Warping;
 
-// turns chat lines into events. only keeps state for the corpse loot block bc hypixel sends
-// that as one chat msg per line
+// hypixel sends corpse loot as 1 msg per line, hence the state
 public final class ChatParser {
 	private final TextPatterns patterns;
 	private LootBlock loot;
@@ -31,8 +30,7 @@ public final class ChatParser {
 		this.patterns = patterns;
 	}
 
-	// one chat msg (not action bar). legacy and hovers are both § coded.
-	// returns the event this msg finishes, or null
+	// chat only, not action bar. returns the event this msg finishes
 	public ShaftEvent parse(String legacy, List<String> hovers) {
 		String text = TextPatterns.clean(legacy);
 		Matcher m;
@@ -62,7 +60,7 @@ public final class ChatParser {
 				}
 				return null;
 			}
-			// other stuff (empty line, random msg) can land in between, so keep the block open
+			// other msgs can land in between, keep the block open
 		}
 
 		if ((m = patterns.match("pristine", text)) != null) {

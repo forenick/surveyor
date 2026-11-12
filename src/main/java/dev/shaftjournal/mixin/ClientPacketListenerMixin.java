@@ -1,19 +1,18 @@
 package dev.shaftjournal.mixin;
 
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import dev.shaftjournal.ShaftJournal;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
-import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 
-// sees chat, action bar and title packets as soon as they hit the client thread, before other
-// mods can hide or change them. read only, never cancels or edits a packet
-// injecting after ensureRunningOnSameThread (not HEAD) so we see each packet once, on the client thread
+// read only, never cancels or edits a packet
+// after ensureRunningOnSameThread (not HEAD) = once, on client thread, before other mods hide it
 @Mixin(value = ClientPacketListener.class, priority = 500)
 public abstract class ClientPacketListenerMixin {
 	private static final String ENSURE_THREAD =

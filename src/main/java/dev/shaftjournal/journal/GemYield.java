@@ -6,23 +6,18 @@ import java.util.regex.Matcher;
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.TextPatterns;
 
-// gems of the shafts own type mined in it, in items
-// from the "[Sacks]" Added hover lines, minus corpse loot and Supercraft output that also went
-// into sacks (Docs/research/06 and 07). the last few secs before leaving never show in Sacks so the
-// tail is estimated. Flawed from PRISTINE msgs after the last Sacks msg, Rough from that Flawed at
-// the shafts own Rough:Flawed ratio. silent Gemstone Spread procs in the tail are missing (slight undercount)
-// mob drops of the same gem count as mined (seen once, Docs/research/07)
-// gem is f.e. "Jade"
+// sacks added - corpse loot - supercrafts, tail estimated (research/06, 07)
+// silent gemstone spread in the tail is missing, slight undercount
+// mob drops of the same gem count as mined (research/07)
 public record GemYield(String gem, long rough, long flawed, long fine, long tailRough, long tailFlawed) {
-	// 80 Rough = 1 Flawed, 80 Flawed = 1 Fine (normal recipes, Docs/research/05)
+	// 80:1 per step (research/05)
 	public static final int RECIPE = 80;
 
-	// everything incl the estimated tail, as Fine
+	// incl estimated tail
 	public double fineEquivalent() {
 		return toFine(rough + tailRough, flawed + tailFlawed, fine);
 	}
 
-	// only what the Sacks msgs reported, as Fine
 	public double reportedFine() {
 		return toFine(rough, flawed, fine);
 	}
@@ -31,7 +26,6 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 		return rough / (double) (RECIPE * RECIPE) + flawed / (double) RECIPE + fine;
 	}
 
-	// null if the shaft has no id yet or no gems of its type were found (f.e. TITA_1)
 	public static GemYield of(Shaft shaft, TextPatterns patterns) {
 		if (shaft.id() == null) return null;
 		String type = shaft.id().type();

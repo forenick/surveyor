@@ -14,9 +14,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-// feeds a recorder .jsonl file through a tracker, same way the live hooks do
 public final class RecordingReplay {
-	// recordings stay out of git (they have player names in them) so tests skip when theyre missing
+	// not in git (player names), tests skip w/o them
 	public static final Path RECORDINGS = Path.of("..", "Recordings");
 
 	private RecordingReplay() {
@@ -30,7 +29,7 @@ public final class RecordingReplay {
 		return events;
 	}
 
-	// clock gets each record's time before its fed, onBlockHit gets the time of every block_hit record
+	// clock set before each record is fed
 	public static void replay(Path file, ShaftTracker tracker, LongConsumer clock, LongConsumer onBlockHit) throws IOException {
 		try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			String line;

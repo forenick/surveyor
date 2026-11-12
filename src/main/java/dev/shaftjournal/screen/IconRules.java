@@ -6,16 +6,12 @@ import java.util.regex.Pattern;
 
 import dev.shaftjournal.util.Resources;
 
-// picks a vanilla stand-in icon for a SkyBlock item name from shaftjournal/item_icons.txt, for when
-// theres no texture. plain Java so it can be tested, ItemIcons turns the result into an item stack
 public final class IconRules {
-	// a comment is '#' after whitespace, up to the end of the line
 	private static final Pattern COMMENT = Pattern.compile("\\s#.*$");
 
 	private static IconRules defaults;
 
 	private record Rule(Pattern pattern, String item) {
-		// * matches any text, everything else matches as is
 		static Rule of(String pattern, String item) {
 			return new Rule(Pattern.compile(Pattern.quote(pattern).replace("*", "\\E.*\\Q")), item);
 		}
@@ -45,7 +41,6 @@ public final class IconRules {
 		fallback = defaultItem;
 	}
 
-	// the rules that come with the mod, read once
 	public static synchronized IconRules defaults() {
 		if (defaults == null) {
 			List<String> lines = Resources.lines("/shaftjournal/item_icons.txt");
@@ -54,7 +49,6 @@ public final class IconRules {
 		return defaults;
 	}
 
-	// Minecraft item id to draw for this item name
 	public String itemId(String name) {
 		for (Rule rule : rules) {
 			if (rule.matches(name)) return rule.item();

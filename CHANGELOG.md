@@ -4,6 +4,11 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.9.3 (2026-11-12)
+Comments cut down to the ones that matter (where a number comes from, gotchas), now keyword-short. Added
+Spotless, which fixes unused imports, import order and trailing whitespace; `./gradlew build` fails until
+`./gradlew spotlessApply` has run. No changes to how the mod works.
+
 ## 0.9.2 (2026-11-12)
 Comments rewritten in a shorter, casual style. No changes to how the mod works.
 

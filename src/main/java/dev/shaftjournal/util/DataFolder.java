@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-// our folder in .minecraft (was shafttools before the rename). plain java
 public final class DataFolder {
 	public static final String NAME = "shaftjournal";
 	static final String OLD_NAME = "shafttools";
@@ -16,8 +15,7 @@ public final class DataFolder {
 		return gameDir.resolve(NAME);
 	}
 
-	// moves the old pre rename folder over, once. does nothing if the new folder already exists so
-	// old data never overwrites newer stuff. true if it moved it
+	// skips if the new folder exists so old data never overwrites newer
 	public static boolean migrate(Path gameDir) throws IOException {
 		Path old = gameDir.resolve(OLD_NAME);
 		Path current = in(gameDir);

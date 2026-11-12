@@ -1,9 +1,5 @@
 package dev.shaftjournal.hud;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -13,7 +9,11 @@ import dev.shaftjournal.hud.HudSnap.Guide;
 import dev.shaftjournal.hud.HudSnap.Rect;
 import dev.shaftjournal.hud.HudSnap.Result;
 
-// screen 480x270 (1080p at auto gui scale), margin 4, like Nick approved
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+// 480x270 (1080p auto gui scale), margin 4, nick approved
 class HudSnapTest {
 	private static final int W = 480;
 	private static final int H = 270;
@@ -94,14 +94,13 @@ class HudSnapTest {
 		assertEquals(48, r.y(), "4 px under the box");
 		assertEquals(30, r.x());
 		assertNull(r.anchorY(), "a stacked box gets its anchor from where it is");
-		// the boxes overlap from x 30 to 84 so the marker sits at 57. no room left of the boxes so the
-		// label goes right of both (they end at 90), level with the gap
+		// overlap 30..84 = marker 57, no room left so label right of both (end 90)
 		assertEquals(List.of(new Guide(57, 44, 1, 4, "4", 92, 42)), r.guides());
 	}
 
 	@Test
 	void theGapLabelStaysOffBothBoxes() {
-		Result r = snap(rect(87, 60, 60, 20), rect(4, 50, 80, 40)); // beside, other ends at 84
+		Result r = snap(rect(87, 60, 60, 20), rect(4, 50, 80, 40));
 		assertEquals(88, r.x());
 		Guide gap = r.guides().getFirst();
 		assertEquals("4", gap.label());
@@ -117,7 +116,7 @@ class HudSnapTest {
 
 	@Test
 	void skipsSpotsPastTheMargin() {
-		// next to the box at 400..440 would put this 40 px box at 444..484, thats past the right margin (476)
+		// beside 400..440 = 444..484, past margin 476
 		Result r = snap(rect(446, 100, 40, 20), rect(400, 85, 40, 40));
 		assertEquals(446, r.x());
 		assertTrue(r.guides().isEmpty(), "no guide pointing at a spot the box can't reach");
@@ -134,7 +133,7 @@ class HudSnapTest {
 
 	@Test
 	void theClosestTargetWins() {
-		// left edge 3 px from the margin, middle 1 px from the other box's middle
+		// left edge 3 px off margin, middle 1 px off other middle
 		Result r = snap(rect(7, 100, 50, 20), rect(13, 200, 40, 20));
 		assertEquals(8, r.x());
 		assertNull(r.anchorX(), "middles lined up, but the other box is anchored by its left edge");

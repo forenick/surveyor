@@ -1,8 +1,6 @@
-# shaft type codes (the 4 letters before "_" in the shaft id), the name the journal shows and the
-# bar color on the Stats tab. format: CODE = Name, #RRGGBB
-# names are from Docs/research/01-shaft-mechanics.md. "seen" = confirmed in Nick's recordings, the rest
-# come from the wiki/SkyHanni and are unconfirmed. colors are just picked to look like the gem or
-# material (not game data), change them however u want. unknown codes show as the code itself, in aqua
+# format: CODE = Name, #RRGGBB (stats bar color)
+# names from research/01. seen = in nicks recordings, rest from wiki/skyhanni, unconfirmed
+# colors are a display choice, not game data
 AMET = Amethyst, #9B4DCA      # seen
 AQUA = Aquamarine, #3FC1C9    # seen
 JADE = Jade, #4CC552          # seen

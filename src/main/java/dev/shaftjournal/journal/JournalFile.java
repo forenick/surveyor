@@ -13,15 +13,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-// the journal on disk. one JournalEntry per line, appended when a shaft finishes so a crash only
-// loses the shaft ur in. all file stuff runs on one background thread
+// append per shaft so a crash only loses the current one
 public final class JournalFile {
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
@@ -41,7 +39,6 @@ public final class JournalFile {
 		return file;
 	}
 
-	// reads every entry in file order, on the background thread
 	public CompletableFuture<List<JournalEntry>> load() {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
@@ -65,7 +62,6 @@ public final class JournalFile {
 		});
 	}
 
-	// finishes pending writes, call this when the game closes
 	public void close() {
 		io.shutdown();
 		try {
@@ -75,7 +71,6 @@ public final class JournalFile {
 		}
 	}
 
-	// same but on the calling thread. broken lines get skipped and logged
 	List<JournalEntry> read() throws IOException {
 		List<JournalEntry> entries = new ArrayList<>();
 		if (!Files.exists(file)) return entries;

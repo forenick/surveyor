@@ -4,20 +4,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-
-import dev.shaftjournal.detection.LiveTracker;
-import dev.shaftjournal.hud.LiveHud;
-import dev.shaftjournal.journal.LiveJournal;
-import dev.shaftjournal.recorder.ShaftRecorder;
-import dev.shaftjournal.screen.JournalScreen;
-import dev.shaftjournal.util.DataFolder;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -34,14 +24,22 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import dev.shaftjournal.detection.LiveTracker;
+import dev.shaftjournal.hud.LiveHud;
+import dev.shaftjournal.journal.LiveJournal;
+import dev.shaftjournal.recorder.ShaftRecorder;
+import dev.shaftjournal.screen.JournalScreen;
+import dev.shaftjournal.util.DataFolder;
 
 public class ShaftJournal implements ClientModInitializer {
 	public static final String MOD_ID = "shaftjournal";
-	// /shaftjournal and short /sj. not /st bc thats hypixels /storage
+	// not /st, thats hypixels /storage
 	private static final List<String> COMMAND_NAMES = List.of(MOD_ID, "sj");
 	private static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal");
 
-	// ClientPacketListenerMixin feeds chat, action bar and titles into these
 	public static final ShaftRecorder RECORDER = new ShaftRecorder();
 	public static final LiveTracker TRACKER = new LiveTracker();
 	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea);
@@ -49,11 +47,11 @@ public class ShaftJournal implements ClientModInitializer {
 
 	private final ShaftRecorder recorder = RECORDER;
 
-	// opens the journal. unbound by default (only opens our own screen, nothing else)
+	// unbound, only opens our own screen
 	private static final KeyMapping JOURNAL_KEY = new KeyMapping("key.shaftjournal.journal", InputConstants.Type.KEYSYM,
 			InputConstants.UNKNOWN.getValue(), KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main")));
 
-	// the command sets this, then it opens next tick once the chat screen is closed
+	// opens next tick once the chat screen is closed
 	private boolean openJournal;
 
 	@Override
@@ -66,7 +64,6 @@ public class ShaftJournal implements ClientModInitializer {
 		ClientLifecycleEvents.CLIENT_STARTED.register(JOURNAL::start);
 		ClientLifecycleEvents.CLIENT_STARTED.register(HUD::start);
 		ClientTickEvents.END_CLIENT_TICK.register(HUD::onTick);
-		// drawn under the chat so u can still read chat over a box
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(MOD_ID, "hud"), HUD::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			recorder.stop();
@@ -74,7 +71,7 @@ public class ShaftJournal implements ClientModInitializer {
 			HUD.close();
 		});
 		TRACKER.addListener(JOURNAL::onEvent);
-		// only watches ur own block hits, PASS means we dont change the hit at all
+		// own hits only, PASS = never changes the hit
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
 			if (level.isClientSide()) {
 				JOURNAL.onBlockHit();
@@ -83,13 +80,11 @@ public class ShaftJournal implements ClientModInitializer {
 			return InteractionResult.PASS;
 		});
 
-		// client side commands, handled locally and never sent to the server
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> {
 			for (String name : COMMAND_NAMES) dispatcher.register(command(name));
 		});
 	}
 
-	// same command tree for every name. just /sj on its own opens the journal
 	private LiteralArgumentBuilder<FabricClientCommandSource> command(String name) {
 		return ClientCommands.literal(name)
 				.executes(this::openJournal)
@@ -109,7 +104,6 @@ public class ShaftJournal implements ClientModInitializer {
 		return 1;
 	}
 
-	// before the rename the journal and recordings lived in .minecraft/shafttools
 	private static void moveOldDataFolder() {
 		Path gameDir = FabricLoader.getInstance().getGameDir();
 		try {

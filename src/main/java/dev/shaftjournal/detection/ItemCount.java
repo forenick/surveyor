@@ -1,5 +1,5 @@
 package dev.shaftjournal.detection;
 
-// item name w/o its icon (f.e. "Rough Jade Gemstone") plus an amount
+// name w/o its icon
 public record ItemCount(String item, long count) {
 }

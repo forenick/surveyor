@@ -1,7 +1,6 @@
-# vanilla stand-in icons for SkyBlock items on the journal screen, used when neither Hypixel's
-# resource pack nor a texture pack mod has the item (see skyblock_items.txt). tooltips still show the real name
-# format: <item name> = <minecraft item id>. * matches any text
-# first matching line wins, anything unmatched uses "default". a # after a space starts a comment
+# vanilla stand-in icons, only when no pack has the item
+# format: <item name> = <minecraft item id>, * = any text, first match wins
+# a # after a space starts a comment
 Flawless * Gemstone      = minecraft:emerald
 Perfect * Gemstone       = minecraft:diamond
 * Gemstone               = minecraft:amethyst_shard

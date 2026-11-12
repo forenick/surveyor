@@ -1,69 +1,57 @@
-# all the game text ShaftJournal knows, in one place. if Hypixel changes a wording u only fix one
-# line here, no code change needed
-#
-# format: <key> <regex>. lines starting with # are comments
-# - text gets matched after the color codes and trailing spaces are stripped.
-#   leading spaces stay, Hypixel indents block lines with them
-# - a key can be on several lines, first one that matches wins
-# - the parsers read the named groups, so dont rename groups when u edit a pattern
-# - \p{Co} matches the private-use icon chars Hypixel puts before stat and gem names
-#
-# every pattern here was confirmed in a recording, see Docs/research/05 and 06
+# format: <key> <regex>, matched after color codes + trailing spaces are stripped
+# leading spaces stay, hypixel indents w/ them. first match per key wins
+# parsers read the named groups, dont rename them
+# \p{Co} = hypixels private use icon chars
+# all confirmed in recordings (research/05, 06)
 
-# shaft spawn. the finder gets both msgs
+# finder gets both
 spawn.found            ^WOW! You found a Glacite Mineshaft portal!$
 spawn.nearby           ^MINESHAFT! A Mineshaft portal spawned nearby!$
 
-# entering: the scoreboard date/server line ends with the shaft id, f.e. "11/08/26 m113BD PERI_2"
+# f.e. "11/08/26 m113BD PERI_2"
 scoreboard.shaft_id    ^\d+/\d+/\d+ \S+ (?<id>(?<type>[A-Z]{4})_(?<variant>\w))$
-# a saved shaft id on its own, split the same way as the scoreboard one above (keep these two the same)
+# keep in sync w/ scoreboard.shaft_id
 shaft.id               ^(?<type>[A-Z]{4})_(?<variant>\w)$
 tab.mineshaft_area     ^Area: Mineshaft$
-# where shafts spawn (Glacite Tunnels + rest of the Dwarven Mines). spawn timer only runs here
+# glacite tunnels count too
 tab.mining_area        ^Area: Dwarven Mines$
 
-# leaving. only BYE! gives exit powder, warping or dying gives nothing
 exit.bye               ^BYE! You got a \+(?<powder>[\d,]+) Glacite Powder bonus for leaving a Mineshaft before you died!$
 exit.warp              ^Warping\.\.\.$
 exit.warp              ^Warping you to your SkyBlock island\.\.\.$
 death.cold             ^ ☠ You froze to death\.$
 
-# shaft modifiers and stuff that happens inside the shaft
 mayhem                 ^MAYHEM! You received a (?:\p{Co} )?(?<buff>.+) buff from your Mineshaft Mayhem perk!$
 mayhem                 ^MAYHEM! Your (?<buff>.+) was buffed by your Mineshaft Mayhem perk!$
 mayhem                 ^MAYHEM! Your (?<buff>.+) was reduced from your Mineshaft Mayhem perk!$
 corpse.extra           ^MORE! You have spawned (?<count>\d+) additional Frozen Corpses?!$
 cave_in                ^The mineshaft entrance has caved in\.\.\. it doesn't look like anyone else will be able to get in here\.$
 
-# tab list "Frozen Corpses:" widget, one line per corpse, f.e. " Lapis: NOT LOOTED"
 tab.corpses_header     ^Frozen Corpses:$
 tab.corpse             ^ (?<type>\w+): (?<status>(?:NOT )?LOOTED)$
 
-# corpse loot block. item lines only count after the REWARDS line, block ends at the next bar
 loot.start             ^  (?<type>[A-Z]+) CORPSE LOOT!$
 loot.bonus             ^  \+1 bonus drop!$
 loot.rewards           ^  REWARDS$
 loot.item              ^    (?:\p{Co} )?(?<item>\S.*?)(?: x(?<count>[\d,]+))?$
 loot.end               ^▬+$
-# item name (from loot.item) thats the corpse's Glacite Powder, not a real item
+# corpse powder, not a real item
 loot.powder            ^Glacite Powder$
 
-# cold: scoreboard line + the Portable Campfire msgs
 scoreboard.cold        ^Cold: (?<cold>-?\d+)❄$
 campfire.placed        ^You placed a Portable Campfire!$
 campfire.used          ^You've warmed your feet by your campfire\. Your ❄ Cold was reduced by (?<amount>\d+)!$
 
-# mining output
 pristine               ^PRISTINE! You found (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
-# pickaxe abilities. Pickobulus breaks ~180 blocks w/o a block hit and can spawn a shaft (Docs/research/08)
+# pickobulus breaks ~180 blocks w/o a block hit (research/08)
 ability.used           ^You used your (?<ability>.+) Pickaxe Ability!$
 scrap                  ^EXCAVATOR! You found a Suspicious Scrap!$
 supercraft             ^You Supercrafted (?:\p{Co} )?(?<item>.+) x(?<count>[\d,]+)!$
 
-# gemstone item name, f.e. "Flawed Jade Gemstone" (icon already removed)
+# icon already removed
 gem.item               ^(?<quality>Rough|Flawed|Fine) (?<gem>\w+) Gemstone$
 
-# [Sacks] msgs. the visible line only has totals, the per item lines are in the hover text
+# per item lines are in the hover text
 sacks                  ^\[Sacks\] .*\(Last (?<seconds>\d+)s\.\)$
 sacks.item             ^  (?<sign>[+-])(?<count>[\d,]+) (?:\p{Co} )?(?<item>.+) \((?<sacks>.+)\)$
 sacks.other            ^  (?<sign>[+-])(?<count>[\d,]+) other items\.$

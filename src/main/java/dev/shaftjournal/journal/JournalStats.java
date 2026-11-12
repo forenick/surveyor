@@ -11,21 +11,17 @@ import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.TextPatterns;
 
-// session summaries and all time stats for the journal screen, from saved entries.
-// every number here is counted from ur own journal, none of it is a game constant
 public final class JournalStats {
-	// shafts per hour only shows for sessions at least this long. display choice, not a game number
+	// display choice, not a game number
 	public static final long MIN_RATE_MILLIS = 5 * 60_000L;
 
-	// a session needs this many timed spawns to count for "fastest session", so one lucky spawn
-	// isnt a record. display choice, not a game number
+	// so 1 lucky spawn isnt a record. display choice, not a game number
 	public static final int MIN_TIMED_FOR_RECORD = 3;
 
-	// a session needs this many shafts to count for "Shafts / h", so a short lucky session isnt a
-	// record. my pick (2026-11-11), display choice, not a game number
+	// nicks pick (2026-11-11), display choice, not a game number
 	public static final int MIN_SHAFTS_FOR_RATE_RECORD = 5;
 
-	// corpse types in the order the screen lists them, unknown ones come after (alphabetical)
+	// display order, not game data
 	public static final List<String> CORPSE_ORDER = List.of("Lapis", "Umber", "Tungsten", "Vanguard");
 
 	private JournalStats() {
@@ -34,13 +30,11 @@ public final class JournalStats {
 	public record CorpseCount(int looted, int total) {
 	}
 
-	// session id is its start time, entries are in the order they got saved
 	public record SessionSummary(long id, List<JournalEntry> entries) {
 		public long start() {
 			return id;
 		}
 
-		// when the last shaft of the session was left
 		public long end() {
 			JournalEntry last = entries.getLast();
 			return Math.max(id, last.enteredAt() + last.durationMillis());
@@ -58,22 +52,18 @@ public final class JournalStats {
 			return (int) entries.stream().filter(e -> e.searchMillis() != null).count();
 		}
 
-		// null when no spawn in the session got timed
 		public Long averageSearchMillis() {
 			return averageSearch(entries);
 		}
 
-		// null for sessions shorter than MIN_RATE_MILLIS
 		public Double shaftsPerHour() {
 			return shaftsPerHour(end());
 		}
 
-		// same but also counts the time since the last shaft up to now
 		public Double shaftsPerHour(long now) {
 			return perHour(shafts(), now);
 		}
 
-		// any amount per hour of session, counted up to now. null in the same cases as shaftsPerHour
 		public Double perHour(double amount, long now) {
 			long length = Math.max(end(), now) - start();
 			return length < MIN_RATE_MILLIS ? null : amount * 3_600_000.0 / length;
@@ -92,7 +82,6 @@ public final class JournalStats {
 		}
 	}
 
-	// a shaft that holds a record, plus the record value
 	public record Best(JournalEntry entry, long value) {
 	}
 
@@ -114,13 +103,11 @@ public final class JournalStats {
 			Map<String, Map<String, Integer>> types,
 			Map<String, Integer> corpsesSeen,
 			Map<String, Integer> shaftsWithCorpse) {
-		// shafts w/ a known type
 		public int typedShafts() {
 			return types.values().stream().flatMap(v -> v.values().stream()).mapToInt(Integer::intValue).sum();
 		}
 	}
 
-	// groups entries (in file order) into sessions, newest first
 	public static List<SessionSummary> sessions(List<JournalEntry> entries) {
 		Map<Long, List<JournalEntry>> bySession = new LinkedHashMap<>();
 		for (JournalEntry entry : entries) {
@@ -132,17 +119,14 @@ public final class JournalStats {
 		return sessions;
 	}
 
-	// corpse powder + the powder for leaving
 	public static long powder(JournalEntry entry) {
 		return powder(entry.loots(), entry.exitPowder());
 	}
 
-	// Glacite Powder from corpses + the "BYE!" bonus, for a saved shaft or one ur still in
 	public static long powder(List<CorpseLoot> loots, long exitPowder) {
 		return loots.stream().mapToLong(CorpseLoot::powder).sum() + exitPowder;
 	}
 
-	// looted and seen corpses per type, in the order the types first show up (tab list order)
 	public static Map<String, CorpseCount> corpseCounts(List<Corpse> corpses) {
 		Map<String, int[]> counts = new LinkedHashMap<>();
 		for (Corpse corpse : corpses) {
@@ -155,7 +139,6 @@ public final class JournalStats {
 		return result;
 	}
 
-	// same but in CORPSE_ORDER
 	public static Map<String, CorpseCount> corpses(JournalEntry entry) {
 		Map<String, CorpseCount> counts = corpseCounts(entry.corpses());
 		Map<String, CorpseCount> ordered = new LinkedHashMap<>();
@@ -163,17 +146,14 @@ public final class JournalStats {
 		return ordered;
 	}
 
-	// the 4 letter type, f.e. "JASP". null w/o a shaft id
 	public static String type(JournalEntry entry) {
 		return idPart(entry, "type");
 	}
 
-	// the variant, f.e. "1", "2" or "C". null w/o a shaft id
 	public static String variant(JournalEntry entry) {
 		return idPart(entry, "variant");
 	}
 
-	// a named group of the shaft.id pattern, same id shape the scoreboard parser reads
 	private static String idPart(JournalEntry entry, String group) {
 		if (entry.shaftId() == null) return null;
 		Matcher m = TextPatterns.defaults().match("shaft.id", entry.shaftId());
@@ -245,7 +225,6 @@ public final class JournalStats {
 				mostPowder, mostLapis, bestRate, fastestSession, mostShafts, mostGems, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse));
 	}
 
-	// avg spawn time over every timed shaft in the newest count sessions (list is newest first)
 	public static Long recentAverage(List<SessionSummary> newestFirst, int count) {
 		return averageSearch(newestFirst.stream().limit(count).flatMap(s -> s.entries().stream()).toList());
 	}
@@ -271,7 +250,6 @@ public final class JournalStats {
 		return known;
 	}
 
-	// types w/ the most shafts first, variants go 1, 2, C, then the rest
 	private static Map<String, Map<String, Integer>> byTotal(Map<String, Map<String, Integer>> types) {
 		List<Map.Entry<String, Map<String, Integer>>> list = new ArrayList<>(types.entrySet());
 		list.sort(Comparator.comparingInt((Map.Entry<String, Map<String, Integer>> e) ->

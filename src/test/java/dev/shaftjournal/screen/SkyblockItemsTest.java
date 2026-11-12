@@ -1,9 +1,5 @@
 package dev.shaftjournal.screen;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -11,6 +7,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import dev.shaftjournal.screen.SkyblockItems.Info;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class SkyblockItemsTest {
 	private final SkyblockItems items = SkyblockItems.defaults();
@@ -34,7 +34,6 @@ class SkyblockItemsTest {
 		assertEquals(new Info("GOBLIN_EGG", "hypixel_skyblock:item/x", false), parsed.get("Goblin Egg"));
 	}
 
-	// every loot item in the real journal fixture needs an entry, so its icon can get textured
 	@Test
 	void coversRecordedLoot() throws Exception {
 		Path journal = Path.of("src/test/resources/journal-2026-11-11.jsonl");

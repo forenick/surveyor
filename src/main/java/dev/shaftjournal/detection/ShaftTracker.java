@@ -8,11 +8,7 @@ import dev.shaftjournal.detection.ShaftEvent.CorpsesChanged;
 import dev.shaftjournal.detection.ShaftEvent.ShaftEntered;
 import dev.shaftjournal.detection.ShaftEvent.ShaftLeft;
 
-// follows u in and out of shafts and sends every event it knows to a listener.
-// gets the same data the recorder writes, so u can replay a recording through it
-// every world change starts a candidate Shaft. it becomes the current shaft once the tab list
-// says "Area: Mineshaft" or the scoreboard shows a shaft id, so msgs that come in between the
-// world change and that still count
+// candidate per world change, so msgs before its confirmed still count
 public final class ShaftTracker {
 	private final ChatParser chat;
 	private final ScoreboardParser scoreboard;
@@ -31,12 +27,11 @@ public final class ShaftTracker {
 		this.listener = listener;
 	}
 
-	// true while the tab list says ur in the Dwarven Mines, false right after a world change
+	// false right after a world change
 	public boolean inMiningArea() {
 		return inMiningArea;
 	}
 
-	// shaft ur in, or null
 	public Shaft current() {
 		return shaft != null && shaft.confirmed ? shaft : null;
 	}
@@ -69,7 +64,7 @@ public final class ShaftTracker {
 				listener.accept(new ShaftEntered(candidate));
 			}
 		}
-		// Cold line can be gone for a sec, so keep the last value instead of forgetting it
+		// cold line can vanish for a sec, keep the last value
 		Integer newCold = scoreboard.cold(lines);
 		if (newCold != null && !newCold.equals(cold)) {
 			cold = newCold;
@@ -80,9 +75,9 @@ public final class ShaftTracker {
 
 	public void onTabList(long now, List<String> lines) {
 		if (tabList.inMineshaft(lines)) candidate(now).confirmed = true;
-		// empty tab list (f.e. while loading) tells us nothing about where we are
+		// empty while loading, says nothing
 		if (!lines.isEmpty()) inMiningArea = tabList.inMiningArea(lines);
-		// widget isnt there for the first few secs in a shaft, empty list just means "not shown"
+		// widget missing first few secs, empty = not shown
 		List<Corpse> newCorpses = tabList.corpses(lines);
 		if (!newCorpses.isEmpty() && !newCorpses.equals(corpses)) {
 			corpses = newCorpses;
@@ -91,7 +86,6 @@ public final class ShaftTracker {
 		}
 	}
 
-	// candidate for the current world. made here if tracking started w/o a world change
 	private Shaft candidate(long now) {
 		if (shaft == null) shaft = new Shaft(now);
 		return shaft;

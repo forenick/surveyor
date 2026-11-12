@@ -13,13 +13,6 @@ import java.util.Set;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import dev.shaftjournal.mixin.PlayerTabOverlayAccessor;
-import dev.shaftjournal.util.DataFolder;
-import dev.shaftjournal.util.HudText;
-import dev.shaftjournal.util.TextUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -34,17 +27,21 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.scores.Scoreboard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-// dev tool. dumps everything hypixel shows u (chat, action bar, titles, scoreboard, tab list,
-// nearby armor stands) into a jsonl file so the parsers can be written and tested on real data
-// fully passive, only reads what the client already has and writes it to disk.
-// never sends anything to the server
+import dev.shaftjournal.mixin.PlayerTabOverlayAccessor;
+import dev.shaftjournal.util.DataFolder;
+import dev.shaftjournal.util.HudText;
+import dev.shaftjournal.util.TextUtil;
+
+// dev tool. read only, never sends anything to the server
 public final class ShaftRecorder {
 	static final Logger LOGGER = LoggerFactory.getLogger("ShaftJournal Recorder");
 
 	private static final DateTimeFormatter FILE_NAME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 	private static final double ENTITY_SCAN_RADIUS = 48;
-	// chat lines starting w/ these never get written, keeps private convos out of recordings
+	// keeps private convos out of recordings
 	private static final List<String> PRIVATE_PREFIXES = List.of("From ", "To ", "Guild > ", "Officer > ");
 
 	private RecordingWriter writer;
@@ -87,8 +84,7 @@ public final class ShaftRecorder {
 		return file;
 	}
 
-	// fires while ur hitting a block (every tick u hold the button). only writes a new block pos,
-	// so the recording shows when mining started and how fast blocks broke
+	// fires every tick while held, only a new block pos gets written
 	public void onBlockHit(BlockPos pos) {
 		if (writer == null || pos.asLong() == lastBlockHit) return;
 		lastBlockHit = pos.asLong();
@@ -106,7 +102,6 @@ public final class ShaftRecorder {
 		writer.write(event);
 	}
 
-	// gets every title and subtitle packet, before other mods can hide or change it
 	public void onTitle(Component text, boolean subtitle) {
 		if (writer == null) return;
 		JsonObject event = event(subtitle ? "subtitle" : "title");
@@ -115,7 +110,6 @@ public final class ShaftRecorder {
 		writer.write(event);
 	}
 
-	// gets every chat and action bar msg, before other mods can hide or change it
 	public void onGameMessage(Component message, boolean overlay) {
 		if (writer == null) return;
 		String plain = message.getString();
@@ -209,7 +203,7 @@ public final class ShaftRecorder {
 		Set<Integer> seen = new HashSet<>();
 		for (ArmorStand stand : level.getEntitiesOfClass(ArmorStand.class, area)) {
 			JsonObject description = describeArmorStand(stand);
-			// plain stands w/ no name and no gear are just decoration, skip them so files stay small
+			// decoration only, skip to keep files small
 			if (!description.has("name") && !description.has("equipment")) continue;
 			seen.add(stand.getId());
 			String signature = description.toString();

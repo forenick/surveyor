@@ -6,11 +6,7 @@ import java.util.Map;
 
 import dev.shaftjournal.util.Resources;
 
-// SkyBlock ids and Hypixel resource pack models by item name, from shaftjournal/skyblock_items.txt.
-// plain Java, ItemIcons turns them into stacks
 public final class SkyblockItems {
-	// id is the SkyBlock id (f.e. FINE_JADE_GEM), model is the model in Hypixels resource pack or
-	// null if the item has none, glint = whether the real item glints
 	public record Info(String id, String model, boolean glint) {
 	}
 
@@ -32,7 +28,6 @@ public final class SkyblockItems {
 		}
 	}
 
-	// the items that come with the mod, read once
 	public static synchronized SkyblockItems defaults() {
 		if (defaults == null) {
 			List<String> lines = Resources.lines("/shaftjournal/skyblock_items.txt");
@@ -41,7 +36,6 @@ public final class SkyblockItems {
 		return defaults;
 	}
 
-	// item w/ this display name, or null if its not in the file
 	public Info get(String name) {
 		return byName.get(name);
 	}

@@ -11,44 +11,33 @@ import com.google.gson.JsonParseException;
 
 import dev.shaftjournal.hud.HudValue.Range;
 
-// every HUD box and its settings, so whats in hud.json. mutable bc the editor changes it in place.
-// only touched on the client thread, except for the toJson() copies. plain java
+// client thread only, except toJson() copies
 public final class HudLayout {
-	// 3: where a box shows is 3 checkboxes (2 had one Visibility choice)
-	// 2: positions are an anchor + an offset in GUI pixels (1 had fractions of the free space)
 	public static final int VERSION = 3;
-	// space between a box and the screen edge, also the gap between snapped boxes. Nick's pick (2026-11-11)
+	// nicks pick (2026-11-11)
 	public static final int MARGIN = 4;
-	// smallest and biggest box size
 	public static final float MIN_SCALE = 0.5f;
 	public static final float MAX_SCALE = 2;
-	// the 16 Minecraft colour codes, in order
 	public static final String COLOR_CODES = "0123456789abcdef";
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-	// version 2's single choice of where a box shows. only read to convert old files
 	enum Visibility {
 		ALWAYS, MINES, IN_SHAFT, OUTSIDE_SHAFT
 	}
 
-	// where a box is placed from, per axis. the screen margin at the start (left/top), the middle of the
-	// screen, or the margin at the end (right/bottom). that edge (or the middle) of the box stays put when
-	// the window, GUI scale or the box's text changes, so boxes lined up on that edge stay lined up
 	public enum Anchor {
 		START, MIDDLE, END;
 
-		// the anchor u get from snapping to this part of a box. 0 its start, 0.5 its middle, 1 its end
+		// edge: 0 start, 0.5 middle, 1 end
 		public static Anchor ofEdge(double edge) {
 			return edge == 0 ? START : edge == 1 ? END : MIDDLE;
 		}
 
-		// for a box placed freely, the third of the screen its middle is in
 		public static Anchor forPosition(int start, int size, int screen) {
 			double middle = start + size / 2.0;
 			return middle < screen / 3.0 ? START : middle > screen * 2 / 3.0 ? END : MIDDLE;
 		}
 
-		// where a box w/ this offset starts (left or top), kept inside the margins
 		public int start(int offset, int size, int screen) {
 			int start = switch (this) {
 				case START -> MARGIN + offset;
@@ -58,7 +47,6 @@ public final class HudLayout {
 			return clamp(start, size, screen);
 		}
 
-		// the offset that puts the box's start at start. inwards from the margin, or right/down from the middle
 		public int offset(int start, int size, int screen) {
 			return switch (this) {
 				case START -> start - MARGIN;
@@ -67,7 +55,7 @@ public final class HudLayout {
 			};
 		}
 
-		// keeps a box's start inside the margins. a box too big for the screen just starts at the margin
+		// too big for the screen = starts at the margin
 		public static int clamp(int start, int size, int screen) {
 			return Math.max(MARGIN, Math.min(start, screen - MARGIN - size));
 		}
@@ -87,27 +75,19 @@ public final class HudLayout {
 
 	public static final class Line {
 		public String value;
-		// text before the value. the value's default prefix unless its changed in the file
 		public String prefix;
 		public boolean shown = true;
-		// index into HudFormat.options
 		public int format;
-		// which shafts the value adds up, null for values without ranges
 		public Range range;
-		// free text w/ & codes and {value_id} tags instead of prefix + value. the text is kept when this
-		// gets switched off, so switching back brings it back
+		// text kept when switched off
 		public boolean advanced;
-		// the free text, null until the line got switched to it the first time
 		public String text;
-		// the value's ready-made colour rule is on (see HudColors.readyRule)
 		public boolean readyRule;
-		// own colour thresholds, checked in order before the ready-made rule. null if there are none
 		public List<ColorRule> rules;
 
 		public Line() {
 		}
 
-		// a new line like the editor adds it. shown, w/ the value's default prefix, format and range
 		public Line(HudValue value) {
 			this(value, null, true, 0);
 		}
@@ -120,22 +100,19 @@ public final class HudLayout {
 			this.range = value.defaultRange();
 		}
 
-		// null when the file has a value this version doesnt know
 		public HudValue hudValue() {
 			return HudValue.byId(value);
 		}
 	}
 
-	// one colour threshold on a line's value, f.e. red over 3:00
 	public static final class ColorRule {
 		public enum When {
 			OVER, UNDER
 		}
 
 		public When when = When.OVER;
-		// in the value's unit, seconds for times
+		// seconds for times, not ms
 		public double value;
-		// a Minecraft colour code, "0" to "f"
 		public String color = "c";
 
 		public boolean matches(double number) {
@@ -145,40 +122,35 @@ public final class HudLayout {
 
 	public static final class Box {
 		public String id;
-		// can have value tags like {shaft_type}
 		public String title = "";
 		public boolean showTitle;
-		// where the box shows. in a shaft, in the Dwarven Mines outside a shaft, and anywhere else
 		public boolean showInShaft = true;
 		public boolean showInMines = true;
 		public boolean showElsewhere;
 		public Background background = Background.DARK;
 		public float scale = 1;
 		public Align align = Align.LEFT;
-		// Minecraft colour codes, "0" to "f"
 		public String labelColor = "7";
 		public String valueColor = "f";
 		public boolean labelBold;
 		public boolean valueBold;
 		public Anchor anchorX = Anchor.START;
 		public Anchor anchorY = Anchor.START;
-		// GUI pixels from the anchor. inwards from the margin for START and END, right/down of the middle for MIDDLE
+		// inwards for START/END, right/down for MIDDLE
 		public int offsetX;
 		public int offsetY;
 		public List<Line> lines = new ArrayList<>();
-		// version 1 position, a fraction of the free space. only read to convert old files, never written
+		// v1/v2 only, read to convert, never written
 		Float x;
 		Float y;
-		// version 2's visibility. only read to convert old files, never written
 		Visibility visibility;
 
-		// if the box shows here. a shaft counts as a shaft even tho its also in the mines
+		// shaft wins over mines
 		public boolean visible(boolean inMines, boolean inShaft) {
 			return inShaft ? showInShaft : inMines ? showInMines : showElsewhere;
 		}
 
-		// moves a line to a gap between lines. gap 0 is above the first line, gap lines.size() is
-		// below the last. dropping a line right above or below itself does nothing
+		// gap 0 = above first, lines.size() = below last
 		public void moveLine(int from, int gap) {
 			if (from < 0 || from >= lines.size() || gap < 0 || gap > lines.size()) return;
 			Line line = lines.remove(from);
@@ -189,7 +161,7 @@ public final class HudLayout {
 	public int version = VERSION;
 	public List<Box> boxes = new ArrayList<>();
 
-	// the 3 default boxes from the approved mockup (Docs/mockups/hud-v1.html)
+	// from Docs/mockups/hud-v1.html
 	public static HudLayout defaults() {
 		HudLayout layout = new HudLayout();
 
@@ -201,7 +173,7 @@ public final class HudLayout {
 		session.lines.add(new Line(HudValue.SESSION_CORPSE_FINE, null, true, 0));
 		layout.boxes.add(session);
 
-		// just under the crosshair, same spot as version 1's 58% at 1080p
+		// = v1s 58% at 1080p, under the crosshair
 		Box spawn = box("spawn", "Spawn", false, true, Background.NONE, Align.CENTER, Anchor.MIDDLE, 0, Anchor.MIDDLE, 18);
 		spawn.valueBold = true;
 		spawn.lines.add(new Line(HudValue.SPAWN_TIMER, null, true, 0));
@@ -217,7 +189,6 @@ public final class HudLayout {
 		return layout;
 	}
 
-	// inMines = also shown in the Dwarven Mines outside a shaft. every default box shows in a shaft
 	private static Box box(String id, String title, boolean showTitle, boolean inMines, Background background,
 			Align align, Anchor anchorX, int offsetX, Anchor anchorY, int offsetY) {
 		Box box = new Box();
@@ -238,9 +209,6 @@ public final class HudLayout {
 		return GSON.toJson(this);
 	}
 
-	// reads a saved layout and repairs what a hand edit might have broken. missing fields get their
-	// defaults, values out of range get clamped, lines with unknown values get dropped
-	// throws JsonParseException if the text isnt a layout at all
 	public static HudLayout fromJson(String json) {
 		HudLayout layout = GSON.fromJson(json, HudLayout.class);
 		if (layout == null || layout.boxes == null) throw new JsonParseException("No boxes in the HUD file");
@@ -248,7 +216,7 @@ public final class HudLayout {
 		Set<String> ids = new HashSet<>();
 		for (Box box : layout.boxes) {
 			repair(box);
-			// ids have to be there and unique, share codes and later features find boxes by them
+			// share codes find boxes by id
 			if (box.id == null || box.id.isBlank() || !ids.add(box.id)) {
 				int n = 1;
 				while (!ids.add("box" + n)) n++;
@@ -277,7 +245,7 @@ public final class HudLayout {
 			if (line.prefix == null) line.prefix = value.defaultPrefix();
 			int formats = HudFormat.options(value.kind()).size();
 			if (line.format < 0 || line.format >= formats) line.format = 0;
-			// files from before ranges dont have one, those values were all session values back then
+			// pre-range files have none, were all session values
 			if (!value.hasRange(line.range)) line.range = value.defaultRange();
 			if (HudColors.readyRule(value) == null) line.readyRule = false;
 			if (line.rules != null) {
@@ -293,7 +261,6 @@ public final class HudLayout {
 		}
 	}
 
-	// turns version 2's single visibility choice into the 3 checkboxes
 	private static void convertVersion2(Box box) {
 		Visibility old = box.visibility;
 		box.showInShaft = old != Visibility.OUTSIDE_SHAFT;
@@ -302,9 +269,7 @@ public final class HudLayout {
 		box.visibility = null;
 	}
 
-	// turns a version 1 position (fraction of the free space) into an anchor + offset. exact for the
-	// edges and the middle, anywhere else the box can land a few pixels off bc we dont know the box size
-	// here. offsets are worked out for 1080p's auto GUI scale (480×270)
+	// 480×270 = 1080p auto gui scale. non-edge boxes can land a few px off
 	private static void convertVersion1(Box box) {
 		float fx = clamp(box.x == null ? 0 : box.x, 0, 1);
 		float fy = clamp(box.y == null ? 0 : box.y, 0, 1);
