@@ -29,6 +29,11 @@ public final class HudData {
 	private final Map<Key, Object> values = new HashMap<>();
 	// real but empty (zeros before the first shaft), editor shows examples
 	private final Set<Key> placeholders = new HashSet<>();
+	private long now;
+
+	public long now() {
+		return now;
+	}
 
 	public Object get(HudValue value) {
 		return get(value, value.defaultRange());
@@ -112,6 +117,7 @@ public final class HudData {
 	public static HudData live(SessionTotals session, Totals allTime, Totals thisShaft, Long spawnTimer, Shaft shaft,
 			long now, ShaftNames names) {
 		HudData data = new HudData();
+		data.now = now;
 		Totals totals = session.totals();
 		data.put(HudValue.SESSION_SHAFTS, totals.shafts());
 		data.put(HudValue.SESSION_POWDER, totals.powder());

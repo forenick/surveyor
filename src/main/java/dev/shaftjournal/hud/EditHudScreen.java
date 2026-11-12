@@ -40,6 +40,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Util;
@@ -54,7 +55,9 @@ import dev.shaftjournal.hud.HudLayout.Line;
 import dev.shaftjournal.screen.SafeLabel;
 
 public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
-	private static final Surface PANEL = Surface.flat(0xE8141414).and(Surface.outline(0x30FFFFFF));
+	private static final int PANEL_FILL = 0xE8141414;
+	private static final int PANEL_OUTLINE = 0x30FFFFFF;
+	private static final Surface PANEL = Surface.flat(PANEL_FILL).and(Surface.outline(PANEL_OUTLINE));
 	private static final Surface MENU = Surface.flat(0xF0101010).and(Surface.outline(0xFFA0A0A0));
 	// no outline, so it doesnt look like a field
 	private static final Surface PREVIEW = Surface.flat(0x8C000000)
@@ -129,6 +132,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
 	private static final String[] COLOR_NAMES = {"Black", "Dark Blue", "Dark Green", "Dark Aqua", "Dark Red",
 			"Dark Purple", "Gold", "Gray", "Dark Gray", "Blue", "Green", "Aqua", "Red", "Light Purple", "Yellow", "White"};
+	private static final String HIDDEN_NOTE = "hidden";
 	private static final String TEXT_HINT = "§8The buttons type values and colours for you. &7 is a colour, {spawn_timer} a value.";
 	// right of the mouse if it fits, else left, always on screen
 	private static final ClientTooltipPositioner FIT = (screenW, screenH, x, y, w, h) -> new Vector2i(
@@ -326,7 +330,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private void drawTip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		if (dragging != null || lineDrag >= 0) return;
 		Map<UIComponent, List<FormattedCharSequence>> tips = menu != null && menu.isInBoundingBox(mouseX, mouseY) ? menuTips
-				: panelScroll != null && panelScroll.isInBoundingBox(mouseX, mouseY) ? panelTips
+				: inPanel(mouseX, mouseY) ? panelTips
 				: toolbar.isInBoundingBox(mouseX, mouseY) ? toolbarTips : Map.of();
 		List<FormattedCharSequence> lines = null;
 		long smallest = Long.MAX_VALUE;
@@ -348,11 +352,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				pinnedLines = helpLines(helpValue, (panelRight ? px : width - px) - 8 - 2 * TIP_MARGIN - 6);
 				if (pinnedLines.size() * 10 + 8 > height - 2 * TIP_MARGIN) pinnedLines = helpLines;
 			}
-			// above a bottom toolbar, so Done stays visible
-			int bottom = toolbar.y() > height / 2 ? toolbar.y() - 2 : height;
+			// clear of the toolbar so Done stays visible
+			boolean toolbarTop = toolbar.y() < height / 2;
+			int top = toolbarTop ? toolbar.y() + toolbar.height() + 2 : 0;
+			int bottom = toolbarTop ? height : toolbar.y() - 2;
 			graphics.setTooltipForNextFrame(font, pinnedLines, (screenW, screenH, x, y, w, h) -> new Vector2i(
-					clamp(panelRight ? px - 8 - w : px + 8, w, screenW), Math.max(TIP_MARGIN, bottom - TIP_MARGIN - h)),
-					mouseX, mouseY, true);
+					clamp(panelRight ? px - 8 - w : px + 8, w, screenW),
+					clamp(Math.max(top + TIP_MARGIN, bottom - TIP_MARGIN - h), h, screenH)), mouseX, mouseY, true);
 		}
 	}
 
@@ -648,7 +654,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			deleteRow.removeChild(deleteButton);
 		}
 		Box box = panelBox;
-		deleteButton = dangerButton(armed ? "Really delete?" : "Delete box", b -> {
+		deleteButton = iconTextButton(REMOVE, armed ? "§cReally delete?" : "§cDelete box", null, b -> {
 			if (!deleteArmed) {
 				armDelete(true);
 				return;
@@ -783,13 +789,21 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private boolean overPanel(double x, double y) {
-		return toolbar.isInBoundingBox(x, y) || (panelScroll != null && panelScroll.isInBoundingBox(x, y))
-				|| (menu != null && menu.isInBoundingBox(x, y));
+		return toolbar.isInBoundingBox(x, y) || inPanel(x, y) || (menu != null && menu.isInBoundingBox(x, y));
 	}
 
-	// owo cant size a scroll area by content, measured after layout
+	// empty part under the content lets boxes show + get clicked
+	private boolean inPanel(double x, double y) {
+		return panelScroll != null && panelScroll.isInBoundingBox(x, y) && y < panelBottom();
+	}
+
+	private int panelBottom() {
+		return Math.min(panelScroll.y() + panelScroll.height(), panel.y() + panel.height());
+	}
+
+	// sizes known after layout
 	private void fitPanel() {
-		if (panelScroll == null || panel.height() <= 0) return;
+		if (panelScroll == null || panelScroll.width() == 0) return;
 		// no room beside it = leave the top for the toolbar
 		boolean narrow = toolbar.width() + panelScroll.width() + 3 * PADDING > width;
 		// title goes first, so the panel keeps the full height at 480 wide
@@ -798,7 +812,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			return;
 		}
 		int reserve = narrow ? toolbar.height() + PADDING : 0;
-		// full height, so it doesnt jump around with its content
+		// screen height, not content, a content fit jumps around
 		int fit = height - 2 * PADDING - reserve;
 		if (fit != panelHeight || panelScroll.height() != fit) {
 			panelHeight = fit;
@@ -964,7 +978,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		panel.padding(Insets.of(5));
 		panel.gap(1);
 		panelScroll = new PanelScroll(panelHeight, panel);
-		panelScroll.surface(PANEL);
+		panelScroll.surface((graphics, c) -> {
+			int h = panelBottom() - c.y();
+			graphics.fill(c.x(), c.y(), c.x() + c.width(), c.y() + h, PANEL_FILL);
+			graphics.drawRectOutline(c.x(), c.y(), c.width(), h, PANEL_OUTLINE);
+		});
 		panelScroll.scrollbar(ScrollContainer.Scrollbar.flat(Color.ofArgb(0x80FFFFFF)));
 		panelScroll.scrollbarThiccness(2);
 		panelScroll.offset(scrollMemory.getOrDefault(panelKey, 0.0));
@@ -994,16 +1012,15 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void buildBoxPage(Box box) {
-		FlowLayout linesHead = heading("Lines §8(" + box.lines.size() + ")");
-		linesHead.surface(Surface.BLANK);
-		linesHead.padding(Insets.none());
-		linesHead.margins(Insets.none());
+		FlowLayout linesHead = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		linesHead.verticalAlignment(VerticalAlignment.CENTER);
+		linesHead.child(label("§fLines §8(" + box.lines.size() + ")"));
 		ButtonComponent addLine = button("+ Add line", b -> {
 			picking = true;
 			rebuildPanel();
 		});
 		tip(addLine, "Add any value to this box");
-		linesHead.child(UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1)));
+		linesHead.child(spacer());
 		linesHead.child(addLine);
 		panel.child(linesHead);
 		for (int i = 0; i < box.lines.size(); i++) panel.child(lineRow(box, i));
@@ -1038,14 +1055,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		panel.child(row("Background", background));
 
-
 		Grid align = new Grid(Align.values().length, ROW_LABEL);
 		for (Align option : Align.values()) {
 			align.add(choice(name(option), box.align == option, () -> box.align = option));
 		}
 		panel.child(row("Align", align));
 
-		// stacked under each other, lined up w/ the controls above
 		FlowLayout places = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
 		places.child(place("Shafts", box.showInShaft, on -> box.showInShaft = on, "In a Glacite Mineshaft"));
 		places.child(place("Mines", box.showInMines, on -> box.showInMines = on, "In the Dwarven Mines, outside a shaft"));
@@ -1053,6 +1068,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				"Anywhere else: the Hub, other islands, other servers"));
 		FlowLayout shows = row("Show in", places);
 		shows.verticalAlignment(VerticalAlignment.TOP);
+		// label level w/ the 1st checkbox
 		shows.children().getFirst().margins(Insets.top(4));
 		shows.margins(Insets.top(1));
 		panel.child(shows);
@@ -1146,7 +1162,14 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		look.horizontalSizing(Sizing.expand());
 		tip(look, "Click to change the label, range, format and colours");
 		row.child(look);
-		LabelComponent marker = label(line.advanced ? "§b✎" : "§8›");
+		UIComponent marker;
+		if (line.advanced) {
+			FlowLayout pencil = UIContainers.horizontalFlow(Sizing.fixed(8), Sizing.fixed(PENCIL_ICON.length));
+			pencil.surface((graphics, c) -> drawIcon(graphics, PENCIL_ICON, c.x(), c.y(), false, 0xFF55FFFF));
+			marker = pencil;
+		} else {
+			marker = label("§8›");
+		}
 		marker.margins(Insets.right(2));
 		if (line.advanced) tip(marker, "Uses custom text");
 		row.child(marker);
@@ -1169,7 +1192,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent back = button("‹ Back", b -> backToLines());
 		tip(back, "Back to the box (Esc)");
 		header.child(back);
-		ButtonComponent remove = dangerButton("Remove", b -> {
+		ButtonComponent remove = iconTextButton(REMOVE, "§cRemove", null, b -> {
 			box.lines.remove(line);
 			editedIndex = -1;
 			scrollToRow = Math.min(index, box.lines.size() - 1);
@@ -1179,7 +1202,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		String range = value.ranges().size() > 1 && !line.advanced ? " · " + line.range.displayName() : "";
 		// back, remove, gaps
 		LabelComponent title = label(clip("§7" + value.displayName() + range,
-				INNER - font.width("‹ Back") - 8 - dangerWidth("Remove") - 8));
+				INNER - font.width("‹ Back") - 8 - fixedWidth(remove) - 8));
 		title.horizontalSizing(Sizing.expand());
 		header.child(title);
 		header.child(remove);
@@ -1192,6 +1215,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		preview = label("");
 		previewLine = line;
 		look.child(preview);
+		if (!line.shown) {
+			look.child(spacer());
+			LabelComponent hidden = label("§7" + HIDDEN_NOTE);
+			tip(hidden, "This line is hidden. Tick it in the box's line list to show it.");
+			look.child(hidden);
+		}
 		panel.child(look);
 
 		if (!line.advanced) {
@@ -1256,9 +1285,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 
 		// same button turns it off again, text is kept
-		FlowLayout customHead = heading("Custom text §8(ADVANCED)");
-		customHead.child(UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1)));
-		ButtonComponent custom = iconTextButton(PENCIL_ICON, line.advanced ? "§eTurn off" : "Turn on", b -> {
+		ButtonComponent custom = iconTextButton(pixels(PENCIL_ICON), line.advanced ? "§eTurn off" : "Turn on", null, b -> {
 			if (!line.advanced && (line.text == null || line.text.isBlank())) line.text = HudBoxText.basicText(box, line);
 			line.advanced = !line.advanced;
 			rebuildPanel();
@@ -1266,6 +1293,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		tip(custom, line.advanced ? "Back to the label, range, format and colours. Your text is kept for next time."
 				: "Type the whole line yourself, with colours like &e and values like {spawn_timer}. "
 						+ "For two values on one line, or a colour per word. Starts from how the line looks now.");
+		// clipped, caxton fonts push the button out
+		FlowLayout customHead = heading(clip("Custom text §8(ADVANCED)", INNER - fixedWidth(custom) - 2));
+		customHead.child(spacer());
 		customHead.child(custom);
 		panel.child(customHead);
 		if (line.advanced) customText(box, line);
@@ -1309,7 +1339,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		freeHint.maxWidth(INNER);
 		freeHintText = TEXT_HINT;
 		panel.child(freeHint);
-		ButtonComponent again = iconTextButton(RESET_ICON, "Reset", b -> {
+		ButtonComponent again = iconTextButton(pixels(RESET_ICON), "Reset", null, b -> {
 			line.text = HudBoxText.basicText(box, line);
 			rebuildPanel();
 		});
@@ -1327,9 +1357,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private void refreshLinePage() {
 		if (preview != null) {
 			String text = HudBoxText.line(panelBox, previewLine, hud.data(), true);
+			if (!previewLine.shown) text = "§8" + strip(text);
 			if (!text.equals(previewRaw)) {
 				previewRaw = text;
-				preview.text(Component.literal(clip(text, INNER - 8)));
+				// padding, + note and gap if hidden
+				int room = INNER - 8 - (previewLine.shown ? 0 : font.width(HIDDEN_NOTE) + 4);
+				preview.text(Component.literal(clip(text, room)));
 			}
 		}
 		if (freeHint == null) return;
@@ -1494,8 +1527,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent color = colorButton(rule.color, null, code -> rule.color = code);
 		tip(color, "Colour when the rule matches");
 		row.child(color);
-		row.child(UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1)));
-		ButtonComponent remove = dangerButton("", b -> {
+		row.child(spacer());
+		ButtonComponent remove = iconTextButton(REMOVE, "", "Remove this rule", b -> {
 			line.rules.remove(rule);
 			if (line.rules.isEmpty()) line.rules = null;
 			rebuildPanel();
@@ -1547,7 +1580,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	private int lineHandleAt(double x, double y) {
 		// rows scrolled out of view keep their bounds, under the toolbar on narrow screens
-		if (panelScroll == null || !panelScroll.isInBoundingBox(x, y)) return -1;
+		if (!inPanel(x, y)) return -1;
 		for (int i = 0; i < lineHandles.size(); i++) {
 			for (UIComponent handle : lineHandles.get(i)) {
 				if (handle.isInBoundingBox(x, y)) return i;
@@ -1560,7 +1593,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private ButtonComponent colorButton(String current, String boxColor, Consumer<String> setColor) {
 		String text = current == null ? "§fBox §7▾" : "§7▾";
 		int shown = colorIndex(current != null ? current : boxColor);
-		ButtonComponent button = button("", b -> colorMenu(b, current, boxColor, setColor));
+		ButtonComponent button = drawnButton("Colour: " + COLOR_NAMES[shown], b -> colorMenu(b, current, boxColor, setColor));
 		button.verticalSizing(Sizing.fixed(CHOICE));
 		button.horizontalSizing(Sizing.fixed(4 + 8 + 3 + font.width(text) + 4));
 		button.renderer((graphics, b, delta) -> {
@@ -1710,27 +1743,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return check;
 	}
 
-	// red, w/ vanilla's remove sprite (no font glyph, caxton safe). text "" = icon only
-	private ButtonComponent dangerButton(String text, Consumer<ButtonComponent> action) {
-		String shown = text.isEmpty() ? "" : "§c" + text;
-		ButtonComponent button = button("", action);
-		button.horizontalSizing(Sizing.fixed(dangerWidth(text)));
-		button.renderer((graphics, b, delta) -> {
-			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
-			int x = text.isEmpty() ? b.getX() + (b.getWidth() - 8) / 2 : b.getX() + 5;
-			graphics.blitSprite(RenderPipelines.GUI_TEXTURED, REMOVE_ICON, x, b.getY() + (b.getHeight() - 7) / 2, 8, 7);
-			if (!shown.isEmpty()) graphics.text(font, shown, x + 11, b.getY() + (b.getHeight() - 8) / 2, 0xFFFFFFFF, true);
-		});
-		return button;
-	}
-
-	private int dangerWidth(String text) {
-		return text.isEmpty() ? CHOICE + 2 : 5 + 8 + 3 + font.width(text) + 5;
-	}
-
 	// pixels bc fonts ↶ is tiny
 	private static ButtonComponent iconButton(boolean redo, Consumer<ButtonComponent> action) {
-		ButtonComponent button = button("", action);
+		ButtonComponent button = drawnButton(redo ? "Redo" : "Undo", action);
 		button.horizontalSizing(Sizing.fixed(BUTTON + 4));
 		button.renderer((graphics, b, delta) -> {
 			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
@@ -1740,16 +1755,33 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return button;
 	}
 
-	private ButtonComponent iconTextButton(String[] icon, String text, Consumer<ButtonComponent> action) {
-		ButtonComponent button = button("", action);
-		button.horizontalSizing(Sizing.fixed(5 + 8 + 4 + font.width(text) + 5));
+	private interface Icon {
+		void draw(GuiGraphicsExtractor graphics, int x, int y, int height);
+	}
+
+	// no font glyph, caxton safe
+	private static final Icon REMOVE = (graphics, x, y, h) -> graphics.blitSprite(RenderPipelines.GUI_TEXTURED, REMOVE_ICON, x,
+			y + (h - 7) / 2, 8, 7);
+
+	private static Icon pixels(String[] icon) {
+		return (graphics, x, y, h) -> drawIcon(graphics, icon, x, y + (h - icon.length) / 2, false, 0xFFFFFFFF);
+	}
+
+	// 8 wide icon + text. text "" = icon only
+	private ButtonComponent iconTextButton(Icon icon, String text, String name, Consumer<ButtonComponent> action) {
+		ButtonComponent button = drawnButton(text.isEmpty() ? name : text, action);
+		button.horizontalSizing(Sizing.fixed(text.isEmpty() ? CHOICE + 2 : 5 + 8 + 4 + font.width(text) + 5));
 		button.renderer((graphics, b, delta) -> {
 			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
-			int x = b.getX() + 5;
-			drawIcon(graphics, icon, x, b.getY() + (b.getHeight() - icon.length) / 2, false, 0xFFFFFFFF);
-			graphics.text(font, text, x + 12, b.getY() + (b.getHeight() - 8) / 2, 0xFFFFFFFF, true);
+			int x = text.isEmpty() ? b.getX() + (b.getWidth() - 8) / 2 : b.getX() + 5;
+			icon.draw(graphics, x, b.getY(), b.getHeight());
+			if (!text.isEmpty()) graphics.text(font, text, x + 12, b.getY() + (b.getHeight() - 8) / 2, 0xFFFFFFFF, true);
 		});
 		return button;
+	}
+
+	private static int fixedWidth(UIComponent c) {
+		return c.horizontalSizing().get().value;
 	}
 
 	private static void drawIcon(GuiGraphicsExtractor graphics, String[] icon, int x0, int y0, boolean mirror, int color) {
@@ -1767,6 +1799,32 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		button.horizontalSizing(Sizing.content(4));
 		button.verticalSizing(Sizing.fixed(BUTTON));
 		return button;
+	}
+
+	// owo draws the message too, so empty msg + narrator name
+	private static ButtonComponent drawnButton(String name, Consumer<ButtonComponent> action) {
+		ButtonComponent button = new DrawnButton(strip(name), action);
+		button.horizontalSizing(Sizing.content(4));
+		button.verticalSizing(Sizing.fixed(BUTTON));
+		return button;
+	}
+
+	private static final class DrawnButton extends ButtonComponent {
+		private final String name;
+
+		DrawnButton(String name, Consumer<ButtonComponent> action) {
+			super(Component.empty(), action);
+			this.name = name;
+		}
+
+		@Override
+		protected MutableComponent createNarrationMessage() {
+			return wrapDefaultNarrationMessage(Component.literal(name));
+		}
+	}
+
+	private static FlowLayout spacer() {
+		return UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1));
 	}
 
 	private static LabelComponent section(String text) {

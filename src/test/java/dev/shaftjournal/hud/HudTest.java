@@ -256,7 +256,12 @@ class HudTest {
 		assertNull(campfires.range, "values that aren't counted over shafts have no range");
 		assertEquals(List.of("§7Powder: §f137.2k/h", "§7Campfires: §f1"), HudBoxText.lines(box, HudData.EXAMPLE, false));
 		HudData empty = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
-		assertEquals(List.of("§7Powder: §f-", "§7Campfires: §f-"), HudBoxText.lines(box, empty, false), "no /h after the dash");
+		assertEquals(List.of("§7Powder: §f.", "§7Campfires: §f-"), HudBoxText.lines(box, empty, false),
+				"a rate thats not ready yet shows waiting dots, no /h");
+		HudData later = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 1_200, ShaftNames.defaults());
+		assertEquals("§7Powder: §f...", HudBoxText.lines(box, later, false).getFirst(), "the dots count up over time");
+		assertEquals(List.of(".", "..", "...", "."), List.of(HudBoxText.waiting(0), HudBoxText.waiting(600),
+				HudBoxText.waiting(1_200), HudBoxText.waiting(1_800)));
 		perHour.range = Range.ALL_TIME;
 		assertEquals("§7Powder: §f0", HudBoxText.lines(box, empty, false).getFirst(), "the HUD shows the real zero");
 		assertEquals("§7Powder: §f1.2M", HudBoxText.lines(box, empty, true).getFirst(), "the editor shows the example");

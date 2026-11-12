@@ -15,6 +15,8 @@ public final class HudBoxText {
 	private static final Pattern ANY_TAG = Pattern.compile("\\{[^{}]*}");
 	// &k left out on purpose
 	private static final String STYLES = "lonm";
+	// display choice, 3 HUD refreshes
+	private static final long WAIT_STEP_MILLIS = 600;
 
 	private HudBoxText() {
 	}
@@ -174,7 +176,18 @@ public final class HudBoxText {
 	}
 
 	static String text(HudValue value, Range range, int format, HudData data, boolean example) {
-		return formatted(value, range, format, value(value, range, data, example));
+		Object v = value(value, range, data, example);
+		return v == null && rate(value, range) ? waiting(data.now()) : formatted(value, range, format, v);
+	}
+
+	// rates wait for 1 saved shaft + JournalStats.MIN_RATE_MILLIS
+	private static boolean rate(HudValue value, Range range) {
+		return value == HudValue.SHAFTS_PER_HOUR || (range == Range.PER_HOUR && value.hasRange(range));
+	}
+
+	// . .. ... so it looks like its waiting, not broken
+	static String waiting(long now) {
+		return ".".repeat(1 + (int) (now / WAIT_STEP_MILLIS % 3));
 	}
 
 	private static Object value(HudValue value, Range range, HudData data, boolean example) {

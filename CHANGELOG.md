@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.11.2 (2026-11-12)
+Fixes from a code review of 0.11.1, plus waiting dots for rates.
+- **Per hour values that aren't ready yet** (Powder, Fine, Shafts per hour) show **. .. ...** counting up
+  instead of "-". A rate needs 1 saved shaft and a session of at least 5 minutes. Nick's pick.
+- The side panel keeps its full height, but **only the part with content is drawn and clickable**. Boxes
+  under the empty part show through and can be clicked and dragged again.
+- The **Custom text** heading is cut short when a wide font (Caxton) would push the Turn on/off button out of
+  the panel.
+- The pinned **custom text help** also keeps clear of a toolbar at the top of the screen.
+- The line page shows when a line is **hidden**: a greyed preview with a "hidden" note.
+- The **pencil** in the line list is drawn as pixels too, like the Turn on/off button.
+- Icon buttons (undo, redo, colours, remove, Reset, Turn on/off, Delete box) have names for the narrator.
+- The gap between an icon and its text is the same 4 px on every button.
+
 ## 0.11.1 (2026-11-12)
 Edit HUD: Nick's tweaks after trying 0.11.0.
 - The side panel always runs the **full height of the screen**, so it doesn't jump around with its content.
