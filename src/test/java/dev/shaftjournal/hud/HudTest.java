@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -14,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import com.google.gson.JsonParseException;
 
 import dev.shaftjournal.detection.Corpse;
+import dev.shaftjournal.detection.RecordingReplay;
+import dev.shaftjournal.detection.ShaftEvent;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.hud.HudData.SessionTotals;
 import dev.shaftjournal.hud.HudData.Totals;
@@ -345,14 +350,12 @@ class HudTest {
 	}
 
 	@Test
-	void coldThresholds() throws Exception {
+	void coldThresholds() {
 		Line cold = new Line(HudValue.SHAFT_COLD);
 		cold.readyRule = true;
-		java.lang.reflect.Method put = HudData.class.getDeclaredMethod("cold", int.class);
-		put.setAccessible(true);
 		for (int[] c : new int[][] {{-49, 0}, {-50, 'e'}, {-79, 'e'}, {-80, 'c'}, {-99, 'c'}}) {
-			HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
-			put.invoke(data, c[0]);
+			HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults())
+					.cold(c[0]);
 			assertEquals(c[1] == 0 ? null : String.valueOf((char) c[1]), HudColors.color(cold, data, false), "cold " + c[0]);
 		}
 	}
@@ -387,5 +390,79 @@ class HudTest {
 		assertNull(lines.get(1).rules, "corpses aren't a number");
 		assertFalse(lines.get(2).advanced, "free text without text falls back to the basic line");
 		assertEquals(read.toJson(), HudLayout.fromJson(read.toJson()).toJson());
+	}
+
+	@Test
+	void freeTextRuleFollowsTheRangeInItsText() {
+		Line powder = new Line(HudValue.SESSION_POWDER);
+		HudLayout.ColorRule big = new HudLayout.ColorRule();
+		big.value = 1_000_000;
+		powder.rules = new java.util.ArrayList<>(List.of(big));
+		Box box = new Box();
+		box.lines.add(powder);
+		assertEquals("§7Powder: §f43,436", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(), "the session is under 1M");
+		powder.advanced = true;
+		powder.text = "Powder {session_powder:all_time} ({session_powder})";
+		assertEquals(Range.ALL_TIME, HudBoxText.ruleRange(powder));
+		assertEquals("§7Powder §c1,204,310§7 (43,436)", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst(),
+				"the first tag of the line's value sets the range the rule looks at and colours");
+		powder.text = "Powder {shaft_type}";
+		assertEquals(Range.SESSION, HudBoxText.ruleRange(powder), "no tag of its own: the line's range");
+	}
+
+	@Test
+	void timeRulesCompareTheShownSeconds() {
+		Line spawn = new Line(HudValue.SPAWN_TIMER);
+		HudLayout.ColorRule slow = new HudLayout.ColorRule();
+		slow.value = 90;
+		spawn.rules = new java.util.ArrayList<>(List.of(slow));
+		HudData at90 = HudData.live(SessionTotals.NONE, Totals.NONE, null, 90_900L, null, 0, ShaftNames.defaults());
+		assertNull(HudColors.color(spawn, at90, false), "1:30.9 shows as 1:30, which isn't over 1:30");
+		HudData at91 = HudData.live(SessionTotals.NONE, Totals.NONE, null, 91_000L, null, 0, ShaftNames.defaults());
+		assertEquals("c", HudColors.color(spawn, at91, false));
+	}
+
+	@Test
+	void coldIsANumber() {
+		HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults()).cold(-12);
+		assertEquals("-12❄", HudBoxText.text(HudValue.SHAFT_COLD, null, 0, data, false));
+		assertEquals(-12.0, data.number(HudValue.SHAFT_COLD, null, false));
+		assertNull(data.number(HudValue.SHAFT_TYPE, null, true), "text has no number");
+	}
+
+	@Test
+	void thresholdCommasAndMinus() {
+		assertEquals(2.5, HudFormat.parseThreshold(Kind.DECIMAL, "2,5"), "a lone comma is a decimal point");
+		assertEquals(1500.0, HudFormat.parseThreshold(Kind.INTEGER, "1,500"), "groups of three are thousands");
+		assertEquals(1_204_310.0, HudFormat.parseThreshold(Kind.INTEGER, "1,204,310"));
+		assertNull(HudFormat.parseThreshold(Kind.INTEGER, "1,2,3"));
+		assertNull(HudFormat.parseThreshold(Kind.TIME, "1-2:30"));
+		assertEquals(-30.0, HudFormat.parseThreshold(Kind.TIME, "-0:30"));
+		assertNull(HudFormat.parseThreshold(Kind.DECIMAL, "1e5"));
+		assertNull(HudFormat.parseThreshold(Kind.DECIMAL, "NaN"));
+		assertNull(HudFormat.parseThreshold(Kind.TIME, "99999999999999999999:00"));
+		assertEquals(0.5, HudFormat.parseThreshold(Kind.DECIMAL, ".5"));
+	}
+
+	@Test
+	void totalsAddUp() {
+		assertEquals(new Totals(3, 30, 1.5), new Totals(1, 10, 0.5).plus(new Totals(2, 20, 1)));
+	}
+
+	/** The "Shaft" range while inside is the same as the shaft's saved entry once it's left. Recording 3. */
+	@Test
+	void shaftTotalsMatchTheSavedEntry() throws Exception {
+		Path recording = RecordingReplay.RECORDINGS.resolve("2026-11-11_14-13-53.jsonl");
+		assumeTrue(Files.exists(recording), "Recording not available: " + recording);
+		TextPatterns patterns = TextPatterns.defaults();
+		List<Totals> inside = new java.util.ArrayList<>();
+		for (ShaftEvent event : RecordingReplay.replay(recording)) {
+			if (!(event instanceof ShaftEvent.ShaftLeft left)) continue;
+			JournalEntry entry = JournalEntry.of(left.shaft(), 0, null, patterns);
+			inside.add(Totals.of(left.shaft(), patterns));
+			assertEquals(Totals.of(List.of(entry), patterns), inside.getLast());
+		}
+		assertEquals(2, inside.size());
+		assertEquals(5759 + 4791 + 1510, inside.getFirst().powder(), "the Aquamarine shaft: corpses plus the exit bonus");
 	}
 }

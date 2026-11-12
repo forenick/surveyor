@@ -67,6 +67,19 @@ public final class LiveJournal {
 		return List.copyOf(entries);
 	}
 
+	/** A copy of the entries from this index on. Call on the client thread. */
+	public List<JournalEntry> entries(int from) {
+		return List.copyOf(entries.subList(from, entries.size()));
+	}
+
+	/**
+	 * The oldest entry, or null. It changes when the journal file loads, as its entries go in front of
+	 * any saved since the game started. Call on the client thread.
+	 */
+	public JournalEntry firstEntry() {
+		return entries.isEmpty() ? null : entries.getFirst();
+	}
+
 	/** See {@link Journal#activeSession}. A new object whenever the session or its totals change. */
 	public Journal.Session activeSession(long now) {
 		return journal.activeSession(now);

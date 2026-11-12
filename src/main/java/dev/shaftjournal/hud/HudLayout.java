@@ -26,6 +26,8 @@ public final class HudLayout {
 	/** The smallest and largest box size. */
 	public static final float MIN_SCALE = 0.5f;
 	public static final float MAX_SCALE = 2;
+	/** The 16 Minecraft colour codes, in order. */
+	public static final String COLOR_CODES = "0123456789abcdef";
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	/** Version 2's single choice of where a box shows. Only read to convert old files. */
@@ -343,7 +345,7 @@ public final class HudLayout {
 	}
 
 	private static boolean isColor(String code) {
-		return code != null && code.length() == 1 && "0123456789abcdef".indexOf(code.charAt(0)) >= 0;
+		return code != null && code.length() == 1 && COLOR_CODES.indexOf(code.charAt(0)) >= 0;
 	}
 
 	private static float clamp(float value, float min, float max) {

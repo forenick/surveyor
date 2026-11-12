@@ -32,8 +32,6 @@ public final class HudData {
 	}
 
 	private final Map<Key, Object> values = new HashMap<>();
-	/** Numbers behind values shown as text, for colour rules: Cold's -12 behind "-12❄". */
-	private final Map<Key, Double> numbers = new HashMap<>();
 	/** Values that are real but say nothing yet (a session's zeros before its first shaft); the editor shows examples. */
 	private final Set<Key> placeholders = new HashSet<>();
 
@@ -62,7 +60,7 @@ public final class HudData {
 	public Double number(HudValue value, Range range, boolean example) {
 		Key key = key(value, range);
 		HudData from = example && (values.get(key) == null || placeholders.contains(key)) ? EXAMPLE : this;
-		return from.values.get(key) instanceof Number n ? (Double) n.doubleValue() : from.numbers.get(key);
+		return from.values.get(key) instanceof Number n ? n.doubleValue() : null;
 	}
 
 	/** Leaves out ranges the value doesn't have, so a hand-edited file can't ask for one. */
@@ -83,6 +81,10 @@ public final class HudData {
 	public record Totals(long shafts, long powder, double fine) {
 		public static final Totals NONE = new Totals(0, 0, 0);
 
+		public Totals plus(Totals other) {
+			return new Totals(shafts + other.shafts, powder + other.powder, fine + other.fine);
+		}
+
 		public static Totals of(List<JournalEntry> entries, TextPatterns patterns) {
 			long powder = 0;
 			double fine = 0;
@@ -95,8 +97,7 @@ public final class HudData {
 
 		/** The shaft the player is in, so far: corpse loot, plus the powder for leaving once it's known. */
 		public static Totals of(Shaft shaft, TextPatterns patterns) {
-			long powder = shaft.loots().stream().mapToLong(CorpseLoot::powder).sum() + shaft.exitPowder();
-			return new Totals(1, powder, fine(shaft.loots(), patterns));
+			return new Totals(1, JournalStats.powder(shaft.loots(), shaft.exitPowder()), fine(shaft.loots(), patterns));
 		}
 
 		private static double fine(List<CorpseLoot> loots, TextPatterns patterns) {
@@ -216,8 +217,8 @@ public final class HudData {
 				.put(HudValue.SHAFT_CAMPFIRES, 1L);
 	}
 
-	private HudData cold(int cold) {
-		numbers.put(key(HudValue.SHAFT_COLD, null), (double) cold);
-		return put(HudValue.SHAFT_COLD, cold + "❄");
+	/** Package-private for tests. */
+	HudData cold(int cold) {
+		return put(HudValue.SHAFT_COLD, (long) cold);
 	}
 }

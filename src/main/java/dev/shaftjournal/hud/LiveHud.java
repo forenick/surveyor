@@ -53,8 +53,9 @@ public final class LiveHud {
 	/** The session {@link #totals} were added up for; a new object whenever a shaft is saved. */
 	private Journal.Session totalsSession;
 	private SessionTotals totals = SessionTotals.NONE;
-	/** How many saved shafts {@link #allTime} and {@link #lastShaft} were added up from. */
+	/** How many saved shafts {@link #allTime} and {@link #lastShaft} were added up from, and the first of them. */
 	private int totalsEntries;
+	private JournalEntry totalsFirst;
 	private Totals allTime = Totals.NONE;
 	/** The last saved shaft, or null before the first. */
 	private Totals lastShaft;
@@ -214,10 +215,14 @@ public final class LiveHud {
 			totals = SessionTotals.of(journal.sessionEntries(session), patterns);
 		}
 		if (journal.entryCount() != totalsEntries) {
-			List<JournalEntry> entries = journal.entries();
-			totalsEntries = entries.size();
-			allTime = Totals.of(entries, patterns);
-			lastShaft = entries.isEmpty() ? null : Totals.of(List.of(entries.getLast()), patterns);
+			// Only the new shafts are added. When the file has just loaded in front of them, it's all again.
+			JournalEntry first = journal.firstEntry();
+			boolean again = first != totalsFirst;
+			List<JournalEntry> added = journal.entries(again ? 0 : totalsEntries);
+			allTime = (again ? Totals.NONE : allTime).plus(Totals.of(added, patterns));
+			totalsFirst = first;
+			totalsEntries = journal.entryCount();
+			lastShaft = added.isEmpty() ? lastShaft : Totals.of(List.of(added.getLast()), patterns);
 		}
 		// This shaft: the one the player is in, else the last one, so it can be read while searching.
 		Totals thisShaft = shaft != null ? Totals.of(shaft, patterns) : lastShaft;

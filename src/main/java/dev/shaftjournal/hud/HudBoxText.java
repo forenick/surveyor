@@ -2,7 +2,6 @@ package dev.shaftjournal.hud;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,7 +14,6 @@ public final class HudBoxText {
 	private static final String TITLE_STYLE = "§e§l";
 	/** {value_id}, or {value_id:option:option} where the options pick a range and a number format. */
 	private static final Pattern TAG = Pattern.compile("\\{([a-z_]+)((?::[a-z_]+)*)}");
-	private static final String COLORS = "0123456789abcdef";
 	/** Bold, italic, underline and strikethrough; obfuscated (&k) is left out on purpose. */
 	private static final String STYLES = "lonm";
 
@@ -56,8 +54,8 @@ public final class HudBoxText {
 			Tag tag = Tag.parse(matcher.group(1), matcher.group(2));
 			String replacement = matcher.group();
 			if (tag != null) {
-				Object v = example ? data.getOrExample(tag.value(), tag.range()) : data.get(tag.value(), tag.range());
-				replacement = v == null ? "" : tag.text(data, example);
+				Object v = value(tag.value(), tag.range(), data, example);
+				replacement = v == null ? "" : formatted(tag.value(), tag.range(), tag.format(), v);
 			}
 			matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
 		}
@@ -67,8 +65,9 @@ public final class HudBoxText {
 
 	/**
 	 * A free-text line: &amp; codes become § codes, tags become values. Plain text starts in the box's label
-	 * colour, and &amp;r goes back to it. When a colour rule fires, the line's own value takes its colour, and
-	 * the text after it goes on in the colour it had. A tag with an unknown value or option stays as typed.
+	 * colour, and &amp;r goes back to it. When a colour rule fires, the line's own value (in its
+	 * {@link #ruleRange}) takes its colour, and the text after it goes on in the colour it had. A tag with an
+	 * unknown value or option stays as typed.
 	 *
 	 * @param rule the colour code a rule gives the line's value, or null
 	 */
@@ -78,12 +77,13 @@ public final class HudBoxText {
 		String color = box.labelColor;
 		StringBuilder styles = new StringBuilder();
 		Matcher tags = TAG.matcher(text);
+		Range own = rule == null ? null : ruleRange(line);
 		int i = 0;
 		while (i < text.length()) {
 			char c = text.charAt(i);
 			if (c == '&' && i + 1 < text.length()) {
 				char code = Character.toLowerCase(text.charAt(i + 1));
-				if (COLORS.indexOf(code) >= 0 || code == 'r') {
+				if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r') {
 					// A colour ends the styles before it, as in Minecraft.
 					color = code == 'r' ? box.labelColor : String.valueOf(code);
 					styles.setLength(0);
@@ -101,10 +101,10 @@ public final class HudBoxText {
 			if (c == '{' && tags.region(i, text.length()).lookingAt()) {
 				Tag tag = Tag.parse(tags.group(1), tags.group(2));
 				if (tag != null) {
-					boolean own = rule != null && tag.value() == line.hudValue() && tag.range() == line.range;
-					if (own) out.append('§').append(rule).append(codes(styles));
+					boolean colored = rule != null && tag.value() == line.hudValue() && tag.range() == own;
+					if (colored) out.append('§').append(rule).append(codes(styles));
 					out.append(tag.text(data, example));
-					if (own) out.append('§').append(color).append(codes(styles));
+					if (colored) out.append('§').append(color).append(codes(styles));
 					i = tags.end();
 					continue;
 				}
@@ -113,6 +113,21 @@ public final class HudBoxText {
 			i++;
 		}
 		return out.toString();
+	}
+
+	/**
+	 * The range a line's colour rules look at. A free-text line's range is set in its text, so it's the range
+	 * of the first tag of the line's own value there; without one, or for a basic line, the line's range.
+	 */
+	public static Range ruleRange(Line line) {
+		HudValue value = line.hudValue();
+		if (!line.advanced || line.text == null || value == null) return line.range;
+		Matcher tags = TAG.matcher(line.text);
+		while (tags.find()) {
+			Tag tag = Tag.parse(tags.group(1), tags.group(2));
+			if (tag != null && tag.value() == value) return tag.range();
+		}
+		return line.range;
 	}
 
 	/** The free text a line starts from when switched to it: the same look as its basic version. */
@@ -130,7 +145,15 @@ public final class HudBoxText {
 
 	/** The value as a line shows it; a rate gets "/h", but not the dash for a missing one. */
 	static String text(HudValue value, Range range, int format, HudData data, boolean example) {
-		Object v = example ? data.getOrExample(value, range) : data.get(value, range);
+		return formatted(value, range, format, value(value, range, data, example));
+	}
+
+	private static Object value(HudValue value, Range range, HudData data, boolean example) {
+		return example ? data.getOrExample(value, range) : data.get(value, range);
+	}
+
+	/** @param v the value, or null while it's missing */
+	private static String formatted(HudValue value, Range range, int format, Object v) {
 		String text = HudFormat.format(value.kind(), format, v);
 		return v != null && range == Range.PER_HOUR ? text + "/h" : text;
 	}
@@ -145,7 +168,7 @@ public final class HudBoxText {
 			int format = 0;
 			for (String option : options.split(":")) {
 				if (option.isEmpty()) continue;
-				Range r = range(option);
+				Range r = Range.byTagName(option);
 				int f = HudFormat.names(value.kind()).indexOf(option);
 				if (value.hasRange(r)) range = r;
 				else if (f >= 0) format = f;
@@ -157,18 +180,11 @@ public final class HudBoxText {
 		/** The tag for this value, leaving out the options that are the defaults. */
 		static String of(HudValue value, Range range, int format) {
 			StringBuilder tag = new StringBuilder("{").append(value.id());
-			if (range != null && range != value.defaultRange()) tag.append(':').append(range.name().toLowerCase(Locale.ROOT));
+			if (range != null && range != value.defaultRange()) tag.append(':').append(range.tagName());
 			if (format > 0 && format < HudFormat.names(value.kind()).size()) {
 				tag.append(':').append(HudFormat.names(value.kind()).get(format));
 			}
 			return tag.append('}').toString();
-		}
-
-		private static Range range(String option) {
-			for (Range r : Range.values()) {
-				if (r.name().toLowerCase(Locale.ROOT).equals(option)) return r;
-			}
-			return null;
 		}
 
 		String text(HudData data, boolean example) {

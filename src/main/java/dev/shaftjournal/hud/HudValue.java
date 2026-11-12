@@ -1,6 +1,7 @@
 package dev.shaftjournal.hud;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Every value a HUD line can show. The ID is what the config file and (later) text tags use, so
@@ -16,7 +17,7 @@ public enum HudValue {
 	SHAFT_TYPE("shaft_type", "Shaft type", Kind.TEXT, "Shaft: "),
 	SHAFT_TIME("shaft_time", "Time inside", Kind.TIME, "Inside: "),
 	SHAFT_CORPSES("shaft_corpses", "Corpses", Kind.TEXT, "Corpses: "),
-	SHAFT_COLD("shaft_cold", "Cold", Kind.TEXT, "Cold: "),
+	SHAFT_COLD("shaft_cold", "Cold", Kind.COLD, "Cold: "),
 	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Kind.INTEGER, "Campfires: ");
 
 	/**
@@ -39,6 +40,19 @@ public enum HudValue {
 		public String displayName() {
 			return displayName;
 		}
+
+		/** The name in free-text tags, e.g. "all_time" in {session_powder:all_time}. */
+		public String tagName() {
+			return name().toLowerCase(Locale.ROOT);
+		}
+
+		/** The range with this tag name, or null. */
+		public static Range byTagName(String name) {
+			for (Range range : values()) {
+				if (range.tagName().equals(name)) return range;
+			}
+			return null;
+		}
 	}
 
 	/** How a value is stored and which number formats it offers. */
@@ -49,6 +63,8 @@ public enum HudValue {
 		INTEGER,
 		/** A Double. */
 		DECIMAL,
+		/** Cold, as a Long; shown with ❄ like the scoreboard, e.g. "-12❄". */
+		COLD,
 		/** A ready-made String. */
 		TEXT
 	}
@@ -103,9 +119,9 @@ public enum HudValue {
 		return hasRange(Range.SESSION) ? Range.SESSION : ranges.isEmpty() ? null : ranges.getFirst();
 	}
 
-	/** Whether colour thresholds can compare it: every number, and Cold (shown as text like "-12❄"). */
+	/** Whether colour thresholds can compare it: every value that isn't text. */
 	public boolean hasNumber() {
-		return kind != Kind.TEXT || this == SHAFT_COLD;
+		return kind != Kind.TEXT;
 	}
 
 	/** The value with this ID, or null. */

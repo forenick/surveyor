@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 
 import dev.shaftjournal.detection.Corpse;
+import dev.shaftjournal.detection.CorpseLoot;
 import dev.shaftjournal.detection.TextPatterns;
 
 /**
@@ -140,7 +141,12 @@ public final class JournalStats {
 
 	/** Corpse powder plus the powder for leaving. */
 	public static long powder(JournalEntry entry) {
-		return entry.corpsePowder() + entry.exitPowder();
+		return powder(entry.loots(), entry.exitPowder());
+	}
+
+	/** Glacite Powder from corpses plus the "BYE!" bonus: a saved shaft's, or one still being played. */
+	public static long powder(List<CorpseLoot> loots, long exitPowder) {
+		return loots.stream().mapToLong(CorpseLoot::powder).sum() + exitPowder;
 	}
 
 	/** Looted and seen corpses per type, in the order the types first appear (tab list order). */

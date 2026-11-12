@@ -32,25 +32,32 @@ public final class HudColors {
 	public static String color(Line line, HudData data, boolean example) {
 		HudValue value = line.hudValue();
 		if (value == null || !value.hasNumber()) return null;
-		Double number = data.number(value, line.range, example);
+		Double number = data.number(value, HudBoxText.ruleRange(line), example);
 		if (number == null) return null;
+		double shown = shown(value.kind(), number);
 		if (line.rules != null) {
-			// Thresholds for times are typed in seconds; the value is in milliseconds.
-			double compared = value.kind() == Kind.TIME ? number / 1000 : number;
 			for (ColorRule rule : line.rules) {
-				if (rule.matches(compared)) return rule.color;
+				if (rule.matches(shown)) return rule.color;
 			}
 		}
-		return line.readyRule ? ready(value, number, data, example) : null;
+		return line.readyRule ? ready(value, shown, data, example) : null;
 	}
 
-	private static String ready(HudValue value, double number, HudData data, boolean example) {
+	/**
+	 * The number as the line shows it, in the unit thresholds are typed in: whole seconds for times
+	 * (as 1:30 is shown until 1:31), so "over 1:30" doesn't colour a "1:30".
+	 */
+	private static double shown(Kind kind, double number) {
+		return kind == Kind.TIME ? Math.floor(number / 1000) : number;
+	}
+
+	private static String ready(HudValue value, double shown, HudData data, boolean example) {
 		return switch (value) {
 			case SPAWN_TIMER -> {
 				Double average = data.number(HudValue.AVERAGE_SPAWN, Range.SESSION, example);
-				yield average != null && number > average ? "c" : null;
+				yield average != null && shown > shown(Kind.TIME, average) ? "c" : null;
 			}
-			case SHAFT_COLD -> number <= COLD_RED ? "c" : number <= COLD_YELLOW ? "e" : null;
+			case SHAFT_COLD -> shown <= COLD_RED ? "c" : shown <= COLD_YELLOW ? "e" : null;
 			default -> null;
 		};
 	}

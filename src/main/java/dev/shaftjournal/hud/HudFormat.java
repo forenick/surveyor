@@ -2,6 +2,8 @@ package dev.shaftjournal.hud;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import dev.shaftjournal.hud.HudValue.Kind;
 
@@ -13,11 +15,16 @@ public final class HudFormat {
 	private static final List<String> TIME = List.of("1:42", "1m 42s", "102s");
 	private static final List<String> INTEGER = List.of("43,436", "43.4k", "43436");
 	private static final List<String> DECIMAL = List.of("19.4", "19", "19.42");
+	private static final List<String> COLD = List.of("-12❄");
 	private static final List<String> TEXT = List.of("Text");
 	/** The formats' names in free-text tags, e.g. {session_powder:short}; same order as the examples above. */
 	private static final List<String> TIME_NAMES = List.of("clock", "minutes", "seconds");
 	private static final List<String> INTEGER_NAMES = List.of("comma", "short", "plain");
 	private static final List<String> DECIMAL_NAMES = List.of("tenths", "whole", "hundredths");
+	/** A time threshold as minutes:seconds, e.g. "1:30" or "-0:30". */
+	private static final Pattern CLOCK = Pattern.compile("(-?)(\\d+):(\\d{2})");
+	/** Commas between groups of three digits, as the HUD shows numbers: "43,436". */
+	private static final Pattern GROUPED = Pattern.compile("-?\\d{1,3}(,\\d{3})+(\\.\\d+)?");
 
 	private HudFormat() {
 	}
@@ -28,40 +35,47 @@ public final class HudFormat {
 			case TIME -> TIME;
 			case INTEGER -> INTEGER;
 			case DECIMAL -> DECIMAL;
+			case COLD -> COLD;
 			case TEXT -> TEXT;
 		};
 	}
 
-	/** The tag names of this kind's formats; TEXT has none. */
+	/** The tag names of this kind's formats; COLD and TEXT have none. */
 	public static List<String> names(Kind kind) {
 		return switch (kind) {
 			case TIME -> TIME_NAMES;
 			case INTEGER -> INTEGER_NAMES;
 			case DECIMAL -> DECIMAL_NAMES;
-			case TEXT -> List.of();
+			case COLD, TEXT -> List.of();
 		};
 	}
 
 	/**
 	 * A colour threshold as typed: a time as "1:30" or seconds ("90"), anything else as a number.
+	 * Commas between groups of three digits are thousands ("43,436"); a single other comma is a
+	 * decimal point ("2,5").
 	 *
 	 * @return the threshold in the value's unit (seconds for times), or null when it can't be read
 	 */
 	public static Double parseThreshold(Kind kind, String text) {
-		String t = text.strip().replace(",", "");
+		String t = text.strip();
 		try {
-			if (kind == Kind.TIME && t.contains(":")) {
-				String[] parts = t.split(":", -1);
-				if (parts.length != 2 || parts[0].isEmpty() || parts[1].length() != 2) return null;
-				long minutes = Long.parseLong(parts[0].replace("-", ""));
-				long seconds = Long.parseLong(parts[1]);
-				if (seconds >= 60 || parts[1].startsWith("-")) return null;
-				double total = minutes * 60 + seconds;
-				return parts[0].startsWith("-") ? -total : total;
+			if (kind == Kind.TIME) {
+				Matcher clock = CLOCK.matcher(t);
+				if (clock.matches()) {
+					long seconds = Long.parseLong(clock.group(3));
+					if (seconds >= 60) return null;
+					double total = Long.parseLong(clock.group(2)) * 60.0 + seconds;
+					return clock.group(1).isEmpty() ? total : -total;
+				}
 			}
-			double value = Double.parseDouble(t);
-			return Double.isFinite(value) ? value : null;
+			if (GROUPED.matcher(t).matches()) t = t.replace(",", "");
+			else if (t.indexOf(',') == t.lastIndexOf(',') && t.indexOf('.') < 0) t = t.replace(',', '.');
+			// Only digits, one point and a leading minus: no "1e5", "NaN" or "1d".
+			if (!t.matches("-?(\\d+\\.?\\d*|\\.\\d+)")) return null;
+			return Double.parseDouble(t);
 		} catch (NumberFormatException e) {
+			// Digits too long for a long.
 			return null;
 		}
 	}
@@ -80,6 +94,7 @@ public final class HudFormat {
 			case TIME -> time(((Number) value).longValue() / 1000, f);
 			case INTEGER -> integer(((Number) value).longValue(), f);
 			case DECIMAL -> decimal(((Number) value).doubleValue(), f);
+			case COLD -> ((Number) value).longValue() + "❄";
 			case TEXT -> value.toString();
 		};
 	}

@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.9.1 (2026-11-12)
+Code review fixes for HUD slices 2 and 3.
+- **Colour rules on free-text lines** follow the range in the text: with `{session_powder:all_time}`, the rule
+  looks at and colours the all-time powder. Before, it kept watching the hidden range and coloured nothing.
+- **Time rules** compare the seconds the line shows, so "Over 1:30" no longer turns a "1:30" red.
+- **Typing a rule's number:** "2,5" is 2.5 (a comma between groups of three, like 43,436, is still thousands),
+  and odd input like "1-2:30" or "1e5" is ignored instead of read as something else.
+- **Ctrl+Z while typing** in Edit HUD no longer leaves the removed text field active, which stopped changes
+  from saving until the next click and swallowed arrow keys and typing.
+- The side panel keeps its scroll position after clicking or dragging the box and after an undo, and no
+  longer shows an empty band when it gets shorter.
+- All-time totals only add the newly saved shaft instead of adding up the whole journal again.
+- Cold is stored as a number, the same as the other values (it still shows as "-12❄").
+
 ## 0.9.0 (2026-11-12)
 HUD slice 3: free text and colours that follow the value.
 - Every line in Edit HUD has a **✎** button that opens the line's own page; **Back** returns to the box.

@@ -29,6 +29,7 @@ import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.OwoUIAdapter;
 import io.wispforest.owo.ui.core.Positioning;
+import io.wispforest.owo.ui.core.Size;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
@@ -83,7 +84,6 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			"...X...X",
 			".......X",
 			"....XXX."};
-	private static final String CODES = "0123456789abcdef";
 	/** How much one scroll notch over the selected box changes its size; the Size slider's step. */
 	private static final float SCALE_STEP = 0.1f;
 	/** Space around the screen's content, so the toolbar and panel don't touch the edge. */
@@ -114,8 +114,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private PanelScroll panelScroll;
 	/** The panel's height last frame; a rebuilt panel starts at it, so it doesn't flicker while it's measured. */
 	private int panelHeight = 200;
-	/** What the panel was built as: {@link #MAIN}, {@link #PICKER} or the edited line; the scroll position only stays within one. */
+	/** What the panel was built as: {@link #MAIN}, {@link #PICKER} or the edited line. */
 	private Object panelKind;
+	/**
+	 * The last panel's box id, kind and scroll position, kept when it's removed: a rebuilt panel of the same
+	 * box and kind starts there, also after the box was dragged (the panel hides meanwhile) or an undo (the
+	 * box is then a new object with the same id).
+	 */
+	private String lastPanelBox;
+	private Object lastPanelKind;
+	private double lastPanelOffset;
 	/** The selected box's Size slider, kept in step when scrolling. */
 	private DiscreteSliderComponent scaleSlider;
 	private ButtonComponent resetButton;
@@ -659,13 +667,32 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			scrollOffset = offset;
 			currentScrollPosition = offset;
 		}
+
+		/**
+		 * owo keeps only the target in range; the drawn position is clamped too, so a panel that got shorter
+		 * doesn't show past its end and then slide back.
+		 */
+		@Override
+		public void layout(Size space) {
+			super.layout(space);
+			currentScrollPosition = Math.max(0, Math.min(currentScrollPosition, maxScroll + .5));
+		}
 	}
 
 	// ---- side panel ----
 
 	private void removePanel() {
 		syncFields();
-		if (panelScroll != null) root.removeChild(panelScroll);
+		// owo keeps a removed field focused, which would count as typing and swallow keys.
+		if (fields.stream().anyMatch(field -> root.focusHandler().focused() == field.box())) {
+			root.focusHandler().focus(null, null);
+		}
+		if (panelScroll != null) {
+			lastPanelBox = panelBox.id;
+			lastPanelKind = panelKind;
+			lastPanelOffset = panelScroll.offset();
+			root.removeChild(panelScroll);
+		}
 		panelScroll = null;
 		panel = null;
 		panelBox = null;
@@ -684,9 +711,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		// A line page only while its line is still in the selected box (not after an undo or switching boxes).
 		if (selected == null || picker || !selected.lines.contains(editedLine)) editedLine = null;
 		Object kind = picker ? PICKER : editedLine != null ? editedLine : MAIN;
-		// Same box, same kind of panel: stay where it was scrolled to, e.g. after changing a line near the bottom.
-		double offset = panelScroll != null && panelBox == selected && panelKind == kind ? panelScroll.offset() : 0;
 		removePanel();
+		// Same box, same kind of panel: stay where it was scrolled to, e.g. after changing a line near the bottom.
+		double offset = selected != null && selected.id.equals(lastPanelBox) && lastPanelKind == kind ? lastPanelOffset : 0;
 		if (selected == null) {
 			pickerBox = null;
 			return;
@@ -914,9 +941,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			ButtonComponent add = button("+ Add colour rule", b -> {
 				if (line.rules == null) line.rules = new ArrayList<>();
 				HudLayout.ColorRule rule = new HudLayout.ColorRule();
-				Double now = hud.data().number(value, line.range, true);
+				Double now = hud.data().number(value, HudBoxText.ruleRange(line), true);
 				// Starts at the value shown now, so it's easy to see which way it goes.
-				if (now != null) rule.value = Math.round(value.kind() == HudValue.Kind.TIME ? now / 1000 : now);
+				if (now != null) rule.value = value.kind() == HudValue.Kind.TIME ? Math.floor(now / 1000) : Math.round(now);
 				line.rules.add(rule);
 				rebuildPanel();
 			});
@@ -976,22 +1003,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		remove.tooltip(Component.literal("Remove this rule"));
 		row.child(remove);
 		panel.child(row);
-		FlowLayout swatches = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-		swatches.gap(1);
+		FlowLayout swatches = swatches(rule.color, code -> rule.color = code);
 		swatches.margins(Insets.left(2));
-		for (int i = 0; i < COLORS.length; i++) {
-			String code = String.valueOf(CODES.charAt(i));
-			FlowLayout swatch = UIContainers.horizontalFlow(Sizing.fixed(SWATCH), Sizing.fixed(SWATCH));
-			swatch.surface(Surface.flat(0xFF000000 | COLORS[i])
-					.and(Surface.outline(code.equals(rule.color) ? 0xFFFFFFFF : 0xFF000000)));
-			swatch.tooltip(Component.literal(COLOR_NAMES[i]));
-			swatch.mouseDown().subscribe((click, doubled) -> {
-				rule.color = code;
-				rebuildPanel();
-				return true;
-			});
-			swatches.child(swatch);
-		}
 		panel.child(swatches);
 	}
 
@@ -1003,7 +1016,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		for (HudValue value : HudValue.values()) {
 			help.append(value == own ? "\n§e" : "\n§f").append('{').append(value.id()).append('}');
 			List<String> options = new ArrayList<>();
-			for (HudValue.Range range : value.ranges()) options.add(range.name().toLowerCase(java.util.Locale.ROOT));
+			for (HudValue.Range range : value.ranges()) options.add(range.tagName());
 			options.addAll(HudFormat.names(value.kind()));
 			if (!options.isEmpty()) help.append(" §8").append(String.join(", ", options));
 		}
@@ -1043,22 +1056,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		FlowLayout row = row(name);
 		row.children().getFirst().horizontalSizing(Sizing.fixed(COLOR_LABEL));
 		row.gap(1);
-		FlowLayout swatches = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-		swatches.gap(1);
-		for (int i = 0; i < COLORS.length; i++) {
-			String code = String.valueOf(CODES.charAt(i));
-			FlowLayout swatch = UIContainers.horizontalFlow(Sizing.fixed(SWATCH), Sizing.fixed(SWATCH));
-			swatch.surface(Surface.flat(0xFF000000 | COLORS[i])
-					.and(Surface.outline(code.equals(current) ? 0xFFFFFFFF : 0xFF000000)));
-			swatch.tooltip(Component.literal(COLOR_NAMES[i]));
-			swatch.mouseDown().subscribe((click, doubled) -> {
-				setColor.accept(code);
-				rebuildPanel();
-				return true;
-			});
-			swatches.child(swatch);
-		}
-		row.child(swatches);
+		row.child(swatches(current, setColor));
 		ButtonComponent boldButton = button((bold ? "§e" : "§f") + "§lB", b -> {
 			setBold.accept(!bold);
 			rebuildPanel();
@@ -1070,6 +1068,26 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	// ---- small builders ----
+
+	/** The 16 colours as swatches; the current one is outlined white, and a click picks one. */
+	private FlowLayout swatches(String current, Consumer<String> setColor) {
+		FlowLayout swatches = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		swatches.gap(1);
+		for (int i = 0; i < COLORS.length; i++) {
+			String code = String.valueOf(HudLayout.COLOR_CODES.charAt(i));
+			FlowLayout swatch = UIContainers.horizontalFlow(Sizing.fixed(SWATCH), Sizing.fixed(SWATCH));
+			swatch.surface(Surface.flat(0xFF000000 | COLORS[i])
+					.and(Surface.outline(code.equals(current) ? 0xFFFFFFFF : 0xFF000000)));
+			swatch.tooltip(Component.literal(COLOR_NAMES[i]));
+			swatch.mouseDown().subscribe((click, doubled) -> {
+				setColor.accept(code);
+				rebuildPanel();
+				return true;
+			});
+			swatches.child(swatch);
+		}
+		return swatches;
+	}
 
 	private FlowLayout row(String name, io.wispforest.owo.ui.core.UIComponent... children) {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
