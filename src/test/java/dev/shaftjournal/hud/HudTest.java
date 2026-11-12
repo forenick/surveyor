@@ -256,12 +256,15 @@ class HudTest {
 		assertNull(campfires.range, "values that aren't counted over shafts have no range");
 		assertEquals(List.of("§7Powder: §f137.2k/h", "§7Campfires: §f1"), HudBoxText.lines(box, HudData.EXAMPLE, false));
 		HudData empty = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
-		assertEquals(List.of("§7Powder: §f.", "§7Campfires: §f-"), HudBoxText.lines(box, empty, false),
+		assertEquals(List.of("§7Powder: §f.§\uE000..§\uE001", "§7Campfires: §f-"), HudBoxText.lines(box, empty, false),
 				"a rate thats not ready yet shows waiting dots, no /h");
 		HudData later = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 1_200, ShaftNames.defaults());
 		assertEquals("§7Powder: §f...", HudBoxText.lines(box, later, false).getFirst(), "the dots count up over time");
-		assertEquals(List.of(".", "..", "...", "."), List.of(HudBoxText.waiting(0), HudBoxText.waiting(600),
-				HudBoxText.waiting(1_200), HudBoxText.waiting(1_800)));
+		assertEquals(List.of(".§\uE000..§\uE001", "..§\uE000.§\uE001", "...", ".§\uE000..§\uE001"),
+				List.of(HudBoxText.waiting(0), HudBoxText.waiting(600), HudBoxText.waiting(1_200), HudBoxText.waiting(1_800)));
+		assertEquals(List.of("§7Powder: §f§l.", "§f§l..", "§f§l gems"),
+				HudBoxText.pieces("§7Powder: §f§l." + HudBoxText.HIDE_START + ".." + HudBoxText.HIDE_END + " gems"),
+				"hidden dots keep the colour + bold, so they measure the same as drawn");
 		perHour.range = Range.ALL_TIME;
 		assertEquals("§7Powder: §f0", HudBoxText.lines(box, empty, false).getFirst(), "the HUD shows the real zero");
 		assertEquals("§7Powder: §f1.2M", HudBoxText.lines(box, empty, true).getFirst(), "the editor shows the example");
@@ -429,6 +432,24 @@ class HudTest {
 	}
 
 	@Test
+	void ruleAgainstAnotherValue() {
+		Line spawn = new Line(HudValue.SPAWN_TIMER);
+		HudLayout.ColorRule slow = new HudLayout.ColorRule();
+		slow.than = "{average_spawn}";
+		slow.color = "6";
+		spawn.rules = new java.util.ArrayList<>(List.of(slow));
+		assertEquals("6", HudColors.color(spawn, HudData.EXAMPLE, false), "example 1:42 is over the 1:25 average");
+		slow.when = HudLayout.ColorRule.When.UNDER;
+		assertNull(HudColors.color(spawn, HudData.EXAMPLE, false));
+		HudData noAverage = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
+		assertNull(HudColors.color(spawn, noAverage, false), "no average yet, rule skipped");
+		assertTrue(HudBoxText.isNumberTag(" {session_powder:all_time} "));
+		assertFalse(HudBoxText.isNumberTag("{shaft_type}"), "text values cant be compared");
+		assertFalse(HudBoxText.isNumberTag("{nope}"));
+		assertFalse(HudBoxText.isNumberTag("90"));
+	}
+
+	@Test
 	void coldThresholds() {
 		Line cold = new Line(HudValue.SHAFT_COLD);
 		cold.readyRule = true;
@@ -457,7 +478,7 @@ class HudTest {
 	void colourSettingsAreRepaired() {
 		HudLayout read = HudLayout.fromJson("""
 				{"boxes": [{"id": "a", "lines": [
-				  {"value": "spawn_timer", "readyRule": true, "rules": [null, {"when": "SIDEWAYS", "value": 90, "color": "z"}]},
+				  {"value": "spawn_timer", "readyRule": true, "rules": [null, {"when": "SIDEWAYS", "value": 90, "color": "z", "than": "{shaft_type}"}]},
 				  {"value": "shaft_corpses", "readyRule": true, "rules": [{"value": 1}]},
 				  {"value": "shaft_cold", "advanced": true}]}]}""");
 		List<Line> lines = read.boxes.getFirst().lines;
@@ -465,6 +486,7 @@ class HudTest {
 		assertEquals(1, lines.get(0).rules.size());
 		assertEquals(HudLayout.ColorRule.When.OVER, lines.get(0).rules.getFirst().when);
 		assertEquals("c", lines.get(0).rules.getFirst().color);
+		assertNull(lines.get(0).rules.getFirst().than, "a text value cant be a limit, back to the number");
 		assertFalse(lines.get(1).readyRule, "corpses have no ready-made rule");
 		assertNull(lines.get(1).rules, "corpses aren't a number");
 		assertFalse(lines.get(2).advanced, "free text without text falls back to the basic line");

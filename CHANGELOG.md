@@ -4,6 +4,17 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.12.0 (2026-11-12)
+Nick's asks after trying 0.11.2.
+- **Colour rules can compare against another value.** Type a value like `{average_spawn}` in a rule's
+  Over/Under field instead of a number, f.e. Spawn timer over `{average_spawn}`. Ranges work too
+  (`{session_powder:all_time}`). The rule is skipped while that value isn't there yet. The field turns red
+  when it's neither a number nor a value.
+- **Breadcrumbs** on top of the side panel: **HUD › Spawn › Spawn timer**. Click "HUD" to close the panel,
+  or the box name to go back to the box. The line page's title (with its range) now lives there.
+- **Waiting dots don't change the box's width** anymore. The dots that aren't shown yet still take their
+  space, so a box whose widest line is a waiting rate stays still.
+
 ## 0.11.2 (2026-11-12)
 Fixes from a code review of 0.11.1, plus waiting dots for rates.
 - **Per hour values that aren't ready yet** (Powder, Fine, Shafts per hour) show **. .. ...** counting up

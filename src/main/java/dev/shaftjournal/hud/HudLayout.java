@@ -117,10 +117,12 @@ public final class HudLayout {
 		public When when = When.OVER;
 		// seconds for times, not ms
 		public double value;
+		// a value tag like {average_spawn}, beats value. null = value
+		public String than;
 		public String color = "c";
 
-		public boolean matches(double number) {
-			return when == When.UNDER ? number < value : number > value;
+		public boolean matches(double number, double limit) {
+			return when == When.UNDER ? number < limit : number > limit;
 		}
 	}
 
@@ -260,6 +262,7 @@ public final class HudLayout {
 					if (rule.when == null) rule.when = ColorRule.When.OVER;
 					if (!isColor(rule.color)) rule.color = "c";
 					if (!Double.isFinite(rule.value)) rule.value = 0;
+					if (rule.than != null && !HudBoxText.isNumberTag(rule.than)) rule.than = null;
 				}
 				if (line.rules.isEmpty() || !value.hasNumber()) line.rules = null;
 			}

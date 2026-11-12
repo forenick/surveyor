@@ -30,10 +30,19 @@ public final class HudColors {
 		double shown = shown(value.kind(), number);
 		if (line.rules != null) {
 			for (ColorRule rule : line.rules) {
-				if (rule.matches(shown)) return rule.color;
+				Double limit = limit(rule, data, example);
+				if (limit != null && rule.matches(shown, limit)) return rule.color;
 			}
 		}
 		return line.readyRule ? ready(value, shown, data, example) : null;
+	}
+
+	// tag not ready yet = rule skipped
+	private static Double limit(ColorRule rule, HudData data, boolean example) {
+		if (rule.than == null) return rule.value;
+		HudValue value = HudBoxText.numberTagValue(rule.than);
+		Double number = value == null ? null : data.number(value, HudBoxText.numberTagRange(rule.than), example);
+		return number == null ? null : shown(value.kind(), number);
 	}
 
 	// whole secs, so "over 1:30" skips a shown 1:30

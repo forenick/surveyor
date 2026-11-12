@@ -69,10 +69,22 @@ public final class HudRenderer {
 				case CENTER -> (textWidth - lineWidth) / 2;
 				case RIGHT -> textWidth - lineWidth;
 			};
-			graphics.text(font, line, x, y, 0xFFFFFFFF, true);
+			drawLine(graphics, font, line, x, y);
 			y += font.lineHeight + LINE_GAP;
 		}
 		graphics.pose().popMatrix();
+	}
+
+	private static void drawLine(GuiGraphicsExtractor graphics, Font font, String line, int x, int y) {
+		if (!line.contains(HudBoxText.HIDE_START)) {
+			graphics.text(font, line, x, y, 0xFFFFFFFF, true);
+			return;
+		}
+		List<String> pieces = HudBoxText.pieces(line);
+		for (int i = 0; i < pieces.size(); i++) {
+			if (i % 2 == 0) graphics.text(font, pieces.get(i), x, y, 0xFFFFFFFF, true);
+			x += font.width(pieces.get(i));
+		}
 	}
 
 	private static int innerWidth(Font font, List<String> lines) {

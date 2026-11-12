@@ -17,6 +17,9 @@ public final class HudBoxText {
 	private static final String STYLES = "lonm";
 	// display choice, 3 HUD refreshes
 	private static final long WAIT_STEP_MILLIS = 600;
+	// unknown § codes, font skips them. text between = measured, not drawn
+	static final String HIDE_START = "§\uE000";
+	static final String HIDE_END = "§\uE001";
 
 	private HudBoxText() {
 	}
@@ -144,6 +147,27 @@ public final class HudBoxText {
 		return next == '&' || next == '{';
 	}
 
+	public static boolean isNumberTag(String text) {
+		return numberTag(text) != null;
+	}
+
+	public static HudValue numberTagValue(String text) {
+		Tag tag = numberTag(text);
+		return tag == null ? null : tag.value();
+	}
+
+	public static Range numberTagRange(String text) {
+		Tag tag = numberTag(text);
+		return tag == null ? null : tag.range();
+	}
+
+	private static Tag numberTag(String text) {
+		Matcher matcher = TAG.matcher(text.strip());
+		if (!matcher.matches()) return null;
+		Tag tag = Tag.parse(matcher.group(1), matcher.group(2));
+		return tag != null && tag.value().hasNumber() ? tag : null;
+	}
+
 	public static String tag(HudValue value, Range range, int format) {
 		return Tag.of(value, range, format);
 	}
@@ -185,9 +209,46 @@ public final class HudBoxText {
 		return value == HudValue.SHAFTS_PER_HOUR || (range == Range.PER_HOUR && value.hasRange(range));
 	}
 
-	// . .. ... so it looks like its waiting, not broken
+	// . .. ... so it looks like its waiting, not broken. unshown dots hidden, so the box keeps its width
 	static String waiting(long now) {
-		return ".".repeat(1 + (int) (now / WAIT_STEP_MILLIS % 3));
+		int dots = 1 + (int) (now / WAIT_STEP_MILLIS % 3);
+		return dots == 3 ? "..." : ".".repeat(dots) + HIDE_START + ".".repeat(3 - dots) + HIDE_END;
+	}
+
+	// drawn, hidden, drawn, ... each w/ the § codes active at its start
+	public static List<String> pieces(String line) {
+		List<String> pieces = new ArrayList<>();
+		int pos = 0;
+		String codes = "";
+		while (true) {
+			int start = line.indexOf(HIDE_START, pos);
+			int end = start < 0 ? -1 : line.indexOf(HIDE_END, start);
+			if (end < 0) {
+				pieces.add(codes + line.substring(pos));
+				return pieces;
+			}
+			pieces.add(codes + line.substring(pos, start));
+			codes = activeCodes(line, start);
+			pieces.add(codes + line.substring(start + HIDE_START.length(), end));
+			pos = end + HIDE_END.length();
+			codes = activeCodes(line, pos);
+		}
+	}
+
+	private static String activeCodes(String line, int upTo) {
+		String color = "";
+		StringBuilder styles = new StringBuilder();
+		for (int i = 0; i + 1 < upTo; i++) {
+			if (line.charAt(i) != '§') continue;
+			char code = Character.toLowerCase(line.charAt(++i));
+			if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r') {
+				color = "§" + code;
+				styles.setLength(0);
+			} else if ("klmno".indexOf(code) >= 0) {
+				styles.append('§').append(code);
+			}
+		}
+		return color + styles;
 	}
 
 	private static Object value(HudValue value, Range range, HudData data, boolean example) {

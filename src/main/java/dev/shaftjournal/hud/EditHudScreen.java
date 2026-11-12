@@ -34,6 +34,7 @@ import io.wispforest.owo.ui.core.VerticalAlignment;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.client.input.KeyEvent;
@@ -85,6 +86,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int DROP_LINE = 0xFFFFFF55;
 	private static final int DRAGGED_LINE = 0x30FFFFFF;
 	private static final int HOVER = 0x20FFFFFF;
+	private static final int BAD_TEXT = 0xFFFF5555;
+	// box name keeps at least this much before the page name gets cut
+	private static final int CRUMB_MIN = 40;
 	private static final Surface GRIP = (graphics, c) -> {
 		int x = c.x() + (c.width() - 3) / 2;
 		int y = c.y() + (c.height() - 5) / 2;
@@ -1012,6 +1016,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void buildBoxPage(Box box) {
+		panel.child(crumbs(box, null));
 		FlowLayout linesHead = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		linesHead.verticalAlignment(VerticalAlignment.CENTER);
 		linesHead.child(label("§fLines §8(" + box.lines.size() + ")"));
@@ -1107,7 +1112,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent back = button("‹ Back", b -> backToLines());
 		tip(back, "Back without adding (Esc)");
 		header.child(back);
-		header.child(label("§fAdd a line"));
+		header.child(label("§7Pick a value to add"));
+		panel.child(crumbs(box, "Add a line"));
 		panel.child(header);
 		for (HudValue.Group group : HudValue.Group.values()) {
 			panel.child(section(group.displayName()));
@@ -1199,13 +1205,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			rebuildPanel();
 		});
 		tip(remove, "Remove this line. Ctrl+Z brings it back.");
-		String range = value.ranges().size() > 1 && !line.advanced ? " · " + line.range.displayName() : "";
-		// back, remove, gaps
-		LabelComponent title = label(clip("§7" + value.displayName() + range,
-				INNER - font.width("‹ Back") - 8 - fixedWidth(remove) - 8));
-		title.horizontalSizing(Sizing.expand());
-		header.child(title);
+		String range = value.ranges().size() > 1 && !line.advanced ? " §7· " + line.range.displayName() : "";
+		header.child(spacer());
 		header.child(remove);
+		panel.child(crumbs(box, value.displayName() + range));
 		panel.child(header);
 
 		FlowLayout look = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
@@ -1278,7 +1281,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				line.rules.add(rule);
 				rebuildPanel();
 			});
-			tip(add, "Colour the value when it's over or under a number you pick. "
+			tip(add, "Colour the value when it's over or under a number you pick, or another value. "
 					+ "Rules beat the value colour, the first one that matches wins.");
 			add.margins(Insets.top(2));
 			panel.child(add);
@@ -1517,17 +1520,25 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 						: HudLayout.ColorRule.When.OVER);
 		tip(when, "Click to switch between over and under");
 		row.child(when);
-		TextBoxComponent number = textField(HudFormat.thresholdText(kind, rule.value), 12, typed -> {
+		String start = rule.than != null ? rule.than : HudFormat.thresholdText(kind, rule.value);
+		TextBoxComponent[] field = {null};
+		field[0] = textField(start, 64, typed -> {
 			Double parsed = HudFormat.parseThreshold(kind, typed);
-			if (parsed != null) rule.value = parsed;
+			boolean tag = HudBoxText.isNumberTag(typed);
+			if (tag) rule.than = typed.strip();
+			else if (parsed != null) {
+				rule.value = parsed;
+				rule.than = null;
+			}
+			field[0].setTextColor(tag || parsed != null ? EditBox.DEFAULT_TEXT_COLOR : BAD_TEXT);
 		});
-		number.horizontalSizing(Sizing.fixed(56));
-		tip(number, kind == HudValue.Kind.TIME ? "A time, like 1:30 or 90 (seconds)" : "A number");
-		row.child(number);
+		tip(field[0], (kind == HudValue.Kind.TIME ? "A time, like 1:30 or 90 (seconds)" : "A number")
+				+ ", or another value, like {" + (kind == HudValue.Kind.TIME ? "average_spawn" : "session_powder:all_time")
+				+ "}. Red = not a number or value.");
+		row.child(field[0]);
 		ButtonComponent color = colorButton(rule.color, null, code -> rule.color = code);
 		tip(color, "Colour when the rule matches");
 		row.child(color);
-		row.child(spacer());
 		ButtonComponent remove = iconTextButton(REMOVE, "", "Remove this rule", b -> {
 			line.rules.remove(rule);
 			if (line.rules.isEmpty()) line.rules = null;
@@ -1654,6 +1665,57 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		row.children().getFirst().horizontalSizing(Sizing.fixed(KEY));
 		row.margins(Insets.vertical(1));
 		return row;
+	}
+
+	// HUD › box › page. here null = the box page
+	private FlowLayout crumbs(Box box, String here) {
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		row.verticalAlignment(VerticalAlignment.CENTER);
+		row.margins(Insets.bottom(2));
+		String gap = "§8 › ";
+		String name = strip(HudBoxText.tags(box.title, hud.data(), true)).strip();
+		if (name.isEmpty()) name = "Box";
+		// crumb padding 2px each
+		int room = INNER - font.width("HUD") - font.width(gap) - 4;
+		Crumb home = new Crumb("HUD", () -> {
+			selected = null;
+			rebuildPanel();
+		});
+		tip(home, "All boxes. Closes this panel, click a box to open it again.");
+		row.child(home);
+		row.child(label(gap));
+		if (here == null) {
+			row.child(label(clip("§f" + name, room)));
+			return row;
+		}
+		room -= font.width(gap) + 2;
+		String last = clip("§f" + here, room - Math.min(font.width(name), CRUMB_MIN));
+		Crumb boxCrumb = new Crumb(clip(name, room - font.width(last)), this::backToLines);
+		tip(boxCrumb, "Back to the box (Esc)");
+		row.child(boxCrumb);
+		row.child(label(gap));
+		row.child(label(last));
+		return row;
+	}
+
+	private final class Crumb extends FlowLayout {
+		Crumb(String text, Runnable action) {
+			super(Sizing.content(), Sizing.content(), Algorithm.HORIZONTAL);
+			padding(Insets.horizontal(1));
+			cursorStyle(CursorStyle.HAND);
+			child(label("§7" + text));
+			mouseDown().subscribe((click, doubled) -> {
+				if (click.button() != 0) return false;
+				action.run();
+				return true;
+			});
+		}
+
+		@Override
+		public void draw(OwoUIGraphics graphics, int mouseX, int mouseY, float partialTicks, float delta) {
+			if (isInBoundingBox(mouseX, mouseY)) graphics.fill(x, y, x + width, y + height, HOVER);
+			super.draw(graphics, mouseX, mouseY, partialTicks, delta);
+		}
 	}
 
 	private static FlowLayout heading(String text) {
