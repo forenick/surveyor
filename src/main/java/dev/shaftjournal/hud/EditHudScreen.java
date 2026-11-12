@@ -32,6 +32,7 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import io.wispforest.owo.ui.inject.GreedyInputUIComponent;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -137,12 +138,20 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private int editedIndex = -1;
 	private LabelComponent preview;
 	private Line previewLine;
-	private String previewText;
+	// unclipped, so clip only runs on change
+	private String previewRaw;
 	private FreeTextArea freeArea;
 	private LabelComponent freeHint;
 	private String freeHintText;
+	private String hintSource;
+	private boolean hintNoRoom;
+	private String noRoomFor;
 	private FlowLayout menu;
 	private UIComponent menuAnchor;
+	// menu picks happen on press, rest of that press isnt a text drag
+	private boolean swallowDrag;
+	// 2nd press of a double click would hit the new page
+	private boolean rebuiltByClick;
 	private int toolbarSpot = -1;
 	private Box selected;
 	private Box dragging;
@@ -288,23 +297,29 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		syncFields();
 		recordChanges(true);
 		mouseHeld = true;
+		swallowDrag = false;
+		boolean left = click.button() == 0;
+		boolean rebuilt = rebuiltByClick;
+		rebuiltByClick = false;
+		if (doubled && rebuilt && overPanel(click.x(), click.y())) return true;
 		if (menu != null) {
-			if (menu.isInBoundingBox(click.x(), click.y())) return super.mouseClicked(click, doubled);
+			// rows + checkboxes act on any button, panel is left click only
+			if (menu.isInBoundingBox(click.x(), click.y())) return !left || super.mouseClicked(click, doubled);
 			// 1st click outside only closes it
 			closeMenu();
 			return true;
 		}
 		if (resetArmed && !resetButton.isInBoundingBox(click.x(), click.y())) armReset(false);
 		if (deleteArmed && !deleteButton.isInBoundingBox(click.x(), click.y())) armDelete(false);
-		int handle = click.button() == 0 ? lineHandleAt(click.x(), click.y()) : -1;
+		int handle = left ? lineHandleAt(click.x(), click.y()) : -1;
 		if (handle >= 0) {
 			root.focusHandler().focus(null, null);
 			lineDrag = handle;
 			lineGap = handle;
 			return true;
 		}
-		if (overPanel(click.x(), click.y())) return super.mouseClicked(click, doubled);
-		if (click.button() != 0) return false;
+		if (overPanel(click.x(), click.y())) return !left || super.mouseClicked(click, doubled);
+		if (!left) return false;
 		root.focusHandler().focus(null, null);
 		Box hit = null;
 		// last drawn = on top
@@ -328,6 +343,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent drag, double dx, double dy) {
+		if (swallowDrag) return true;
 		if (lineDrag >= 0) {
 			lineGap = 0;
 			for (FlowLayout row : lineRows) {
@@ -367,6 +383,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+		// panel would scroll away from it
+		if (menu != null && !menu.isInBoundingBox(mouseX, mouseY)) closeMenu();
 		HudRenderer.Bounds bounds = selected == null ? null : drawn.get(selected);
 		if (vertical == 0 || bounds == null || overPanel(mouseX, mouseY) || !bounds.contains(mouseX, mouseY)) {
 			return super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
@@ -396,7 +414,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			undo(key.hasShiftDown());
 			return true;
 		}
-		if (selected != null && !inputFocused()) {
+		if (selected != null && !typing()) {
 			int step = key.hasShiftDown() ? 10 : 1;
 			int dx = key.isLeft() ? -step : key.isRight() ? step : 0;
 			int dy = key.isUp() ? -step : key.isDown() ? step : 0;
@@ -413,14 +431,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return super.keyPressed(key);
 	}
 
-	private boolean inputFocused() {
-		UIComponent focused = root.focusHandler().focused();
-		return focused instanceof GreedyInputUIComponent || focused instanceof TextAreaComponent;
-	}
-
 	@Override
 	public boolean mouseReleased(MouseButtonEvent release) {
 		mouseHeld = false;
+		swallowDrag = false;
 		if (lineDrag >= 0) {
 			int from = lineDrag;
 			lineDrag = -1;
@@ -450,7 +464,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	// new button each time, owo doesnt re-measure a changed label
 	private void armReset(boolean armed) {
 		resetArmed = armed;
-		if (resetButton != null) toolbar.removeChild(resetButton);
+		if (resetButton != null) {
+			dropFocusIn(resetButton);
+			toolbar.removeChild(resetButton);
+		}
 		resetButton = button(armed ? "§cReally reset?" : "Reset", b -> {
 			if (!resetArmed) {
 				armReset(true);
@@ -499,7 +516,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private void armDelete(boolean armed) {
 		deleteArmed = armed;
 		if (deleteRow == null) return;
-		if (deleteButton != null) deleteRow.removeChild(deleteButton);
+		if (deleteButton != null) {
+			dropFocusIn(deleteButton);
+			deleteRow.removeChild(deleteButton);
+		}
 		Box box = panelBox;
 		deleteButton = button(armed ? "§cReally delete?" : "Delete box", b -> {
 			if (!deleteArmed) {
@@ -516,7 +536,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		deleteRow.child(deleteButton);
 	}
 
-	private record Field(UIComponent component, Supplier<String> value, Consumer<String> apply) {
+	private record Field(Supplier<String> value, Consumer<String> apply) {
 	}
 
 	// polled bc caxton cancels onValueChange
@@ -546,9 +566,23 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		hud.save();
 	}
 
+	// owo mixins make EditBox + MultiLineEditBox greedy, javac cant see the 2nd
 	private boolean typing() {
-		UIComponent focused = root.focusHandler().focused();
-		return focused instanceof TextBoxComponent || focused instanceof TextAreaComponent;
+		return root.focusHandler().focused() instanceof GreedyInputUIComponent;
+	}
+
+	// owo keeps a removed component focused, enter/space would still press it
+	private void dropFocusIn(UIComponent removed) {
+		for (UIComponent c = root.focusHandler().focused(); c != null; c = c.parent()) {
+			if (c == removed) {
+				root.focusHandler().focus(null, null);
+				return;
+			}
+		}
+	}
+
+	private static List<String> lineValues(Box box) {
+		return box.lines.stream().map(line -> line.value).toList();
 	}
 
 	private void undo(boolean redo) {
@@ -557,6 +591,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		String json = redo ? history.redo() : history.undo();
 		if (json == null) return;
 		String selectedId = selected == null ? null : selected.id;
+		List<String> lineValues = selected == null ? null : lineValues(selected);
 		HudLayout layout = HudLayout.fromJson(json);
 		hud.setLayout(layout);
 		shownLayout = layout;
@@ -564,6 +599,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		for (Box box : layout.boxes) {
 			if (box.id.equals(selectedId)) selected = box;
 		}
+		// lines moved, the index may point at another line now
+		if (selected != null && !lineValues(selected).equals(lineValues)) editedIndex = -1;
 		dragging = null;
 		lineDrag = -1;
 		guides = List.of();
@@ -692,8 +729,12 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			super(horizontal, vertical);
 		}
 
-		void insert(String text) {
+		// vanilla cuts it to the char limit, half a tag is worse than none
+		boolean insert(String text) {
+			int length = editBox.value().length() - editBox.getSelectedText().length() + text.length();
+			if (length > editBox.characterLimit()) return false;
 			editBox.insertText(text);
+			return true;
 		}
 
 		// 1 HUD line, no newlines or tab spaces
@@ -701,17 +742,25 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		public boolean keyPressed(KeyEvent input) {
 			if (input.key() == GLFW.GLFW_KEY_ENTER || input.key() == GLFW.GLFW_KEY_KP_ENTER) return true;
 			if (input.isCycleFocus()) return false;
+			// vanilla paste keeps newlines
+			if (input.isPaste()) {
+				editBox.insertText(Minecraft.getInstance().keyboardHandler.getClipboard().replace("\r", "").replace('\n', ' '));
+				return true;
+			}
 			return super.keyPressed(input);
+		}
+
+		// vanilla eats the wheel even w/ nothing to scroll, panel should scroll
+		@Override
+		public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+			return maxScrollAmount() > 0 && super.mouseScrolled(mouseX, mouseY, horizontal, vertical);
 		}
 	}
 
 	private void removePanel() {
 		syncFields();
-		// owo keeps a removed field focused, eats keys
-		if (fields.stream().anyMatch(field -> root.focusHandler().focused() == field.component())) {
-			root.focusHandler().focus(null, null);
-		}
 		if (panelScroll != null) {
+			dropFocusIn(panelScroll);
 			scrollMemory.put(panelKey, panelScroll.offset());
 			root.removeChild(panelScroll);
 		}
@@ -729,10 +778,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		deleteArmed = false;
 		preview = null;
 		previewLine = null;
-		previewText = null;
+		previewRaw = null;
 		freeArea = null;
 		freeHint = null;
 		freeHintText = null;
+		hintSource = null;
+		hintNoRoom = false;
+		noRoomFor = null;
 	}
 
 	private void rebuildPanel() {
@@ -762,11 +814,13 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height);
 		boolean boxOnRight = bounds.x() + bounds.width() / 2 > width / 2;
 		panelScroll.positioning(Positioning.relative(boxOnRight ? 0 : 100, 100));
-		root.child(panelScroll);
 		if (picking) buildPicker(box);
 		else if (editedIndex >= 0) buildLinePage(box, editedIndex);
 		else if (boxTab) buildBoxTab(box);
 		else buildLinesTab(box);
+		// after the content, owo lays out right away and would clamp the offset to 0
+		root.child(panelScroll);
+		rebuiltByClick = true;
 	}
 
 	private void openLine(int index) {
@@ -949,7 +1003,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		header.child(button("‹ Lines", b -> backToLines()));
 		header.child(UIContainers.horizontalFlow(Sizing.expand(), Sizing.fixed(1)));
 		ButtonComponent remove = button("§cRemove", b -> {
-			box.lines.remove(index);
+			box.lines.remove(line);
 			editedIndex = -1;
 			scrollToRow = Math.min(index, box.lines.size() - 1);
 			rebuildPanel();
@@ -1050,7 +1104,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		area.setCharacterLimit(256);
 		area.text(line.text);
 		String[] last = {line.text};
-		fields.add(new Field(area, area::getValue, typed -> {
+		fields.add(new Field(area::getValue, typed -> {
 			// pasted newlines, 1 HUD line
 			if (typed.indexOf('\n') >= 0 || typed.indexOf('\r') >= 0) {
 				typed = typed.replace("\r", "").replace('\n', ' ');
@@ -1086,22 +1140,28 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	// live, the text fields are polled
 	private void refreshLinePage() {
-		if (preview != null && panelBox != null) {
+		if (preview != null) {
 			String text = HudBoxText.line(panelBox, previewLine, hud.data(), true);
-			text = clip(text == null ? "" : text, INNER - 8);
-			if (!text.equals(previewText)) {
-				previewText = text;
-				preview.text(Component.literal(text));
+			if (!text.equals(previewRaw)) {
+				previewRaw = text;
+				preview.text(Component.literal(clip(text, INNER - 8)));
 			}
 		}
-		if (freeHint != null && previewLine != null && previewLine.text != null) {
-			List<String> unknown = HudBoxText.unknownTags(previewLine.text);
-			String hint = unknown.isEmpty() ? TEXT_HINT
-					: "§cNot a value: " + String.join(" ", unknown).replace("§", "") + ". It shows as typed.";
-			if (!hint.equals(freeHintText)) {
-				freeHintText = hint;
-				freeHint.text(Component.literal(hint));
-			}
+		if (freeHint == null) return;
+		String source = previewLine.text;
+		if (noRoomFor != null && !noRoomFor.equals(source)) noRoomFor = null;
+		boolean noRoom = noRoomFor != null;
+		// same object = same text, the poll only swaps it on change
+		if (source == hintSource && noRoom == hintNoRoom) return;
+		hintSource = source;
+		hintNoRoom = noRoom;
+		List<String> unknown = HudBoxText.unknownTags(source);
+		String hint = noRoom ? "§cNo room for that, free text is 256 characters max."
+				: unknown.isEmpty() ? TEXT_HINT
+				: "§cNot a value: " + String.join(" ", unknown).replace("§", "") + ". It shows as typed.";
+		if (!hint.equals(freeHintText)) {
+			freeHintText = hint;
+			freeHint.text(Component.literal(hint));
 		}
 	}
 
@@ -1139,10 +1199,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		openMenu(anchor, m -> {
 			m.child(menuTitle(value.displayName() + (value.ranges().size() > 1 ? " · " + range.displayName() : "")));
+			// own examples, real values can look the same in every format
+			List<String> examples = HudFormat.options(value.kind());
 			for (int i = 0; i < formats; i++) {
 				int format = i;
-				m.child(menuEntry("§f" + HudBoxText.text(value, range, i, hud.data(), true),
-						() -> insertText(HudBoxText.tag(value, range, format))));
+				m.child(menuEntry("§f" + examples.get(i), () -> insertText(HudBoxText.tag(value, range, format))));
 			}
 		});
 	}
@@ -1181,8 +1242,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private void insertText(String text) {
 		closeMenu();
 		if (freeArea == null) return;
-		freeArea.insert(text);
+		if (!freeArea.insert(text)) noRoomFor = freeArea.getValue();
 		root.focusHandler().focus(freeArea, UIComponent.FocusSource.MOUSE_CLICK);
+		swallowDrag = true;
 	}
 
 	private void openMenu(UIComponent anchor, Consumer<FlowLayout> fill) {
@@ -1190,11 +1252,17 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		menu = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
 		menu.surface(MENU);
 		menu.padding(Insets.of(2));
+		// headings + gaps would pass clicks to the panel below
+		menu.mouseDown().subscribe((click, doubled) -> true);
+		menu.mouseScroll().subscribe((x, y, amount) -> true);
 		menuAnchor = anchor;
 		fill.accept(menu);
 		menu.positioning(Positioning.absolute(anchor.x() - root.x() - PADDING,
 				anchor.y() + anchor.height() + 1 - root.y() - PADDING));
+		// owo lays it out right away, so no frame below the screen
 		root.child(menu);
+		fitMenu();
+		rebuiltByClick = true;
 	}
 
 	// kept on screen, sizes known after layout
@@ -1262,7 +1330,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 
 	private static Component tagHelp(HudValue own) {
 		StringBuilder help = new StringBuilder("§fFree text\n§7&0-&f colours, &l bold, &o italic, &n underline, "
-				+ "&m strikethrough, &r the box's label colour, &v the box's value colour.\n§7Values: §f{value_id}§7, "
+				+ "&m strikethrough, &r the box's label colour, &v the box's value colour, && and &{ a plain & and {.\n"
+				+ "§7Values: §f{value_id}§7, "
 				+ "options after a colon, e.g. §f{session_powder:all_time:short}§7.\n");
 		for (HudValue value : HudValue.values()) {
 			help.append(value == own ? "\n§e" : "\n§f").append('{').append(value.id()).append('}');
@@ -1280,7 +1349,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		field.setMaxLength(maxLength);
 		field.text(text);
 		String[] last = {text};
-		fields.add(new Field(field, field::getValue, typed -> {
+		fields.add(new Field(field::getValue, typed -> {
 			if (typed.equals(last[0])) return;
 			last[0] = typed;
 			apply.accept(typed);
@@ -1291,6 +1360,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private int lineHandleAt(double x, double y) {
+		// rows scrolled out of view keep their bounds, under the toolbar on narrow screens
+		if (panelScroll == null || !panelScroll.isInBoundingBox(x, y)) return -1;
 		for (int i = 0; i < lineHandles.size(); i++) {
 			for (UIComponent handle : lineHandles.get(i)) {
 				if (handle.isInBoundingBox(x, y)) return i;
@@ -1377,15 +1448,21 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		});
 	}
 
-	// cut to width w/ "…", never mid § code
+	// cut to width w/ "…", never mid § code. binary search, caxton shapes every width call
 	private String clip(String text, int max) {
 		if (font.width(text) <= max) return text;
-		int cut = text.length();
-		while (cut > 0 && font.width(text.substring(0, cut) + "…") > max) {
-			cut--;
-			if (cut > 0 && text.charAt(cut - 1) == '§') cut--;
+		int low = 0;
+		int high = text.length();
+		while (low < high) {
+			int mid = (low + high + 1) >>> 1;
+			if (font.width(text.substring(0, codeSafe(text, mid)) + "…") <= max) low = mid;
+			else high = mid - 1;
 		}
-		return text.substring(0, cut) + "…";
+		return text.substring(0, codeSafe(text, low)) + "…";
+	}
+
+	private static int codeSafe(String text, int cut) {
+		return cut > 0 && text.charAt(cut - 1) == '§' ? cut - 1 : cut;
 	}
 
 	private static String strip(String text) {

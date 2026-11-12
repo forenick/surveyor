@@ -74,6 +74,12 @@ public final class HudBoxText {
 		while (i < text.length()) {
 			char c = text.charAt(i);
 			if (c == '&' && i + 1 < text.length()) {
+				// && and &{ = a plain & or {
+				if (escaped(text.charAt(i + 1))) {
+					out.append(text.charAt(i + 1));
+					i += 2;
+					continue;
+				}
 				char code = Character.toLowerCase(text.charAt(i + 1));
 				if (HudLayout.COLOR_CODES.indexOf(code) >= 0 || code == 'r' || code == 'v') {
 					// colour resets styles, like vanilla
@@ -119,11 +125,21 @@ public final class HudBoxText {
 	public static List<String> unknownTags(String text) {
 		List<String> unknown = new ArrayList<>();
 		Matcher any = ANY_TAG.matcher(text);
-		while (any.find()) {
-			Matcher tag = TAG.matcher(any.group());
-			if (!tag.matches() || Tag.parse(tag.group(1), tag.group(2)) == null) unknown.add(any.group());
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c == '&' && i + 1 < text.length() && escaped(text.charAt(i + 1))) {
+				i++;
+			} else if (c == '{' && any.region(i, text.length()).lookingAt()) {
+				Matcher tag = TAG.matcher(any.group());
+				if (!tag.matches() || Tag.parse(tag.group(1), tag.group(2)) == null) unknown.add(any.group());
+				i = any.end() - 1;
+			}
 		}
 		return unknown;
+	}
+
+	private static boolean escaped(char next) {
+		return next == '&' || next == '{';
 	}
 
 	public static String tag(HudValue value, Range range, int format) {
@@ -142,12 +158,13 @@ public final class HudBoxText {
 		return line.range;
 	}
 
-	// own colours as codes, box colours stay live (&v)
+	// own colours as codes, box colours stay live (&v). label escaped, its typed as is
 	public static String basicText(Box box, Line line) {
 		HudValue value = line.hudValue();
 		String label = line.labelColor == null ? "" : "&" + line.labelColor + (box.labelBold ? "&l" : "");
 		String valueCode = line.valueColor == null ? "&v" : "&" + line.valueColor + (box.valueBold ? "&l" : "");
-		return label + line.prefix + valueCode + Tag.of(value, line.range, line.format);
+		String prefix = line.prefix.replace("&", "&&").replace("{", "&{");
+		return label + prefix + valueCode + Tag.of(value, line.range, line.format);
 	}
 
 	private static String codes(CharSequence styles) {

@@ -332,6 +332,8 @@ class HudTest {
 	void basicTextLooksTheSame() {
 		for (Box box : HudLayout.defaults().boxes) {
 			box.lines.getFirst().labelColor = "6";
+			// typed labels w/ & and { stay as typed
+			box.lines.getLast().prefix = "R&D &&{spawn_timer} {x: ";
 			for (Line line : box.lines) {
 				String basic = HudBoxText.line(box, line, HudData.EXAMPLE, false);
 				line.text = HudBoxText.basicText(box, line);
@@ -377,6 +379,8 @@ class HudTest {
 				"&v and the start follow the box theme later on");
 		powder.text = "&aX &rY &vZ";
 		assertEquals("§e§aX §r§eY §b§lZ", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst());
+		powder.text = "R&&D &{spawn_timer} &a!";
+		assertEquals("§eR&D {spawn_timer} §a!", HudBoxText.lines(box, HudData.EXAMPLE, false).getFirst());
 	}
 
 	@Test
@@ -384,6 +388,7 @@ class HudTest {
 		assertEquals(List.of("{gems_hr}", "{session_powder:weekly}", "{Spawn}"),
 				HudBoxText.unknownTags("{spawn_timer} {gems_hr} {session_powder:weekly} {session_powder:per_hour:short} {Spawn}"));
 		assertEquals(List.of(), HudBoxText.unknownTags("no tags { here"));
+		assertEquals(List.of("{nope}"), HudBoxText.unknownTags("&{gems_hr} &&{nope}"), "&{ is a plain {, && a plain &");
 	}
 
 	@Test

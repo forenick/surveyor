@@ -4,6 +4,30 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.10.1 (2026-11-12)
+Code review fixes for the Edit HUD lines v2.
+- **Remove** no longer deletes more lines when Enter or Space is pressed after it. Clicked buttons and
+  checkboxes in the side panel let go of the keyboard when the panel changes, so Enter or Space can't press
+  them again (this also covers Reset and Delete box, which went past "Really?").
+- **Insert menus:** picking a value or colour no longer selects text when the mouse moves during the click,
+  so the next pick or keystroke can't delete part of the line. Clicks and the mouse wheel on a menu's headings
+  or empty space stay in the menu instead of reaching the page below. The menu opens in the right place
+  straight away and closes when the panel is scrolled.
+- **Scroll position:** each page really keeps it now, also after clicking a choice or swatch, switching tabs
+  or undoing (0.9.1 and 0.10.0 promised this, but the panel always went back to the top).
+- **Clicks:** a double click no longer acts on the page it opened (a line, colour rule or range nobody
+  picked), and right or middle clicks don't add or open lines any more.
+- The mouse wheel scrolls the side panel over the free-text field too, unless the text itself needs scrolling.
+- Undo or redo that brings back or moves lines goes back to the line list instead of showing another line.
+- A label with `&` or `{` (like "R&D: ") looks the same after "Write this line yourself": free text gets `&&`
+  and `&{` for a plain `&` and `{`.
+- The format choices in "+ Value" show their own examples ("43.4k"), not the current value, which could look
+  the same for all three.
+- An insert that doesn't fit in the 256 characters is skipped with a note instead of typing half a tag.
+- Pasting text with a line break keeps the cursor where you pasted.
+- Line grips scrolled out of view no longer catch clicks meant for the toolbar.
+- The line preview only measures its text when it changes.
+
 ## 0.10.0 (2026-11-12)
 Edit HUD: lines are easier to change, without typing codes. Built from `Docs/mockups/hud-lines-v2.html`.
 - **Lines and Box tabs.** A box opens on its lines; title, background, size, align, Show in, colours and
