@@ -5,6 +5,7 @@
 	"client": [
 		"ClientCommonPacketListenerMixin",
 		"ClientPacketListenerMixin",
+		"MultiPlayerGameModeMixin",
 		"PlayerTabOverlayAccessor"
 	],
 	"injectors": {

@@ -20,10 +20,12 @@ public final class HudBoxText {
 	// unknown § codes, font skips them. text between = measured, not drawn
 	static final String HIDE_START = "§\uE000";
 	static final String HIDE_END = "§\uE001";
+	private static final Pattern HIDDEN = Pattern.compile(Pattern.quote(HIDE_START) + ".*?" + Pattern.quote(HIDE_END));
 
 	private HudBoxText() {
 	}
 
+	// for HudRenderer only, keeps the hidden dots
 	public static List<String> lines(Box box, HudData data, boolean example) {
 		List<String> lines = new ArrayList<>();
 		if (box.showTitle) {
@@ -32,14 +34,19 @@ public final class HudBoxText {
 		}
 		for (Line line : box.lines) {
 			if (!line.shown) continue;
-			String text = line(box, line, data, example);
+			String text = rawLine(box, line, data, example);
 			if (text != null) lines.add(text);
 		}
 		return lines;
 	}
 
-	// also hidden lines, for the editor
+	// also hidden lines, for the editor. no hidden dots, labels would draw them
 	public static String line(Box box, Line line, HudData data, boolean example) {
+		String raw = rawLine(box, line, data, example);
+		return raw == null ? null : visible(raw);
+	}
+
+	private static String rawLine(Box box, Line line, HudData data, boolean example) {
 		HudValue hudValue = line.hudValue();
 		if (hudValue == null) return null;
 		String rule = HudColors.color(line, data, example);
@@ -147,21 +154,13 @@ public final class HudBoxText {
 		return next == '&' || next == '{';
 	}
 
-	public static boolean isNumberTag(String text) {
-		return numberTag(text) != null;
-	}
-
-	public static HudValue numberTagValue(String text) {
+	// a tag a colour rule on own can compare against
+	public static boolean isLimitTag(String text, HudValue own) {
 		Tag tag = numberTag(text);
-		return tag == null ? null : tag.value();
+		return tag != null && HudColors.comparable(own, tag.value());
 	}
 
-	public static Range numberTagRange(String text) {
-		Tag tag = numberTag(text);
-		return tag == null ? null : tag.range();
-	}
-
-	private static Tag numberTag(String text) {
+	static Tag numberTag(String text) {
 		Matcher matcher = TAG.matcher(text.strip());
 		if (!matcher.matches()) return null;
 		Tag tag = Tag.parse(matcher.group(1), matcher.group(2));
@@ -215,6 +214,10 @@ public final class HudBoxText {
 		return dots == 3 ? "..." : ".".repeat(dots) + HIDE_START + ".".repeat(3 - dots) + HIDE_END;
 	}
 
+	static String visible(String line) {
+		return line.contains(HIDE_START) ? HIDDEN.matcher(line).replaceAll("") : line;
+	}
+
 	// drawn, hidden, drawn, ... each w/ the § codes active at its start
 	public static List<String> pieces(String line) {
 		List<String> pieces = new ArrayList<>();
@@ -257,8 +260,11 @@ public final class HudBoxText {
 
 	private static String formatted(HudValue value, Range range, int format, Object v) {
 		String text = HudFormat.format(value.kind(), format, v);
-		if (v == null) return text;
-		return range == Range.PER_HOUR ? text + "/h" : text + value.unit();
+		return v == null ? text : text + suffix(value, range);
+	}
+
+	public static String suffix(HudValue value, Range range) {
+		return range == Range.PER_HOUR ? "/h" : value.unit();
 	}
 
 	record Tag(HudValue value, Range range, int format) {

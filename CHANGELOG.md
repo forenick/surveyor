@@ -4,6 +4,22 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.13.1 (2026-11-12)
+Fixes from a code review of 0.12.0 to 0.13.0, plus a Ping that works on Hypixel.
+- **Ping works on Hypixel.** Hypixel puts a fixed 1 in the tab list for you, so Ping was stuck at 1ms. Now it
+  times your block breaks and clicks: the game already sends those to the server and gets an answer back, the
+  mod only measures the gap and sends nothing itself. It shows the middle of the last 10, updates while you
+  mine and goes back to "-" a minute after you stop. It may read up to 50 ms high if Hypixel answers on its
+  next tick. Still to check in game.
+- **TPS waits again after every server switch**, also when the new server has the same dimension (that used
+  to skip the 5 s wait).
+- **Format tooltips show the unit**: "Shows as 42ms" on Ping, "/h" on per hour values.
+- **Colour rules only take values that fit**: times against times, cold against cold, numbers against
+  numbers. Anything else turns the field red, and a saved file with one falls back to the number. The
+  tooltip only suggests `{average_spawn}` where it makes sense.
+- Waiting dots for rates can't show up in full in the editor's labels anymore (only the HUD itself hides
+  the dots that aren't shown yet).
+
 ## 0.13.0 (2026-11-12)
 Nick's asks: game values, presets and clearer number formats.
 - **New "Game" values** in the line picker and as tags: **FPS** (`{fps}`), **Ping** (`{ping}`, in ms),
@@ -29,8 +45,7 @@ No more dot separators in the editor (Nick doesn't want them anywhere).
 - The custom text help lists each value's options with commas only.
 
 ## 0.12.1 (2026-11-12)
-- The line page's breadcrumb no longer shows the range ("· Session"), just the value's name. Nick doesn't
-  want dot separators.
+- The line page's breadcrumb no longer shows the range after the value's name. Nick doesn't want dot separators.
 
 ## 0.12.0 (2026-11-12)
 Nick's asks after trying 0.11.2.
@@ -84,7 +99,7 @@ Edit HUD on one page, bigger buttons, and tooltips that fit. Built from `Docs/mo
 - **Delete box** is red with an ✕ icon (vanilla's own sprite, so Caxton can't break it). Line **Remove** and
   the rule ✕ use the same icon. **Reset** is now **Reset all**, set apart from Done.
 - **Tooltips** wrap and always stay on screen. The tag help behind **?** fits at 480×270, splits each tag's
-  options into "ranges · formats", and **clicking ?** keeps it open beside the panel while you type.
+  options into ranges, then formats, and **clicking ?** keeps it open beside the panel while you type.
 - **Custom text** (was "Free text"): the section says "(ADVANCED)", the box reads "Type this line with codes",
   and a short note explains what it's for before you tick it.
 - **Line page:** Range is a 2×2 grid and Range/Format/Colour have row names again, so "All-time" no longer

@@ -18,7 +18,7 @@ public final class TickRate {
 	private int lastId;
 	private boolean hasId;
 
-	// world change, join burst would read as 20+
+	// server switch, join burst would read as 20+
 	public void reset(long now) {
 		times.clear();
 		since = now;

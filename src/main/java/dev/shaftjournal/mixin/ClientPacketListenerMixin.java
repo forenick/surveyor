@@ -1,6 +1,9 @@
 package dev.shaftjournal.mixin;
 
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
+import net.minecraft.network.protocol.game.ClientboundLoginPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
@@ -32,5 +35,21 @@ public abstract class ClientPacketListenerMixin {
 	@Inject(method = "setSubtitleText", at = @At(value = "INVOKE", target = ENSURE_THREAD, shift = At.Shift.AFTER))
 	private void shaftjournal$onSubtitle(ClientboundSetSubtitleTextPacket packet, CallbackInfo ci) {
 		ShaftJournal.RECORDER.onTitle(packet.text(), true);
+	}
+
+	// every server switch, even same dimension (that keeps the old ClientLevel)
+	@Inject(method = "handleLogin", at = @At(value = "INVOKE", target = ENSURE_THREAD, shift = At.Shift.AFTER))
+	private void shaftjournal$onLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
+		ShaftJournal.HUD.onServerChange();
+	}
+
+	@Inject(method = "handleRespawn", at = @At(value = "INVOKE", target = ENSURE_THREAD, shift = At.Shift.AFTER))
+	private void shaftjournal$onRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
+		ShaftJournal.HUD.onServerChange();
+	}
+
+	@Inject(method = "handleBlockChangedAck", at = @At(value = "INVOKE", target = ENSURE_THREAD, shift = At.Shift.AFTER))
+	private void shaftjournal$onBlockAck(ClientboundBlockChangedAckPacket packet, CallbackInfo ci) {
+		ShaftJournal.HUD.onBlockAck(packet.sequence());
 	}
 }

@@ -631,12 +631,17 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		box.title = "New box";
 		box.showTitle = true;
 		placeFree(box);
+		addAndOpen(box, true);
+	}
+
+	// pick = straight to the line picker
+	private void addAndOpen(Box box, boolean pick) {
 		hud.layout().boxes.add(box);
 		selected = box;
 		scrollLeft = 0;
 		pageBox = box.id;
 		editedIndex = -1;
-		picking = true;
+		picking = pick;
 		rebuildPanel();
 	}
 
@@ -661,13 +666,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			box.offsetY = 0;
 			placeFree(box);
 		}
-		hud.layout().boxes.add(box);
-		selected = box;
-		scrollLeft = 0;
-		pageBox = box.id;
-		editedIndex = -1;
-		picking = false;
-		rebuildPanel();
+		addAndOpen(box, false);
 	}
 
 	// first free spot, else the last one
@@ -1296,7 +1295,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				for (int i = 0; i < formats.size(); i++) {
 					int format = i;
 					tip(options.add(choice(formats.get(i), line.format == i, () -> line.format = format)),
-							"Shows as " + HudFormat.example(value.kind(), i));
+							"Shows as " + HudFormat.example(value.kind(), i, HudBoxText.suffix(value, line.range)));
 				}
 				panel.child(keyRow("Format", options));
 			}
@@ -1466,8 +1465,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			List<String> codes = HudFormat.options(value.kind());
 			for (int i = 0; i < formats; i++) {
 				int format = i;
-				m.child(menuEntry("§f" + codes.get(i) + "   §7" + HudFormat.example(value.kind(), i),
-						() -> insertText(HudBoxText.tag(value, range, format))));
+				String example = HudFormat.example(value.kind(), i, HudBoxText.suffix(value, range));
+				m.child(menuEntry("§f" + codes.get(i) + "   §7" + example, () -> insertText(HudBoxText.tag(value, range, format))));
 			}
 		});
 	}
@@ -1553,7 +1552,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void ruleRow(Line line, HudLayout.ColorRule rule) {
-		HudValue.Kind kind = line.hudValue().kind();
+		HudValue value = line.hudValue();
+		HudValue.Kind kind = value.kind();
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		row.gap(2);
 		row.verticalAlignment(VerticalAlignment.CENTER);
@@ -1567,7 +1567,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		TextBoxComponent[] field = {null};
 		field[0] = textField(start, 64, typed -> {
 			Double parsed = HudFormat.parseThreshold(kind, typed);
-			boolean tag = HudBoxText.isNumberTag(typed);
+			boolean tag = HudBoxText.isLimitTag(typed, value);
 			if (tag) rule.than = typed.strip();
 			else if (parsed != null) {
 				rule.value = parsed;
@@ -1575,9 +1575,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			}
 			field[0].setTextColor(tag || parsed != null ? EditBox.DEFAULT_TEXT_COLOR : BAD_TEXT);
 		});
+		String example = HudColors.limitExample(value);
 		tip(field[0], (kind == HudValue.Kind.TIME ? "A time, like 1:30 or 90 (seconds)" : "A number")
-				+ ", or another value, like {" + (kind == HudValue.Kind.TIME ? "average_spawn" : "session_powder:all_time")
-				+ "}. Red = not a number or value.");
+				+ (kind == HudValue.Kind.TIME ? ", or another time value" : ", or another number value")
+				+ (example != null ? ", like " + example : " in {curly brackets}")
+				+ ". Red = not a number or a value that fits.");
 		row.child(field[0]);
 		ButtonComponent color = colorButton(rule.color, null, code -> rule.color = code);
 		tip(color, "Colour when the rule matches");

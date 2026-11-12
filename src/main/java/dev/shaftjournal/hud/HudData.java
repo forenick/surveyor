@@ -152,12 +152,12 @@ public final class HudData {
 	}
 
 	// null = not known right now
-	public record Game(Integer fps, Integer ping, Double tps, String clock, String modVersion, String minecraftVersion) {
+	public record Game(Integer fps, Long ping, Double tps, String clock, String modVersion, String minecraftVersion) {
 	}
 
 	public HudData game(Game game) {
 		put(HudValue.FPS, game.fps() == null ? null : game.fps().longValue());
-		put(HudValue.PING, game.ping() == null ? null : game.ping().longValue());
+		put(HudValue.PING, game.ping());
 		put(HudValue.TPS, game.tps());
 		put(HudValue.CLOCK, game.clock());
 		put(HudValue.MOD_VERSION, game.modVersion());

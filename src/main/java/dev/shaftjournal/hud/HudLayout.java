@@ -304,7 +304,7 @@ public final class HudLayout {
 					if (rule.when == null) rule.when = ColorRule.When.OVER;
 					if (!isColor(rule.color)) rule.color = "c";
 					if (!Double.isFinite(rule.value)) rule.value = 0;
-					if (rule.than != null && !HudBoxText.isNumberTag(rule.than)) rule.than = null;
+					if (rule.than != null && !HudBoxText.isLimitTag(rule.than, value)) rule.than = null;
 				}
 				if (line.rules.isEmpty() || !value.hasNumber()) line.rules = null;
 			}

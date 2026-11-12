@@ -40,9 +40,28 @@ public final class HudColors {
 	// tag not ready yet = rule skipped
 	private static Double limit(ColorRule rule, HudData data, boolean example) {
 		if (rule.than == null) return rule.value;
-		HudValue value = HudBoxText.numberTagValue(rule.than);
-		Double number = value == null ? null : data.number(value, HudBoxText.numberTagRange(rule.than), example);
-		return number == null ? null : shown(value.kind(), number);
+		HudBoxText.Tag tag = HudBoxText.numberTag(rule.than);
+		Double number = tag == null ? null : data.number(tag.value(), tag.range(), example);
+		return number == null ? null : shown(tag.value().kind(), number);
+	}
+
+	// times only vs times (secs), cold vs cold, counts vs counts
+	public static boolean comparable(HudValue a, HudValue b) {
+		if (!a.hasNumber() || !b.hasNumber()) return false;
+		return family(a.kind()) == family(b.kind());
+	}
+
+	private static Kind family(Kind kind) {
+		return kind == Kind.DECIMAL ? Kind.INTEGER : kind;
+	}
+
+	// a value thats worth comparing w/, null = none
+	public static String limitExample(HudValue value) {
+		return switch (value) {
+			case SPAWN_TIMER, SHAFT_TIME -> "{average_spawn}";
+			case AVERAGE_SPAWN -> "{spawn_timer}";
+			default -> null;
+		};
 	}
 
 	// whole secs, so "over 1:30" skips a shown 1:30

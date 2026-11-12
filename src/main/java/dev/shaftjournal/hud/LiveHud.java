@@ -23,9 +23,6 @@ import net.minecraft.SharedConstants;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +77,7 @@ public final class LiveHud {
 	private Path file;
 	private int tick;
 	private final TickRate tickRate = new TickRate();
-	private ClientLevel tickRateLevel;
+	private final PingTimer pingTimer = new PingTimer();
 
 	private record Prepared(Box box, List<String> lines, HudRenderer.Bounds bounds) {
 	}
@@ -196,18 +193,27 @@ public final class LiveHud {
 		return box.visible(inMines, inShaft);
 	}
 
-	// mixin, client thread
+	// mixins, client thread
 	public void onServerPing(int id) {
 		tickRate.onPing(id, System.currentTimeMillis());
 	}
 
+	public void onServerChange() {
+		tickRate.reset(System.currentTimeMillis());
+		pingTimer.reset();
+	}
+
+	public void onBlockSent(int sequence) {
+		pingTimer.onSent(sequence, System.currentTimeMillis());
+	}
+
+	public void onBlockAck(int sequence) {
+		pingTimer.onAck(sequence, System.currentTimeMillis());
+	}
+
 	public void onTick(Minecraft client) {
-		long now = System.currentTimeMillis();
-		if (client.level != tickRateLevel) {
-			tickRateLevel = client.level;
-			tickRate.reset(now);
-		}
 		if (++tick % REFRESH_TICKS != 0) return;
+		long now = System.currentTimeMillis();
 		Shaft shaft = tracker.currentShaft();
 		inShaft = shaft != null;
 		inMines = tracker.inMiningArea();
@@ -234,13 +240,9 @@ public final class LiveHud {
 	}
 
 	private HudData.Game game(Minecraft client, long now) {
-		// servers own number from the tab list, we cant ping (sends packets). may lag on hypixel
-		ClientPacketListener connection = client.getConnection();
-		PlayerInfo self = connection == null || client.player == null ? null : connection.getPlayerInfo(client.player.getUUID());
-		Integer ping = self == null || self.getLatency() <= 0 ? null : self.getLatency();
 		// java 20+ puts a narrow nbsp before AM/PM, not every font has it
 		String clock = LocalTime.now().format(CLOCK).replace('\u202f', ' ').replace('\u00a0', ' ');
-		return new HudData.Game(client.getFps(), ping, tickRate.tps(now), clock, MOD_VERSION,
+		return new HudData.Game(client.getFps(), pingTimer.ping(now), tickRate.tps(now), clock, MOD_VERSION,
 				SharedConstants.getCurrentVersion().name());
 	}
 

@@ -16,9 +16,10 @@ public final class HudFormat {
 	private static final List<String> DECIMAL = List.of("0.0", "0", "0.00");
 	private static final List<String> COLD = List.of("0❄");
 	private static final List<String> TEXT = List.of("Text");
-	private static final List<String> TIME_EXAMPLES = List.of("1:42", "1m 42s", "102s");
-	private static final List<String> INTEGER_EXAMPLES = List.of("43,436", "43.4k, 1.2M", "43436");
-	private static final List<String> DECIMAL_EXAMPLES = List.of("19.4", "19", "19.42");
+	private static final List<List<String>> TIME_EXAMPLES = List.of(List.of("1:42"), List.of("1m 42s"), List.of("102s"));
+	private static final List<List<String>> INTEGER_EXAMPLES = List.of(List.of("43,436"), List.of("43.4k", "1.2M"),
+			List.of("43436"));
+	private static final List<List<String>> DECIMAL_EXAMPLES = List.of(List.of("19.4"), List.of("19"), List.of("19.42"));
 	// same order as the lists above
 	private static final List<String> TIME_NAMES = List.of("clock", "minutes", "seconds");
 	private static final List<String> INTEGER_NAMES = List.of("comma", "short", "plain");
@@ -39,14 +40,16 @@ public final class HudFormat {
 		};
 	}
 
-	public static String example(Kind kind, int format) {
-		List<String> examples = switch (kind) {
+	// suffix = unit or /h, see HudBoxText.suffix
+	public static String example(Kind kind, int format, String suffix) {
+		List<List<String>> examples = switch (kind) {
 			case TIME -> TIME_EXAMPLES;
 			case INTEGER -> INTEGER_EXAMPLES;
 			case DECIMAL -> DECIMAL_EXAMPLES;
 			case COLD, TEXT -> List.of();
 		};
-		return format >= 0 && format < examples.size() ? examples.get(format) : "";
+		if (format < 0 || format >= examples.size()) return "";
+		return String.join(", ", examples.get(format).stream().map(example -> example + suffix).toList());
 	}
 
 	public static List<String> names(Kind kind) {

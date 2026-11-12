@@ -17,7 +17,7 @@ public enum HudValue {
 	SHAFT_COLD("shaft_cold", "Cold", Group.SHAFT, Kind.COLD, "Cold: "),
 	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Group.SHAFT, Kind.INTEGER, "Campfires: "),
 	FPS("fps", "FPS", Group.GAME, Kind.INTEGER, "FPS: "),
-	PING("ping", "Ping", Group.GAME, Kind.INTEGER, "Ping: "),
+	PING("ping", "Ping", Group.GAME, Kind.INTEGER, "Ping: ", "ms"),
 	TPS("tps", "TPS", Group.GAME, Kind.DECIMAL, "TPS: "),
 	CLOCK("clock", "Clock", Group.GAME, Kind.TEXT, "Time: "),
 	MOD_VERSION("mod_version", "ShaftJournal version", Group.GAME, Kind.TEXT, "ShaftJournal "),
@@ -86,13 +86,19 @@ public enum HudValue {
 	private final Kind kind;
 	private final String defaultPrefix;
 	private final List<Range> ranges;
+	private final String unit;
 
 	HudValue(String id, String displayName, Group group, Kind kind, String defaultPrefix, Range... ranges) {
+		this(id, displayName, group, kind, defaultPrefix, "", ranges);
+	}
+
+	HudValue(String id, String displayName, Group group, Kind kind, String defaultPrefix, String unit, Range... ranges) {
 		this.id = id;
 		this.displayName = displayName;
 		this.group = group;
 		this.kind = kind;
 		this.defaultPrefix = defaultPrefix;
+		this.unit = unit;
 		this.ranges = List.of(ranges);
 	}
 
@@ -130,7 +136,7 @@ public enum HudValue {
 	}
 
 	public String unit() {
-		return this == PING ? "ms" : "";
+		return unit;
 	}
 
 	public boolean hasNumber() {

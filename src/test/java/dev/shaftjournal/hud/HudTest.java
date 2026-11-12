@@ -262,6 +262,7 @@ class HudTest {
 		assertEquals("§7Powder: §f...", HudBoxText.lines(box, later, false).getFirst(), "the dots count up over time");
 		assertEquals(List.of(".§\uE000..§\uE001", "..§\uE000.§\uE001", "...", ".§\uE000..§\uE001"),
 				List.of(HudBoxText.waiting(0), HudBoxText.waiting(600), HudBoxText.waiting(1_200), HudBoxText.waiting(1_800)));
+		assertEquals("§7Powder: §f.", HudBoxText.line(box, perHour, empty, false), "labels get no hidden dots");
 		assertEquals(List.of("§7Powder: §f§l.", "§f§l..", "§f§l gems"),
 				HudBoxText.pieces("§7Powder: §f§l." + HudBoxText.HIDE_START + ".." + HudBoxText.HIDE_END + " gems"),
 				"hidden dots keep the colour + bold, so they measure the same as drawn");
@@ -443,10 +444,13 @@ class HudTest {
 		assertNull(HudColors.color(spawn, HudData.EXAMPLE, false));
 		HudData noAverage = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
 		assertNull(HudColors.color(spawn, noAverage, false), "no average yet, rule skipped");
-		assertTrue(HudBoxText.isNumberTag(" {session_powder:all_time} "));
-		assertFalse(HudBoxText.isNumberTag("{shaft_type}"), "text values cant be compared");
-		assertFalse(HudBoxText.isNumberTag("{nope}"));
-		assertFalse(HudBoxText.isNumberTag("90"));
+		assertTrue(HudBoxText.isLimitTag(" {session_powder:all_time} ", HudValue.SESSION_POWDER));
+		assertTrue(HudBoxText.isLimitTag("{shafts_per_hour}", HudValue.SESSION_SHAFTS), "counts vs decimals is fine");
+		assertFalse(HudBoxText.isLimitTag("{shaft_type}", HudValue.SESSION_POWDER), "text values cant be compared");
+		assertFalse(HudBoxText.isLimitTag("{session_powder}", HudValue.SHAFT_COLD), "cold vs powder makes no sense");
+		assertFalse(HudBoxText.isLimitTag("{average_spawn}", HudValue.FPS), "secs vs a count neither");
+		assertFalse(HudBoxText.isLimitTag("{nope}", HudValue.FPS));
+		assertFalse(HudBoxText.isLimitTag("90", HudValue.FPS));
 	}
 
 	@Test
@@ -570,7 +574,7 @@ class HudTest {
 	@Test
 	void gameValuesShowWithUnits() {
 		HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults())
-				.game(new HudData.Game(144, 42, 19.94, "21:42", "0.13.0", "26.2"));
+				.game(new HudData.Game(144, 42L, 19.94, "21:42", "0.13.0", "26.2"));
 		Box box = new Box();
 		for (HudValue value : List.of(HudValue.FPS, HudValue.PING, HudValue.TPS, HudValue.CLOCK, HudValue.MOD_VERSION,
 				HudValue.MINECRAFT_VERSION)) {
@@ -604,7 +608,34 @@ class HudTest {
 		assertEquals(10.0, rate.tps(t - 100), 1e-9, "last 100 gaps only");
 		assertEquals(0.0, rate.tps(t - 100 + TickRate.STALE_MILLIS + 1), "stalled server");
 		rate.reset(t);
-		assertNull(rate.tps(t), "world change clears it");
+		assertNull(rate.tps(t), "server switch clears it");
+	}
+
+	@Test
+	void pingFromBlockAcks() {
+		PingTimer ping = new PingTimer();
+		assertNull(ping.ping(0), "no mining yet");
+		ping.onSent(1, 1_000);
+		ping.onSent(2, 1_010);
+		ping.onSent(3, 1_020);
+		ping.onAck(3, 1_100);
+		assertEquals(80L, ping.ping(1_100), "only the acked sequence is timed, 1 + 2 waited longer");
+		ping.onAck(2, 1_200);
+		assertEquals(80L, ping.ping(1_200), "old ack ignored");
+		for (int i = 4; i < 4 + PingTimer.SAMPLES; i++) {
+			ping.onSent(i, i * 1_000L);
+			ping.onAck(i, i * 1_000L + (i == 5 ? 900 : 50));
+		}
+		assertEquals(50L, ping.ping(20_000), "median, one slow ack doesnt move it");
+		long last = (3 + PingTimer.SAMPLES) * 1_000L + 50;
+		assertNull(ping.ping(last + PingTimer.STALE_MILLIS + 1), "stopped mining a while ago");
+		ping.onSent(100, 200_000);
+		ping.reset();
+		ping.onAck(100, 200_050);
+		assertNull(ping.ping(200_050), "server switch drops whats in flight");
+		ping.onSent(1, 300_000);
+		ping.onAck(1, 300_030);
+		assertEquals(30L, ping.ping(300_030), "old samples dropped after a long break");
 	}
 
 	@Test
@@ -638,7 +669,9 @@ class HudTest {
 		assertEquals(List.of("m:ss", "m\"m\" s\"s\"", "s\"s\""), HudFormat.options(Kind.TIME));
 		for (Kind kind : List.of(Kind.INTEGER, Kind.DECIMAL, Kind.TIME)) {
 			assertEquals(HudFormat.options(kind).size(), HudFormat.names(kind).size(), kind + " names");
-			for (int i = 0; i < HudFormat.options(kind).size(); i++) assertFalse(HudFormat.example(kind, i).isEmpty());
+			for (int i = 0; i < HudFormat.options(kind).size(); i++) assertFalse(HudFormat.example(kind, i, "").isEmpty());
 		}
+		assertEquals("43.4kms, 1.2Mms", HudFormat.example(Kind.INTEGER, 1, HudBoxText.suffix(HudValue.PING, null)));
+		assertEquals("43,436/h", HudFormat.example(Kind.INTEGER, 0, HudBoxText.suffix(HudValue.SESSION_POWDER, Range.PER_HOUR)));
 	}
 }
