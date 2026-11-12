@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.13.0 (2026-11-12)
+Nick's asks: game values, presets and clearer number formats.
+- **New "Game" values** in the line picker and as tags: **FPS** (`{fps}`), **Ping** (`{ping}`, in ms),
+  **TPS** (`{tps}`), **Clock** (`{clock}`, your computer's time in your system's 12h/24h style),
+  **ShaftJournal version** (`{mod_version}`) and **Minecraft version** (`{minecraft_version}`).
+  - Ping is the number the server puts in the tab list for you. Measuring it ourselves would mean sending
+    packets, which the mod never does. It may update slowly or be off on Hypixel; still to check in game.
+  - TPS times the "ping" packets Hypixel's anticheat sends once per server tick (SkyHanni's method). It
+    waits 5 s after joining or switching servers, shows 0 when the server stops sending them, and "-" on
+    servers that don't send them. Still to check in game.
+- **"+ Preset" on the Edit HUD toolbar** adds a ready-made box: Spawn, Session or Current shaft (the
+  defaults, f.e. to get a deleted one back), All-time totals (shafts, powder and Fine, all-time) or
+  Performance (FPS, ping and TPS, shown everywhere). A preset goes to its own spot if that's free, or the
+  first free spot otherwise. Hover an entry to see its lines.
+- **Format buttons show format codes** instead of example numbers, spreadsheet style: `#,##0`, `0.0k`, `0`
+  for numbers, `0.0`, `0`, `0.00` for decimals and `m:ss`, `m"m" s"s"`, `s"s"` for times. Hovering a
+  button shows an example, f.e. "Shows as 43.4k, 1.2M". The "+ Value ▾" menu in custom text shows both.
+
 ## 0.12.2 (2026-11-12)
 No more dot separators in the editor (Nick doesn't want them anywhere).
 - The hint at the bottom of the editor uses commas.

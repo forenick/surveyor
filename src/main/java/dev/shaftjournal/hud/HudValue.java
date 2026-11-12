@@ -15,13 +15,20 @@ public enum HudValue {
 	SHAFT_TIME("shaft_time", "Time inside", Group.SHAFT, Kind.TIME, "Inside: "),
 	SHAFT_CORPSES("shaft_corpses", "Corpses", Group.SHAFT, Kind.TEXT, "Corpses: "),
 	SHAFT_COLD("shaft_cold", "Cold", Group.SHAFT, Kind.COLD, "Cold: "),
-	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Group.SHAFT, Kind.INTEGER, "Campfires: ");
+	SHAFT_CAMPFIRES("shaft_campfires", "Campfires", Group.SHAFT, Kind.INTEGER, "Campfires: "),
+	FPS("fps", "FPS", Group.GAME, Kind.INTEGER, "FPS: "),
+	PING("ping", "Ping", Group.GAME, Kind.INTEGER, "Ping: "),
+	TPS("tps", "TPS", Group.GAME, Kind.DECIMAL, "TPS: "),
+	CLOCK("clock", "Clock", Group.GAME, Kind.TEXT, "Time: "),
+	MOD_VERSION("mod_version", "ShaftJournal version", Group.GAME, Kind.TEXT, "ShaftJournal "),
+	MINECRAFT_VERSION("minecraft_version", "Minecraft version", Group.GAME, Kind.TEXT, "Minecraft ");
 
 	// picker headings, display only
 	public enum Group {
 		SPAWN("Spawn"),
 		SESSION("Session"),
-		SHAFT("This shaft");
+		SHAFT("This shaft"),
+		GAME("Game");
 
 		private final String displayName;
 
@@ -120,6 +127,10 @@ public enum HudValue {
 	// session so pre-range lines + tags still show the same
 	public Range defaultRange() {
 		return hasRange(Range.SESSION) ? Range.SESSION : ranges.isEmpty() ? null : ranges.getFirst();
+	}
+
+	public String unit() {
+		return this == PING ? "ms" : "";
 	}
 
 	public boolean hasNumber() {

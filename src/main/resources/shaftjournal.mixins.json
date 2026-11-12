@@ -3,6 +3,7 @@
 	"package": "dev.shaftjournal.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"ClientCommonPacketListenerMixin",
 		"ClientPacketListenerMixin",
 		"PlayerTabOverlayAccessor"
 	],

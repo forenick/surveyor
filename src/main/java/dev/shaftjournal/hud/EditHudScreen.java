@@ -256,6 +256,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent newBox = button("+ New box", b -> newBox());
 		tip(toolbarTips, newBox, "Add an empty box and pick its first line");
 		toolbar.child(newBox);
+		ButtonComponent preset = button("+ Preset", this::presetMenu);
+		tip(toolbarTips, preset, "Add a ready-made box");
+		toolbar.child(preset);
 		ButtonComponent done = button("Done", b -> onClose());
 		tip(toolbarTips, done, "Changes save by themselves");
 		toolbar.child(done);
@@ -627,12 +630,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		box.id = newBoxId();
 		box.title = "New box";
 		box.showTitle = true;
-		for (Anchor[] spot : NEW_BOX_SPOTS) {
-			box.anchorX = spot[0];
-			box.anchorY = spot[1];
-			HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height).grown(HudLayout.MARGIN);
-			if (drawn.values().stream().noneMatch(b -> bounds.overlapArea(b) > 0)) break;
-		}
+		placeFree(box);
 		hud.layout().boxes.add(box);
 		selected = box;
 		scrollLeft = 0;
@@ -640,6 +638,50 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		editedIndex = -1;
 		picking = true;
 		rebuildPanel();
+	}
+
+	private void presetMenu(ButtonComponent anchor) {
+		openMenu(anchor, m -> {
+			m.child(menuTitle("Add a ready-made box"));
+			for (HudLayout.Preset preset : HudLayout.presets()) {
+				FlowLayout entry = menuEntry("§f" + preset.name(), () -> addPreset(preset));
+				tip(entry, preset.description());
+				m.child(entry);
+			}
+		});
+	}
+
+	private void addPreset(HudLayout.Preset preset) {
+		closeMenu();
+		Box box = preset.box().get();
+		if (hud.layout().boxes.stream().anyMatch(b -> box.id.equals(b.id))) box.id = newBoxId();
+		// own spot if free
+		if (!free(box)) {
+			box.offsetX = 0;
+			box.offsetY = 0;
+			placeFree(box);
+		}
+		hud.layout().boxes.add(box);
+		selected = box;
+		scrollLeft = 0;
+		pageBox = box.id;
+		editedIndex = -1;
+		picking = false;
+		rebuildPanel();
+	}
+
+	// first free spot, else the last one
+	private void placeFree(Box box) {
+		for (Anchor[] spot : NEW_BOX_SPOTS) {
+			box.anchorX = spot[0];
+			box.anchorY = spot[1];
+			if (free(box)) return;
+		}
+	}
+
+	private boolean free(Box box) {
+		HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height).grown(HudLayout.MARGIN);
+		return drawn.values().stream().noneMatch(b -> bounds.overlapArea(b) > 0);
 	}
 
 	private String newBoxId() {
@@ -1253,7 +1295,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				Grid options = new Grid(formats.size(), KEY);
 				for (int i = 0; i < formats.size(); i++) {
 					int format = i;
-					tip(options.add(choice(formats.get(i), line.format == i, () -> line.format = format)), "Number format");
+					tip(options.add(choice(formats.get(i), line.format == i, () -> line.format = format)),
+							"Shows as " + HudFormat.example(value.kind(), i));
 				}
 				panel.child(keyRow("Format", options));
 			}
@@ -1420,10 +1463,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		openMenu(anchor, m -> {
 			m.child(menuTitle(value.displayName()));
 			// own examples, real values can look the same in every format
-			List<String> examples = HudFormat.options(value.kind());
+			List<String> codes = HudFormat.options(value.kind());
 			for (int i = 0; i < formats; i++) {
 				int format = i;
-				m.child(menuEntry("§f" + examples.get(i), () -> insertText(HudBoxText.tag(value, range, format))));
+				m.child(menuEntry("§f" + codes.get(i) + "   §7" + HudFormat.example(value.kind(), i),
+						() -> insertText(HudBoxText.tag(value, range, format))));
 			}
 		});
 	}

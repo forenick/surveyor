@@ -257,7 +257,8 @@ public final class HudBoxText {
 
 	private static String formatted(HudValue value, Range range, int format, Object v) {
 		String text = HudFormat.format(value.kind(), format, v);
-		return v != null && range == Range.PER_HOUR ? text + "/h" : text;
+		if (v == null) return text;
+		return range == Range.PER_HOUR ? text + "/h" : text + value.unit();
 	}
 
 	record Tag(HudValue value, Range range, int format) {

@@ -10,11 +10,15 @@ import dev.shaftjournal.hud.HudValue.Kind;
 public final class HudFormat {
 	public static final String MISSING = "-";
 
-	private static final List<String> TIME = List.of("1:42", "1m 42s", "102s");
-	private static final List<String> INTEGER = List.of("43,436", "43.4k", "43436");
-	private static final List<String> DECIMAL = List.of("19.4", "19", "19.42");
-	private static final List<String> COLD = List.of("-12❄");
+	// spreadsheet style codes, nicks pick (2026-11-12)
+	private static final List<String> TIME = List.of("m:ss", "m\"m\" s\"s\"", "s\"s\"");
+	private static final List<String> INTEGER = List.of("#,##0", "0.0k", "0");
+	private static final List<String> DECIMAL = List.of("0.0", "0", "0.00");
+	private static final List<String> COLD = List.of("0❄");
 	private static final List<String> TEXT = List.of("Text");
+	private static final List<String> TIME_EXAMPLES = List.of("1:42", "1m 42s", "102s");
+	private static final List<String> INTEGER_EXAMPLES = List.of("43,436", "43.4k, 1.2M", "43436");
+	private static final List<String> DECIMAL_EXAMPLES = List.of("19.4", "19", "19.42");
 	// same order as the lists above
 	private static final List<String> TIME_NAMES = List.of("clock", "minutes", "seconds");
 	private static final List<String> INTEGER_NAMES = List.of("comma", "short", "plain");
@@ -33,6 +37,16 @@ public final class HudFormat {
 			case COLD -> COLD;
 			case TEXT -> TEXT;
 		};
+	}
+
+	public static String example(Kind kind, int format) {
+		List<String> examples = switch (kind) {
+			case TIME -> TIME_EXAMPLES;
+			case INTEGER -> INTEGER_EXAMPLES;
+			case DECIMAL -> DECIMAL_EXAMPLES;
+			case COLD, TEXT -> List.of();
+		};
+		return format >= 0 && format < examples.size() ? examples.get(format) : "";
 	}
 
 	public static List<String> names(Kind kind) {

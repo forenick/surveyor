@@ -566,4 +566,79 @@ class HudTest {
 		assertEquals(2, inside.size());
 		assertEquals(5759 + 4791 + 1510, inside.getFirst().powder(), "the Aquamarine shaft: corpses plus the exit bonus");
 	}
+
+	@Test
+	void gameValuesShowWithUnits() {
+		HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults())
+				.game(new HudData.Game(144, 42, 19.94, "21:42", "0.13.0", "26.2"));
+		Box box = new Box();
+		for (HudValue value : List.of(HudValue.FPS, HudValue.PING, HudValue.TPS, HudValue.CLOCK, HudValue.MOD_VERSION,
+				HudValue.MINECRAFT_VERSION)) {
+			box.lines.add(new Line(value));
+		}
+		assertEquals(List.of("§7FPS: §f144", "§7Ping: §f42ms", "§7TPS: §f19.9", "§7Time: §f21:42", "§7ShaftJournal §f0.13.0",
+				"§7Minecraft §f26.2"), HudBoxText.lines(box, data, false));
+		HudData unknown = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults())
+				.game(new HudData.Game(60, null, null, "21:42", null, "26.2"));
+		assertEquals("§7Ping: §f-", HudBoxText.line(box, box.lines.get(1), unknown, false), "no ms after a missing ping");
+		assertEquals("§7Ping: §f42ms", HudBoxText.line(box, box.lines.get(1), unknown, true), "editor example");
+		assertEquals("Ping 42ms", HudBoxText.tags("Ping {ping}", data, false), "tags carry the unit too");
+	}
+
+	@Test
+	void tickRateFromServerPings() {
+		TickRate rate = new TickRate();
+		rate.reset(0);
+		assertNull(rate.tps(0));
+		long t = 0;
+		int id = 0;
+		// warm-up pings ignored
+		for (; t < TickRate.WARMUP_MILLIS; t += 50) rate.onPing(id++, t);
+		assertNull(rate.tps(t), "nothing after warm-up yet");
+		for (int i = 0; i <= TickRate.MIN_GAPS; i++, t += 50) {
+			rate.onPing(id++, t);
+			rate.onPing(id - 1, t + 10);
+		}
+		assertEquals(20.0, rate.tps(t - 50), 1e-9, "duplicate ids skipped");
+		for (int i = 0; i < 200; i++, t += 100) rate.onPing(id++, t);
+		assertEquals(10.0, rate.tps(t - 100), 1e-9, "last 100 gaps only");
+		assertEquals(0.0, rate.tps(t - 100 + TickRate.STALE_MILLIS + 1), "stalled server");
+		rate.reset(t);
+		assertNull(rate.tps(t), "world change clears it");
+	}
+
+	@Test
+	void presetsAddTheirLines() {
+		List<HudLayout.Preset> presets = HudLayout.presets();
+		assertEquals(List.of("Spawn", "Session", "Current shaft", "All-time totals", "Performance"),
+				presets.stream().map(HudLayout.Preset::name).toList());
+		HudLayout defaults = HudLayout.defaults();
+		assertEquals(defaults.boxes.get(1).id, presets.get(0).box().get().id);
+		assertEquals(json(defaults.boxes.get(1)), json(presets.get(0).box().get()), "same as the default box");
+		Box allTime = presets.get(3).box().get();
+		assertEquals(List.of("§e§lAll-time", "§7Shafts: §f412", "§7Powder: §f1,204,310", "§7Fine: §f412.8"),
+				HudBoxText.lines(allTime, HudData.EXAMPLE, true));
+		Box performance = presets.get(4).box().get();
+		assertTrue(performance.visible(false, false), "shown everywhere");
+		assertEquals(List.of("§7FPS: §f144", "§7Ping: §f42ms", "§7TPS: §f19.9"),
+				HudBoxText.lines(performance, HudData.EXAMPLE, true));
+		assertTrue(presets.get(0).box().get() != presets.get(0).box().get(), "a new box each time");
+	}
+
+	private static String json(Box box) {
+		HudLayout layout = new HudLayout();
+		layout.boxes.add(box);
+		return layout.toJson();
+	}
+
+	@Test
+	void formatCodesMatchTheFormats() {
+		assertEquals(List.of("#,##0", "0.0k", "0"), HudFormat.options(Kind.INTEGER));
+		assertEquals(List.of("0.0", "0", "0.00"), HudFormat.options(Kind.DECIMAL));
+		assertEquals(List.of("m:ss", "m\"m\" s\"s\"", "s\"s\""), HudFormat.options(Kind.TIME));
+		for (Kind kind : List.of(Kind.INTEGER, Kind.DECIMAL, Kind.TIME)) {
+			assertEquals(HudFormat.options(kind).size(), HudFormat.names(kind).size(), kind + " names");
+			for (int i = 0; i < HudFormat.options(kind).size(); i++) assertFalse(HudFormat.example(kind, i).isEmpty());
+		}
+	}
 }

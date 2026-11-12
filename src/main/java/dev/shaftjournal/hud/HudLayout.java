@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -170,29 +171,70 @@ public final class HudLayout {
 	// from Docs/mockups/hud-v1.html
 	public static HudLayout defaults() {
 		HudLayout layout = new HudLayout();
+		layout.boxes.add(sessionBox());
+		layout.boxes.add(spawnBox());
+		layout.boxes.add(shaftBox());
+		return layout;
+	}
 
+	public record Preset(String name, String description, Supplier<Box> box) {
+	}
+
+	// nicks picks (2026-11-12), lines matter more than looks
+	public static List<Preset> presets() {
+		return List.of(
+				new Preset("Spawn", "Spawn timer and average spawn", HudLayout::spawnBox),
+				new Preset("Session", "Shafts, shafts per hour, powder and Fine", HudLayout::sessionBox),
+				new Preset("Current shaft", "Time inside, corpses, cold and campfires", HudLayout::shaftBox),
+				new Preset("All-time totals", "Shafts, powder and Fine, all-time", HudLayout::allTimeBox),
+				new Preset("Performance", "FPS, ping and TPS", HudLayout::performanceBox));
+	}
+
+	private static Box sessionBox() {
 		Box session = box("session", "Session", true, true, Background.DARK, Align.LEFT, Anchor.START, 0, Anchor.START, 0);
 		session.lines.add(new Line(HudValue.SESSION_SHAFTS, null, true, 0));
 		session.lines.add(new Line(HudValue.SHAFTS_PER_HOUR, null, true, 0));
 		session.lines.add(new Line(HudValue.AVERAGE_SPAWN, null, false, 1));
 		session.lines.add(new Line(HudValue.SESSION_POWDER, null, true, 0));
 		session.lines.add(new Line(HudValue.SESSION_CORPSE_FINE, null, true, 0));
-		layout.boxes.add(session);
+		return session;
+	}
 
+	private static Box spawnBox() {
 		// = v1s 58% at 1080p, under the crosshair
 		Box spawn = box("spawn", "Spawn", false, true, Background.NONE, Align.CENTER, Anchor.MIDDLE, 0, Anchor.MIDDLE, 18);
 		spawn.valueBold = true;
 		spawn.lines.add(new Line(HudValue.SPAWN_TIMER, null, true, 0));
 		spawn.lines.add(new Line(HudValue.AVERAGE_SPAWN, "Avg: ", true, 0));
-		layout.boxes.add(spawn);
+		return spawn;
+	}
 
+	private static Box shaftBox() {
 		Box shaft = box("shaft", "{shaft_type} Shaft", true, false, Background.FRAME, Align.LEFT, Anchor.END, 0, Anchor.START, 0);
 		shaft.lines.add(new Line(HudValue.SHAFT_TIME, null, true, 0));
 		shaft.lines.add(new Line(HudValue.SHAFT_CORPSES, null, true, 0));
 		shaft.lines.add(new Line(HudValue.SHAFT_COLD, null, true, 0));
 		shaft.lines.add(new Line(HudValue.SHAFT_CAMPFIRES, null, true, 0));
-		layout.boxes.add(shaft);
-		return layout;
+		return shaft;
+	}
+
+	private static Box allTimeBox() {
+		Box box = box("all_time", "All-time", true, true, Background.DARK, Align.LEFT, Anchor.START, 0, Anchor.MIDDLE, 0);
+		for (HudValue value : List.of(HudValue.SESSION_SHAFTS, HudValue.SESSION_POWDER, HudValue.SESSION_CORPSE_FINE)) {
+			Line line = new Line(value);
+			line.range = Range.ALL_TIME;
+			box.lines.add(line);
+		}
+		return box;
+	}
+
+	private static Box performanceBox() {
+		Box box = box("performance", "Performance", false, true, Background.DARK, Align.LEFT, Anchor.END, 0, Anchor.END, 0);
+		box.showElsewhere = true;
+		box.lines.add(new Line(HudValue.FPS));
+		box.lines.add(new Line(HudValue.PING));
+		box.lines.add(new Line(HudValue.TPS));
+		return box;
 	}
 
 	private static Box box(String id, String title, boolean showTitle, boolean inMines, Background background,

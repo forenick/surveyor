@@ -151,6 +151,19 @@ public final class HudData {
 		return data;
 	}
 
+	// null = not known right now
+	public record Game(Integer fps, Integer ping, Double tps, String clock, String modVersion, String minecraftVersion) {
+	}
+
+	public HudData game(Game game) {
+		put(HudValue.FPS, game.fps() == null ? null : game.fps().longValue());
+		put(HudValue.PING, game.ping() == null ? null : game.ping().longValue());
+		put(HudValue.TPS, game.tps());
+		put(HudValue.CLOCK, game.clock());
+		put(HudValue.MOD_VERSION, game.modVersion());
+		return put(HudValue.MINECRAFT_VERSION, game.minecraftVersion());
+	}
+
 	private void placeholders(Range range) {
 		for (HudValue value : HudValue.values()) {
 			if (value.hasRange(range)) placeholders.add(key(value, range));
@@ -188,7 +201,10 @@ public final class HudData {
 				.put(HudValue.SHAFT_TIME, 134_000L)
 				.put(HudValue.SHAFT_CORPSES, "2/4 Lapis, Umber")
 				.cold(-12)
-				.put(HudValue.SHAFT_CAMPFIRES, 1L);
+				.put(HudValue.SHAFT_CAMPFIRES, 1L)
+				.put(HudValue.FPS, 144L)
+				.put(HudValue.PING, 42L)
+				.put(HudValue.TPS, 19.9);
 	}
 
 	// package private for tests
