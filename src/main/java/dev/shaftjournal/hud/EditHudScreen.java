@@ -1205,10 +1205,9 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			rebuildPanel();
 		});
 		tip(remove, "Remove this line. Ctrl+Z brings it back.");
-		String range = value.ranges().size() > 1 && !line.advanced ? " §7· " + line.range.displayName() : "";
 		header.child(spacer());
 		header.child(remove);
-		panel.child(crumbs(box, value.displayName() + range));
+		panel.child(crumbs(box, value.displayName()));
 		panel.child(header);
 
 		FlowLayout look = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
