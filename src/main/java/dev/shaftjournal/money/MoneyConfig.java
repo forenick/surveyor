@@ -42,7 +42,7 @@ final class MoneyConfig {
 		byDay = value;
 	}
 
-	// rewrites only "journal", rest of the file stays as typed
+	// rewrites the file, other values kept but json comments + layout arent
 	void saveByDay(boolean value) {
 		byDay = value;
 		try {
@@ -52,8 +52,8 @@ final class MoneyConfig {
 			JsonObject journal = json.has("journal") && json.get("journal").isJsonObject() ? json.getAsJsonObject("journal") : new JsonObject();
 			journal.addProperty("byDay", value);
 			json.add("journal", journal);
+			// loadedMtime stays, so the next reload picks up "money" edits made before this
 			SafeWrite.write(file, GSON.toJson(json));
-			loadedMtime = Files.getLastModifiedTime(file).toMillis();
 		} catch (IOException | RuntimeException e) {
 			// broken hand edit, never overwrite it
 			LOGGER.warn("Could not save {}: {}", file, e.toString());

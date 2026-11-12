@@ -27,6 +27,11 @@ public final class JournalStats {
 	private JournalStats() {
 	}
 
+	// null under MIN_RATE_MILLIS
+	public static Double perHour(double amount, long millis) {
+		return millis < MIN_RATE_MILLIS ? null : amount * 3_600_000.0 / millis;
+	}
+
 	public record CorpseCount(int looted, int total) {
 	}
 
@@ -65,8 +70,7 @@ public final class JournalStats {
 		}
 
 		public Double perHour(double amount, long now) {
-			long length = Math.max(end(), now) - start();
-			return length < MIN_RATE_MILLIS ? null : amount * 3_600_000.0 / length;
+			return JournalStats.perHour(amount, Math.max(end(), now) - start());
 		}
 
 		public long powder() {

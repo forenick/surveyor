@@ -145,6 +145,23 @@ class JournalTest {
 	}
 
 	@Test
+	void onlyMinesAndShaftsKeepASession() {
+		at(0).hit(true);
+		visitShaft(MINUTE, "JADE_1");
+		// half an hour on the garden
+		for (long t = 2 * MINUTE; t <= 32 * MINUTE; t += MINUTE) at(t).hit(false);
+		assertNull(journal.activeSession(32 * MINUTE));
+
+		// 20 min mining inside one shaft
+		at(40 * MINUTE).hit(true);
+		at(41 * MINUTE).tracker.onWorldChange(now);
+		tracker.onScoreboard(now, List.of("§e§lSKYBLOCK", "§711/11/26 §8m19AB JADE_1"));
+		for (long t = 42 * MINUTE; t <= 60 * MINUTE; t += MINUTE) at(t).hit(false);
+		at(61 * MINUTE).tracker.onWorldChange(now);
+		assertEquals(40 * MINUTE, entries.get(1).sessionId(), "same session, not a new one at the exit");
+	}
+
+	@Test
 	void longBreakStartsNewSessionAndDropsTheTimer() {
 		at(0).hit(true);
 		at(16 * MINUTE).hit(true);

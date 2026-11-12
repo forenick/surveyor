@@ -4,6 +4,24 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.17.3 (2026-11-13)
+Fixes from a code review of 0.15.0 to 0.17.2.
+- **Sessions only count Mines and shaft time.** Hitting blocks on the Garden, the Hub or anywhere else no longer starts
+  a session or keeps one going, so the Session tab doesn't say your session has started while you're farming, and
+  a session's length and coins per hour aren't stretched by time spent elsewhere. Mining inside a shaft still counts.
+- **Overview with By day off** sizes Coins and Coins / h for the rows it shows, so columns no longer drop out early
+  on narrow screens.
+- **New prices no longer scroll the journal back to the top.** The tables, the shaft view and the Stats columns keep
+  where you scrolled when prices arrive after opening it.
+- **HUD coins**: all-time coins are added up off the game thread when prices change, so a big journal no longer
+  causes a hitch on shaft entry. "This shaft" is only re-valued when something in the shaft changes. A price update
+  that arrived at just the wrong moment could be missed until the next one; fixed.
+- **config.json**: a hand edit to the money settings made right before clicking By day now loads instead of being
+  skipped.
+- **Top bar** works out the room for the date from the real button sizes, so the "< Back" button keeps fitting at
+  GUI scale 4.
+- Old-save tests now include Nick's journal, HUD and config written by 0.17.0, and check that By day loads back.
+
 ## 0.17.2 (2026-11-13)
 - **Shaft view: the net sits in the Coins heading** (`Coins +32.2M`) with the parts indented under it, so it reads
   as a breakdown. The extra Coins line near the top is gone. Hover the heading for how coins are counted.

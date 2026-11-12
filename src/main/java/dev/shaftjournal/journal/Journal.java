@@ -42,6 +42,7 @@ public final class Journal {
 	private long lastMiningAt;
 	private long portalFoundAt = -1;
 	private Long timedSearch;
+	private boolean inShaft;
 
 	public Journal(TextPatterns patterns, BooleanSupplier inMiningArea, Consumer<JournalEntry> listener) {
 		this.patterns = patterns;
@@ -95,11 +96,13 @@ public final class Journal {
 			}
 			case ShaftEntered entered -> {
 				touch(now);
+				inShaft = true;
 				searching = false;
 				portalFoundAt = -1;
 			}
 			case ShaftLeft left -> {
 				touch(now);
+				inShaft = false;
 				JournalEntry entry = JournalEntry.of(left.shaft(), session.id(), timedSearch, patterns);
 				timedSearch = null;
 				session = session.add(entry);
@@ -119,8 +122,11 @@ public final class Journal {
 	}
 
 	private void mining(long now) {
+		boolean mines = inMiningArea.getAsBoolean();
+		// hits on the garden, hub etc dont start or keep a session
+		if (!mines && !inShaft) return;
 		touch(now);
-		if (!inMiningArea.getAsBoolean()) return;
+		if (!mines) return;
 		// mining between finding and entering belongs to neither search
 		if (portalFoundAt >= 0 && now - portalFoundAt <= PAUSE_MILLIS) return;
 		if (searching) {

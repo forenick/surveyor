@@ -63,10 +63,17 @@ public final class LiveHud {
 	private JournalEntry totalsFirst;
 	private Totals allTime = Totals.NONE;
 	private Totals lastShaft;
+	private JournalEntry lastEntry;
 	private int moneyChanges = -1;
+	private List<JournalEntry> sessionEntries = List.of();
 	private Double sessionCoins;
-	private Double allTimeCoins;
 	private Double lastShaftCoins;
+	// entries [0, coinsUpTo) at prices coinsAt, from coinsFirst on
+	private Double allTimeCoins;
+	private int coinsUpTo;
+	private int coinsAt = -1;
+	private JournalEntry coinsFirst;
+	private boolean coinsPending;
 	private List<Prepared> prepared;
 	private int preparedWidth;
 	private int preparedHeight;
@@ -227,35 +234,70 @@ public final class LiveHud {
 		inMines = tracker.inMiningArea();
 		Journal.Session session = journal.activeSession(now);
 		TextPatterns patterns = TextPatterns.defaults();
-		// new prices or settings = every coin value again
-		boolean revalue = money.changes() != moneyChanges;
-		moneyChanges = money.changes();
-		if (session != totalsSession || revalue) {
+		// read once, the io thread bumps it. new prices or settings = coins again, totals stay
+		int changes = money.changes();
+		boolean revalue = changes != moneyChanges;
+		moneyChanges = changes;
+		boolean newSession = session != totalsSession;
+		if (newSession) {
 			totalsSession = session;
-			List<JournalEntry> entries = journal.sessionEntries(session);
-			totals = SessionTotals.of(entries, patterns);
-			sessionCoins = MoneyStats.coins(entries, money::value);
+			sessionEntries = journal.sessionEntries(session);
+			totals = SessionTotals.of(sessionEntries, patterns);
 		}
-		if (journal.entryCount() != totalsEntries || revalue) {
+		if (newSession || revalue) sessionCoins = MoneyStats.coins(sessionEntries, money::value);
+		JournalEntry last = lastEntry;
+		if (journal.entryCount() != totalsEntries) {
 			// only new ones, all again if the file loaded in front of them
 			JournalEntry first = journal.firstEntry();
-			boolean again = first != totalsFirst || revalue;
+			boolean again = first != totalsFirst;
 			List<JournalEntry> added = journal.entries(again ? 0 : totalsEntries);
 			allTime = (again ? Totals.NONE : allTime).plus(Totals.of(added, patterns));
-			allTimeCoins = MoneyStats.plus(again ? null : allTimeCoins, MoneyStats.coins(added, money::value));
 			totalsFirst = first;
 			totalsEntries = journal.entryCount();
 			if (!added.isEmpty()) {
-				lastShaft = Totals.of(List.of(added.getLast()), patterns);
-				lastShaftCoins = MoneyStats.net(money.value(added.getLast()));
+				lastEntry = added.getLast();
+				lastShaft = Totals.of(List.of(lastEntry), patterns);
 			}
 		}
+		if (lastEntry != last || revalue) lastShaftCoins = lastEntry == null ? null : MoneyStats.net(money.value(lastEntry));
+		allTimeCoins(client, changes);
 		Totals thisShaft = shaft != null ? Totals.of(shaft, patterns) : lastShaft;
 		Double shaftCoins = shaft != null ? MoneyStats.net(money.live(shaft)) : lastShaftCoins;
 		data = HudData.live(totals, allTime, thisShaft, journal.spawnTimerMillis(now), shaft, now, ShaftNames.defaults())
-				.money(new HudData.Money(shaftCoins, sessionCoins, allTimeCoins, allTime.shafts()))
+				.money(new HudData.Money(shaftCoins, sessionCoins, allTimeCoins, coinsUpTo))
 				.game(game(client, now));
 		prepared = null;
+	}
+
+	// new shafts added here, all of them again on the io thread (thousands of shafts = a hitch)
+	private void allTimeCoins(Minecraft client, int changes) {
+		JournalEntry first = journal.firstEntry();
+		if (coinsAt == changes && coinsFirst == first) {
+			int count = journal.entryCount();
+			if (coinsUpTo < count) {
+				allTimeCoins = MoneyStats.plus(allTimeCoins, MoneyStats.coins(journal.entries(coinsUpTo), money::value));
+				coinsUpTo = count;
+			}
+			return;
+		}
+		if (coinsPending) return;
+		List<JournalEntry> all = journal.entries();
+		try {
+			coinsPending = true;
+			CompletableFuture.supplyAsync(() -> MoneyStats.coins(all, money::compute), io)
+					.whenComplete((coins, error) -> client.execute(() -> {
+						coinsPending = false;
+						if (error != null) LOGGER.warn("Could not add up all-time coins", error);
+						else allTimeCoins = coins;
+						// on error too, else it retries every refresh
+						coinsUpTo = all.size();
+						coinsAt = changes;
+						coinsFirst = all.isEmpty() ? null : all.getFirst();
+					}));
+		} catch (RejectedExecutionException e) {
+			// closing
+			coinsPending = false;
+		}
 	}
 
 	private HudData.Game game(Minecraft client, long now) {

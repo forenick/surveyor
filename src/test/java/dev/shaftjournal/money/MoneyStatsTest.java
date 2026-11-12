@@ -33,7 +33,7 @@ class MoneyStatsTest {
 	void totalsBestsAndCorpses() {
 		List<JournalEntry> entries = new ArrayList<>();
 		Map<JournalEntry, ShaftValue> values = new HashMap<>();
-		// session 1: 5 shafts over 10 min, 1M each
+		// session 1: 5 shafts, 2 min apart, 1 min each, 1M each
 		for (int i = 0; i < 5; i++) {
 			JournalEntry entry = entry(0, i * 120_000L);
 			entries.add(entry);
@@ -57,7 +57,7 @@ class MoneyStatsTest {
 		assertEquals(2_000_000, stats.perShaft(), 1e-6);
 		assertEquals(Map.of(Part.MINED, 14_000_000.0), stats.parts(), "lines summed per part");
 		assertSame(rich, stats.bestShaft().entry());
-		// 5M over 8 min (start to last shafts end)
+		// 5M over 9 min (start to last shafts end)
 		assertSame(sessions.get(1), stats.bestRate().session());
 		assertEquals(5_000_000 * 60 / 9.0, stats.bestRate().perHour(), 1e-6);
 

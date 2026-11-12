@@ -55,12 +55,15 @@ public final class Shaft {
 	// corpse loot + supercrafts wait here until a sacks msg reports them
 	private final Map<String, Long> notMinedPending = new LinkedHashMap<>();
 	private final Map<String, Long> notMinedInSacks = new LinkedHashMap<>();
+	// goes up on every event, so callers can cache
+	private int version;
 
 	Shaft(long enteredAt) {
 		this.enteredAt = enteredAt;
 	}
 
 	void apply(ShaftEvent event, long now) {
+		version++;
 		switch (event) {
 			case ExitBonus bye -> {
 				pendingExit = ExitReason.BYE;
@@ -101,12 +104,17 @@ public final class Shaft {
 	}
 
 	void leave(long now) {
+		version++;
 		leftAt = now;
 		exitReason = pendingExit == null ? ExitReason.UNKNOWN : pendingExit;
 	}
 
 	private static void add(Map<String, Long> totals, ItemCount item) {
 		totals.merge(item.item(), item.count(), Long::sum);
+	}
+
+	public int version() {
+		return version;
 	}
 
 	public long enteredAt() {

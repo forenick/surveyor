@@ -3,6 +3,7 @@ package dev.shaftjournal.money;
 import java.nio.file.Path;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import dev.shaftjournal.detection.Shaft;
 import dev.shaftjournal.detection.ShaftEvent;
+import dev.shaftjournal.detection.ShaftId;
 import dev.shaftjournal.detection.TextPatterns;
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.money.MoneySettings.OldShafts;
@@ -33,6 +35,12 @@ public final class LiveMoney {
 	// client thread only, saved entries only (live ones would pile up). cleared when changes() moves
 	private final Map<JournalEntry, ShaftValue> values = new IdentityHashMap<>();
 	private int valuesAt = -1;
+	// client thread only, live value until the shaft or prices change
+	private Shaft liveShaft;
+	private int liveVersion;
+	private ShaftId liveId;
+	private int liveAt = -1;
+	private ShaftValue liveValue;
 
 	public void start(Path folder, String version) {
 		feed = new PriceFeed(folder, version);
@@ -116,12 +124,21 @@ public final class LiveMoney {
 		return value;
 	}
 
-	// shaft still going, todays prices, not cached
+	// shaft still going, todays prices
 	public ShaftValue live(Shaft shaft) {
-		return compute(JournalEntry.of(shaft, 0, null, TextPatterns.defaults()));
+		int now = changes.get();
+		if (shaft != liveShaft || shaft.version() != liveVersion || !Objects.equals(shaft.id(), liveId) || now != liveAt) {
+			liveValue = compute(JournalEntry.of(shaft, 0, null, TextPatterns.defaults()));
+			liveShaft = shaft;
+			liveVersion = shaft.version();
+			liveId = shaft.id();
+			liveAt = now;
+		}
+		return liveValue;
 	}
 
-	private ShaftValue compute(JournalEntry entry) {
+	// uncached, any thread
+	public ShaftValue compute(JournalEntry entry) {
 		PriceBook book = book();
 		MoneySettings settings = settings();
 		boolean saved = usesSavedPrices(entry, settings);

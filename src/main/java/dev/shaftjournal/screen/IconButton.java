@@ -2,12 +2,14 @@ package dev.shaftjournal.screen;
 
 import java.util.function.Consumer;
 
+import io.wispforest.owo.mixin.ui.access.AbstractWidgetAccessor;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -37,5 +39,11 @@ final class IconButton extends ButtonComponent {
 		int y = getY() + (height - 8) / 2;
 		graphics.blit(RenderPipelines.GUI_TEXTURED, icon, x, y, 0, 0, iconWidth, iconHeight, iconWidth, iconHeight);
 		graphics.text(font, getMessage(), x + iconWidth + GAP, y, color, textShadow);
+		// same as owos own button, tooltip() lives there. cast via Object, mixin accessor
+		var tooltip = ((AbstractWidgetAccessor) (Object) this).owo$getTooltip();
+		if (isHovered && tooltip.get() != null) {
+			graphics.setTooltipForNextFrame(font, tooltip.get().toCharSequence(Minecraft.getInstance()), DefaultTooltipPositioner.INSTANCE,
+					mouseX, mouseY, false);
+		}
 	}
 }
