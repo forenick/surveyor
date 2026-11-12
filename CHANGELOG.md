@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.17.2 (2026-11-13)
+- **Shaft view: the net sits in the Coins heading** (`Coins +32.2M`) with the parts indented under it, so it reads
+  as a breakdown. The extra Coins line near the top is gone. Hover the heading for how coins are counted.
+- **Crystal shafts** show a gray `(crystal)` after the ID instead of a pink "Crystal".
+- **The Back button fits at GUI scale 4.** On an older session the "Shaft Journal" title steps aside when Back,
+  the arrows and the date need the room, instead of Back running into the Stats tab.
+
 ## 0.17.1 (2026-11-12)
 Old shafting data is now checked on every build, so an update can't wipe or corrupt it.
 - **Old-save tests.** `src/test/resources/old-saves/<version>/` holds real files older versions wrote: Nick's

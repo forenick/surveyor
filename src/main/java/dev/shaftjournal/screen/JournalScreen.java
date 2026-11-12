@@ -107,6 +107,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private Tab tab;
 	// an older session opened from overview or stats, tab stays where it came from
 	private boolean viewing;
+	private boolean hideTitle;
 	private final boolean current;
 	private final boolean started;
 	private boolean byDay = ShaftJournal.MONEY.byDay();
@@ -216,9 +217,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		bar.padding(Insets.of(4));
 		bar.gap(4);
 		bar.verticalAlignment(VerticalAlignment.CENTER);
-		LabelComponent title = label("§fShaft §bJournal");
-		title.margins(Insets.of(0, 0, 2, 8));
-		bar.child(title);
+		// 480 wide + older session: title makes room for back, arrows and date
+		hideTitle = false;
+		if (viewing) hideTitle = navRoom("Back") < font.width(day(sessions.get(sessionIndex).start()));
+		if (!hideTitle) {
+			LabelComponent title = label("§fShaft §bJournal");
+			title.margins(Insets.of(0, 0, 2, 8));
+			bar.child(title);
+		}
 		bar.child(tabButton("Overview", Tab.OVERVIEW));
 		bar.child(tabButton("Session", Tab.SESSION));
 		bar.child(tabButton("Stats", Tab.STATS));
@@ -423,13 +429,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		ShaftValue value = ShaftJournal.MONEY.value(entry);
 
 		String id = entry.shaftId() == null ? "Unknown shaft" : entry.shaftId();
-		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? "  §dCrystal" : "")));
+		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? " §7(crystal)" : "")));
 		detail.child(spacer(4));
 		detail.child(keyValue("Entered", "§f" + time(entry.enteredAt())));
 		detail.child(keyValue("Exit", "§f" + SummaryText.exitName(entry.exit())));
 		detail.child(keyValue("Spawned in", entry.searchMillis() == null ? "§8not timed" : spawn(entry.searchMillis())));
 		detail.child(keyValue("Inside", "§f" + SummaryText.duration(entry.durationMillis())));
-		if (value != null && !value.lines().isEmpty()) detail.child(keyValue("Coins", coins(value.net())));
 		if (!entry.mayhemBuffs().isEmpty()) detail.child(keyValue("Mayhem", "§e" + String.join(", ", entry.mayhemBuffs())));
 		String powder = "§b" + number(JournalStats.powder(entry));
 		if (entry.corpsePowder() > 0 && entry.exitPowder() > 0) {
@@ -471,7 +476,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void coinsSection(JournalEntry entry, ShaftValue value) {
-		detail.child(section("Coins"));
+		boolean worth = value != null && !value.lines().isEmpty();
+		FlowLayout heading = section("Coins" + (worth ? " " + coins(value.net()) : ""));
+		detail.child(heading);
 		if (value == null) {
 			detail.child(wrapped("§8No prices yet. They load when you enter a shaft or open the journal."));
 			return;
@@ -490,7 +497,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 				tooltip.add(Component.literal("§7" + count(line) + " " + line.item() + "  "
 						+ (line.coins() == null ? "§8no price" : coins(line.coins()))));
 			}
-			detail.child(tipRow(part.displayName(), priced ? coins(value.total(part)) : "§8no price", tooltip));
+			FlowLayout row = tipRow(part.displayName(), priced ? coins(value.total(part)) : "§8no price", tooltip);
+			// indented = breakdown of the net above
+			row.margins(Insets.left(INDENT));
+			detail.child(row);
 		}
 		MoneySettings settings = ShaftJournal.MONEY.settings();
 		List<Component> how = List.of(Component.literal("§fHow coins are counted"),
@@ -499,9 +509,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 						+ ", " + settings.bazaarTax() + "% Bazaar tax"),
 				Component.literal("§7Keys and campfires at insta-buy"),
 				Component.literal("§8Change it in .minecraft/shaftjournal/config.json"));
-		FlowLayout net = tipRow("Net", coins(value.net()), how);
-		net.margins(Insets.top(2));
-		detail.child(net);
+		withTooltip(heading, how);
 		int unpriced = value.unpriced().size();
 		if (unpriced > 0) detail.child(wrapped("§c" + unpriced + (unpriced == 1 ? " item has" : " items have") + " no price"));
 		boolean saved = ShaftJournal.MONEY.usesSavedPrices(entry);
@@ -1228,7 +1236,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	// top bar minus everything but the date: padding, title, tabs, arrows, edit hud, gaps
 	private int navRoom(String back) {
-		int used = 2 * PADDING + 8 + font.width("Shaft Journal") + 10 + font.width("Edit HUD") + 18 + 2 * 16 + 5 * 4 + 2 * 4;
+		int used = 2 * PADDING + 8 + (hideTitle ? 0 : font.width("Shaft Journal") + 10)
+				// owo pads content(6) buttons by 20, measured
+				+ font.width("Edit HUD") + 26 + 2 * 16 + 5 * 4 + 2 * 4;
 		// tab icons + gap
 		for (String tab : List.of("Overview", "Session", "Stats")) used += font.width(tab) + 12 + 9 + 3;
 		if (back != null) used += font.width(back) + 12 + 4 + 4;
