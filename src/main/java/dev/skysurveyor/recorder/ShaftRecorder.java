@@ -1,6 +1,7 @@
 package dev.skysurveyor.recorder;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,6 +31,7 @@ import net.minecraft.world.scores.Scoreboard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.mixin.PlayerTabOverlayAccessor;
 import dev.skysurveyor.util.DataFolder;
 import dev.skysurveyor.util.HudText;
@@ -41,8 +43,8 @@ public final class ShaftRecorder {
 
 	private static final DateTimeFormatter FILE_NAME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 	private static final double ENTITY_SCAN_RADIUS = 48;
-	// keeps private convos out of recordings
-	private static final List<String> PRIVATE_PREFIXES = List.of("From ", "To ", "Guild > ", "Officer > ");
+	// keeps player chat out of recordings
+	private static final TextPatterns PATTERNS = TextPatterns.defaults();
 
 	private RecordingWriter writer;
 	private long lastBlockHit = Long.MIN_VALUE;
@@ -62,8 +64,11 @@ public final class ShaftRecorder {
 
 	public Path start(Minecraft client) throws IOException {
 		stop();
-		Path file = DataFolder.in(client.gameDirectory.toPath()).resolve("recordings")
-				.resolve(LocalDateTime.now().format(FILE_NAME) + ".jsonl");
+		Path folder = DataFolder.in(client.gameDirectory.toPath()).resolve("recordings");
+		String name = LocalDateTime.now().format(FILE_NAME);
+		Path file = folder.resolve(name + ".jsonl");
+		// 2 starts in 1 second, dont overwrite the 1st
+		for (int i = 2; Files.exists(file); i++) file = folder.resolve(name + "_" + i + ".jsonl");
 		writer = new RecordingWriter(file);
 		startMillis = System.currentTimeMillis();
 		resetSnapshots();
@@ -113,7 +118,7 @@ public final class ShaftRecorder {
 	public void onGameMessage(Component message, boolean overlay) {
 		if (writer == null) return;
 		String plain = message.getString();
-		if (!overlay && PRIVATE_PREFIXES.stream().anyMatch(plain::startsWith)) return;
+		if (!overlay && PATTERNS.matches("chat.private", TextPatterns.clean(plain))) return;
 		JsonObject event = event(overlay ? "actionbar" : "chat");
 		event.addProperty("text", plain);
 		event.addProperty("legacy", TextUtil.toLegacy(message));

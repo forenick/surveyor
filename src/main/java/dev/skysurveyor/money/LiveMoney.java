@@ -178,11 +178,14 @@ public final class LiveMoney {
 		return settings.oldShafts() == OldShafts.THAT_DAY && entry.prices() != null && !entry.prices().isEmpty();
 	}
 
+	// shutdown not shutdownNow, queued config saves must still run
 	public void close() {
-		io.shutdownNow();
+		if (feed != null) feed.close();
+		io.shutdown();
 		try {
-			io.awaitTermination(2, TimeUnit.SECONDS);
+			if (!io.awaitTermination(5, TimeUnit.SECONDS)) io.shutdownNow();
 		} catch (InterruptedException e) {
+			io.shutdownNow();
 			Thread.currentThread().interrupt();
 		}
 	}

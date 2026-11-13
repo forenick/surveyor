@@ -1,5 +1,6 @@
 package dev.skysurveyor.money;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -14,6 +15,11 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPInputStream;
 
 import com.google.gson.JsonElement;
@@ -34,6 +40,8 @@ final class PriceFeed {
 	static final long BINS_MAX_AGE = 30 * 60_000L;
 	static final long NAMES_MAX_AGE = 7 * 24 * 60 * 60_000L;
 	static final long RETRY_AFTER = 60_000L;
+	// whole download incl body, request timeout stops at the headers
+	static final long DOWNLOAD_TIMEOUT_SECONDS = 60;
 	private static final URI BAZAAR = URI.create("https://api.hypixel.net/v2/skyblock/bazaar");
 	// skyhanni + firmament use elite, hysky = skyblockers (research/03)
 	private static final List<URI> BINS = List.of(
@@ -47,6 +55,8 @@ final class PriceFeed {
 	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 
+	private volatile boolean closed;
+	private volatile CompletableFuture<?> download;
 	private volatile PriceBook book = PriceBook.EMPTY;
 	private volatile Map<String, String> names = Map.of();
 	private long namesAt;
@@ -56,6 +66,13 @@ final class PriceFeed {
 		this.pricesFile = folder.resolve("prices.json");
 		this.itemsFile = folder.resolve("items.json");
 		this.userAgent = "Surveyor/" + version;
+	}
+
+	// any thread. stops the download, queued config saves still run
+	void close() {
+		closed = true;
+		CompletableFuture<?> running = download;
+		if (running != null) running.cancel(true);
 	}
 
 	PriceBook book() {
@@ -117,7 +134,7 @@ final class PriceFeed {
 				} catch (IOException | RuntimeException e) {
 					LOGGER.warn("Could not get lowest BIN prices from {}: {}", uri.getHost(), e.toString());
 					last = e;
-					if (e instanceof Interrupted) break;
+					if (e instanceof Interrupted || e instanceof Closed) break;
 				}
 			}
 			// only when every source failed, a working fallback shouldnt pause refreshes
@@ -160,18 +177,33 @@ final class PriceFeed {
 	}
 
 	private JsonObject get(URI uri) throws IOException {
+		if (closed) throw new Closed();
 		HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30))
 				.header("User-Agent", userAgent).header("Accept-Encoding", "gzip").GET().build();
-		HttpResponse<InputStream> response;
+		CompletableFuture<HttpResponse<byte[]>> pending = http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+		download = pending;
+		HttpResponse<byte[]> response;
 		try {
-			response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+			if (closed) throw new Closed();
+			response = pending.get(DOWNLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {
+			pending.cancel(true);
 			throw new Interrupted(e);
+		} catch (TimeoutException e) {
+			pending.cancel(true);
+			throw new IOException(uri.getHost() + " took over " + DOWNLOAD_TIMEOUT_SECONDS + "s", e);
+		} catch (CancellationException e) {
+			throw new Closed();
+		} catch (ExecutionException e) {
+			if (e.getCause() instanceof IOException io) throw io;
+			throw new IOException(uri.getHost() + " failed", e.getCause());
+		} finally {
+			download = null;
 		}
-		try (InputStream body = response.body()) {
-			if (response.statusCode() != 200) throw new IOException(uri.getHost() + " answered " + response.statusCode());
-			boolean gzip = response.headers().firstValue("Content-Encoding").filter("gzip"::equalsIgnoreCase).isPresent();
-			InputStream in = gzip ? new GZIPInputStream(body) : body;
+		if (response.statusCode() != 200) throw new IOException(uri.getHost() + " answered " + response.statusCode());
+		boolean gzip = response.headers().firstValue("Content-Encoding").filter("gzip"::equalsIgnoreCase).isPresent();
+		try (InputStream body = new ByteArrayInputStream(response.body());
+				InputStream in = gzip ? new GZIPInputStream(body) : body) {
 			return JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
 		} catch (JsonParseException | IllegalStateException e) {
 			throw new IOException(uri.getHost() + " sent unreadable json", e);
@@ -193,6 +225,12 @@ final class PriceFeed {
 			SafeWrite.write(file, json.toString());
 		} catch (IOException e) {
 			LOGGER.warn("Could not write {}: {}", file, e.toString());
+		}
+	}
+
+	private static final class Closed extends IOException {
+		Closed() {
+			super("game closing");
 		}
 	}
 

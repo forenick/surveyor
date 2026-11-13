@@ -62,3 +62,8 @@ crystal.item           ^(?<gem>Ruby|Amber|Sapphire|Jade|Amethyst|Topaz|Jasper|Op
 sacks                  ^\[Sacks\] .*\(Last (?<seconds>\d+)s\.\)$
 sacks.item             ^  (?<sign>[+-])(?<count>[\d,]+) (?:\p{Co} )?(?<item>.+) \((?<sacks>.+)\)$
 sacks.other            ^  (?<sign>[+-])(?<count>[\d,]+) other items\.$
+
+# recorder skips player chat (names). lobby + friend seen in recordings, party + co-op unconfirmed
+chat.private           ^(?:From|To) \S
+chat.private           ^(?:Guild|Officer|Party|Co-op|Friend) > \S
+chat.private           ^\[\d+\] [^:]+:\s

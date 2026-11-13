@@ -42,6 +42,11 @@ public final class LiveTracker {
 		tracker.onChat(System.currentTimeMillis(), TextUtil.toLegacy(message), TextUtil.hoverTexts(message));
 	}
 
+	// game closing inside a shaft, no world change comes
+	public void onQuit() {
+		tracker.onWorldChange(System.currentTimeMillis());
+	}
+
 	public void onTick(Minecraft client) {
 		tick++;
 		long now = System.currentTimeMillis();

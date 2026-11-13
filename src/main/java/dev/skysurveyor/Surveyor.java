@@ -40,7 +40,7 @@ import dev.skysurveyor.util.DataFolder;
  This is my first real Java project i'll make public. The code is probably ass in some places.
  Author is @forenick
 
- Yes, i did use AI to help me out in some places.
+ Yes, i did use AI to help me out in some places. (go to README.MD)
 
  Fun Fact: Lobsters pee out of their faces. From right under their eyes. :o
 
@@ -82,6 +82,8 @@ public class Surveyor implements ClientModInitializer {
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(MOD_ID, "hud"), HUD::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			recorder.stop();
+			// before journal.close, else the shaft ur in is lost
+			TRACKER.onQuit();
 			JOURNAL.close();
 			HUD.close();
 			MONEY.close();

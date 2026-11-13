@@ -7,6 +7,11 @@
 	"authors": [
 		"Nick"
 	],
+	"contact": {
+		"homepage": "https://github.com/forenick/surveyor",
+		"sources": "https://github.com/forenick/surveyor",
+		"issues": "https://github.com/forenick/surveyor/issues"
+	},
 	"license": "LGPL-3.0-only",
 	"icon": "assets/skysurveyor/icon.png",
 	"environment": "client",

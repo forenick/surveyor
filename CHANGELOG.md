@@ -3,7 +3,12 @@
 [SemVer](https://semver.org). Betas are `X.Y.Z-beta.N` (GitHub pre-releases).
 
 ## Unreleased
-- Bars / Line switch keeps the Stats tab's scroll.
+- Bars / Line and range arrows keep the Stats tab's scroll.
+- Closing the game inside a shaft saves that shaft.
+- Settings changed while prices load are kept when you quit.
+- Price downloads can't get stuck.
+- GitHub links in Mod Menu.
+- Recordings leave out player chat.
 - Small Stats tooltip fixes.
 - An old ShaftTools jar can't run next to Surveyor.
 - Square mod icon with a plain green background.
