@@ -85,7 +85,7 @@ class CoinBreakdownTest {
 	void corpseKeepsTotal() {
 		MoneyStats stats = stats();
 		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 1000);
-		assertTrue(lines.contains("§7Total §6+404.0k §8(2 of 3 with prices)"), lines.toString());
+		assertTrue(lines.contains("§7Total §6+404.0k §8(2 of 3 with loot seen)"), lines.toString());
 		assertTrue(lines.contains("§7Avg §6+202.0k §7each"));
 		assertTrue(lines.contains("  §7Key §c-400.0k §7each"));
 		int loot = lines.indexOf("§fLoot §8drop chance (2 corpses seen)");

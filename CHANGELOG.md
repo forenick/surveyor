@@ -3,7 +3,9 @@
 [SemVer](https://semver.org). Betas are `X.Y.Z-beta.N` (GitHub pre-releases).
 
 ## Unreleased
-- Nothing yet.
+- Bars / Line switch keeps the Stats tab's scroll.
+- Small Stats tooltip fixes.
+- An old ShaftTools jar can't run next to Surveyor.
 
 ## 0.21.1 (2026-11-13)
 - Open source under the LGPL-3.0.

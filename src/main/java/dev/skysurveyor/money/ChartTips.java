@@ -14,7 +14,7 @@ public final class ChartTips {
 	}
 
 	// coins null = no prices, perHour null = under the rate minimum
-	public record SessionCoins(Double coins, long millis, Double perHour) {
+	public record SessionCoins(Double coins, Double perHour) {
 	}
 
 	// avg = every timed shaft, not the avg of the session avgs
@@ -28,10 +28,10 @@ public final class ChartTips {
 		lines.add("§fAvg spawn §e" + SummaryText.duration(average));
 		lines.add("");
 		lines.add("§7From §f" + shafts.size() + " §7timed shafts in §f" + timed.size() + (timed.size() == 1 ? " §7session" : " §7sessions"));
-		lines.add("§7Median shaft §f" + SummaryText.duration(shafts.get(shafts.size() / 2)));
+		lines.add("§7Median shaft §f" + SummaryText.duration(Math.round(median(shafts))));
 		if (shafts.size() >= 4) {
 			lines.add("§7Middle half §f" + SummaryText.duration(shafts.get(shafts.size() / 4)) + " §7to §f"
-					+ SummaryText.duration(shafts.get(shafts.size() * 3 / 4)));
+					+ SummaryText.duration(shafts.get((shafts.size() * 3 - 1) / 4)));
 		}
 		lines.add("");
 		long fasterSessions = timed.stream().filter(s -> s.averageSearchMillis() < average).count();
@@ -43,7 +43,8 @@ public final class ChartTips {
 		if (timed.size() > 1) {
 			lines.add("§7Fastest session §a" + SummaryText.duration(fastest) + "§7, slowest §c" + SummaryText.duration(slowest));
 		}
-		if (timed.size() > 1 && average > 0) {
+		// latest only if it has a spawn time, else it'd be an older one
+		if (timed.size() > 1 && average > 0 && timed.getLast() == oldestFirst.getLast()) {
 			long latest = timed.getLast().averageSearchMillis();
 			double change = (average - latest) / (double) average;
 			lines.add("");
@@ -69,7 +70,7 @@ public final class ChartTips {
 		lines.add("");
 		lines.add("§7Coins " + CoinBreakdown.coins(total) + " §7in §f" + SummaryText.duration(totalMillis) + " §8(total / time shafting)");
 		List<Double> rates = rated.stream().map(SessionCoins::perHour).sorted().toList();
-		lines.add("§7Median session " + CoinBreakdown.coins(rates.get(rates.size() / 2)) + " §7/ h");
+		lines.add("§7Median session " + CoinBreakdown.coins(median(rates)) + " §7/ h");
 		if (rates.size() > 1) {
 			lines.add("§7Best session " + CoinBreakdown.coins(rates.getLast()) + " §7/ h, worst " + CoinBreakdown.coins(rates.getFirst()) + " §7/ h");
 		}
@@ -83,7 +84,8 @@ public final class ChartTips {
 			double best = oldestFirst.stream().filter(s -> s.coins() != null).mapToDouble(SessionCoins::coins).max().orElse(0);
 			if (best > 0) lines.add("§7Best session made §f" + percent(best / total) + " §7of all coins");
 		}
-		if (rates.size() > 1 && average > 0) {
+		// latest only if it has a rate, else it'd be an older one
+		if (rates.size() > 1 && average > 0 && rated.getLast() == oldestFirst.getLast()) {
 			double latest = rated.getLast().perHour();
 			double change = (latest - average) / average;
 			lines.add("");
@@ -91,6 +93,13 @@ public final class ChartTips {
 					: change > 0 ? "§a+" + percent(change) + "§7 vs avg" : "§c-" + percent(-change) + "§7 vs avg") + ")");
 		}
 		return lines;
+	}
+
+	// sorted, even count = avg of the 2 middle ones
+	private static double median(List<? extends Number> sorted) {
+		int middle = sorted.size() / 2;
+		double upper = sorted.get(middle).doubleValue();
+		return sorted.size() % 2 == 1 ? upper : (sorted.get(middle - 1).doubleValue() + upper) / 2;
 	}
 
 	private static String percent(long part, long of) {

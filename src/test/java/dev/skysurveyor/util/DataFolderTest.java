@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class DataFolderTest {
 	@Test
@@ -74,8 +76,11 @@ class DataFolderTest {
 	void failedMoveKeepsOldFolderInUse(@TempDir Path game) throws IOException {
 		Path old = realFolder(game.resolve("shaftjournal"));
 		Map<String, byte[]> before = files(old);
+		// needs posix + non-root, else the folder stays writable
+		assumeTrue(game.getFileSystem().supportedFileAttributeViews().contains("posix"));
 		Files.setPosixFilePermissions(game, PosixFilePermissions.fromString("r-xr-xr-x"));
 		try {
+			assumeFalse(Files.isWritable(game));
 			assertThrows(IOException.class, () -> DataFolder.migrate(game));
 		} finally {
 			Files.setPosixFilePermissions(game, PosixFilePermissions.fromString("rwxr-xr-x"));

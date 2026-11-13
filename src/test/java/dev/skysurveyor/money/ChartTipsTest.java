@@ -33,8 +33,8 @@ class ChartTipsTest {
 		List<String> lines = ChartTips.spawn(oldestFirst);
 		assertEquals("§fAvg spawn §e1m 30s", lines.getFirst());
 		assertTrue(lines.contains("§7From §f4 §7timed shafts in §f2 §7sessions"), lines.toString());
-		assertTrue(lines.contains("§7Median shaft §f1m 40s"), "upper middle of 4");
-		assertTrue(lines.contains("§7Middle half §f1m 20s §7to §f2m 0s"), lines.toString());
+		assertTrue(lines.contains("§7Median shaft §f1m 30s"), "avg of the 2 middle ones");
+		assertTrue(lines.contains("§7Middle half §f1m 20s §7to §f1m 40s"), lines.toString());
 		assertTrue(lines.contains("§7Sessions faster than avg §f1 of 2 §8(50%)"));
 		assertTrue(lines.contains("§7Shafts faster than avg §f50%"));
 		// latest 1m 50s vs 1m 30s avg
@@ -44,8 +44,8 @@ class ChartTipsTest {
 	@Test
 	void coinLine() {
 		// 1 h each: +10M, +30M, -2M, then a 2 min one w/o a rate
-		List<SessionCoins> sessions = List.of(new SessionCoins(10e6, 3_600_000, 10e6), new SessionCoins(30e6, 3_600_000, 30e6),
-				new SessionCoins(-2e6, 3_600_000, -2e6), new SessionCoins(2e6, 120_000, null));
+		List<SessionCoins> sessions = List.of(new SessionCoins(10e6, 10e6), new SessionCoins(30e6, 30e6),
+				new SessionCoins(-2e6, -2e6), new SessionCoins(2e6, null));
 		List<String> lines = ChartTips.coins(sessions, 3 * 3_600_000 + 120_000);
 		// 40M over 3h 2m
 		assertEquals("§fAvg coins / h §6+13.2M", lines.getFirst());
@@ -54,11 +54,21 @@ class ChartTipsTest {
 		assertTrue(lines.contains("§7Sessions above avg §f1 of 3 §8(33%)"));
 		assertTrue(lines.contains("§7Sessions that made coins §f3 of 4 §8(75%)"));
 		assertTrue(lines.contains("§7Best session made §f75% §7of all coins"));
-		assertEquals("§7Latest session §c-2.0M §7/ h (§c-115%§7 vs avg)", lines.getLast());
+		// latest has no rate, so no latest line
+		assertTrue(lines.stream().noneMatch(l -> l.contains("Latest session")), lines.toString());
+	}
+
+	@Test
+	void latestCoinLine() {
+		List<SessionCoins> sessions = List.of(new SessionCoins(10e6, 10e6), new SessionCoins(30e6, 30e6),
+				new SessionCoins(-2e6, -2e6));
+		List<String> lines = ChartTips.coins(sessions, 3 * 3_600_000);
+		// -2M vs 12.7M avg
+		assertEquals("§7Latest session §c-2.0M §7/ h (§c-116%§7 vs avg)", lines.getLast());
 	}
 
 	@Test
 	void noPricesNoTip() {
-		assertEquals(List.of(), ChartTips.coins(List.of(new SessionCoins(null, 3_600_000, null)), 3_600_000));
+		assertEquals(List.of(), ChartTips.coins(List.of(new SessionCoins(null, null)), 3_600_000));
 	}
 }

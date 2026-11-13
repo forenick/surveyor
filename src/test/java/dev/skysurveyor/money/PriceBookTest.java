@@ -97,5 +97,10 @@ class PriceBookTest {
 		assertEquals("+12.3M", Coins.signed(12_340_000));
 		assertEquals("-2.8M", Coins.signed(-2_800_000));
 		assertEquals("0", Coins.signed(0.2));
+		assertEquals("1M", Coins.whole(1_000_000));
+		assertEquals("150k", Coins.whole(150_000));
+		assertEquals("1.5M", Coins.whole(1_500_000));
+		assertEquals("-5k", Coins.whole(-5_000));
+		assertEquals("100", Coins.whole(100));
 	}
 }

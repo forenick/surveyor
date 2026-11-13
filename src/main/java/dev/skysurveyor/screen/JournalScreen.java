@@ -615,7 +615,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 				Component.literal("§7Sold by " + (settings.sellPrice() == MoneySettings.SellPrice.INSTA_SELL ? "insta-sell" : "sell offer")
 						+ ", " + Setting.Number.format(settings.bazaarTax()) + "% Bazaar tax"),
 				Component.literal("§7Keys and campfires at insta-buy"),
-				Component.literal("§8Change it in .minecraft/skysurveyor/config.json"));
+				Component.literal("§8Change it in Settings"));
 		withTooltip(heading, how);
 		int unpriced = value.unpriced().size();
 		if (unpriced > 0) detail.child(wrapped("§c" + unpriced + (unpriced == 1 ? " item has" : " items have") + " no price"));
@@ -945,7 +945,6 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<Component> tooltip = List.of(Component.literal("§fTime range"),
 				Component.literal("§7Which sessions the whole Stats tab counts"),
 				Component.literal("§8Click the arrows to cycle"));
-		row.tooltip(tooltip);
 		applyTooltip(row, tooltip);
 		return row;
 	}
@@ -984,7 +983,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		arrow.cursorStyle(CursorStyle.HAND);
 		arrow.mouseDown().subscribe((event, doubleClick) -> {
 			action.run();
-			rebuild();
+			rebuild(true);
 			return true;
 		});
 		return arrow;
@@ -1128,9 +1127,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<Bar> bars = new ArrayList<>();
 		List<ChartTips.SessionCoins> sessionCoins = new ArrayList<>();
 		for (SessionSummary session : oldestFirst) {
-			Double rate = MoneyStats.perHour(session, Surveyor.MONEY::value);
 			Double coins = MoneyStats.coins(session.entries(), Surveyor.MONEY::value);
-			sessionCoins.add(new ChartTips.SessionCoins(coins, session.lengthMillis(), rate));
+			Double rate = coins == null ? null : session.perHour(coins, session.end());
+			sessionCoins.add(new ChartTips.SessionCoins(coins, rate));
 			if (rate == null) continue;
 			bars.add(new Bar(session, rate, Math.round(rate) < 0 ? BAR_RED : BAR_GOLD, List.of(
 					Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
@@ -1145,7 +1144,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static String axisCoins(double coins) {
-		return Coins.format(coins).replace(".0", "");
+		return Coins.whole(coins);
 	}
 
 	// up to 4 steps, bars under 0 hang down from the 0 line

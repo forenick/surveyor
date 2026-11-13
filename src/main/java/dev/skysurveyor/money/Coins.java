@@ -15,6 +15,13 @@ public final class Coins {
 		return Long.toString(Math.round(coins));
 	}
 
+	// no .0, f.e. 1.0M = 1M on chart axes
+	public static String whole(double coins) {
+		String text = format(coins);
+		int suffix = text.length() - 1;
+		return text.startsWith(".0", suffix - 2) && !Character.isDigit(text.charAt(suffix)) ? text.substring(0, suffix - 2) + text.charAt(suffix) : text;
+	}
+
 	public static String signed(double coins) {
 		return (Math.round(coins) > 0 ? "+" : "") + format(coins);
 	}

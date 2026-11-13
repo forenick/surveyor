@@ -121,7 +121,7 @@ public final class CoinBreakdown {
 		gap(lines);
 		if (corpse != null) {
 			String counted = corpse.corpses() == looted ? corpse.corpses() + " corpses"
-					: corpse.corpses() + " of " + looted + " with prices";
+					: corpse.corpses() + " of " + looted + " with loot seen";
 			lines.add("§7Total " + coins(corpse.net()) + " §8(" + counted + ")");
 			lines.add("§7Avg " + coins(corpse.each()) + " §7each");
 			if (Math.round(corpse.keys()) != 0) {
