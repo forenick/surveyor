@@ -1,0 +1,106 @@
+package dev.skysurveyor.detection;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import dev.skysurveyor.detection.Shaft.ExitReason;
+import dev.skysurveyor.detection.ShaftEvent.ShaftLeft;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+// hand-worked numbers from research/05 + 06
+class RecordingReplayTest {
+	@Test
+	void recording1() throws IOException {
+		List<Shaft> shafts = shafts("2026-11-08_20-00-11.jsonl");
+		assertEquals(List.of("AQUA_C", "JASP_1"), ids(shafts));
+
+		Shaft aqua = shafts.get(0);
+		assertEquals(ExitReason.BYE, aqua.exitReason());
+		assertEquals(1260, aqua.exitPowder());
+		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Tungsten", false)), aqua.corpses());
+		assertEquals(1, aqua.loots().size());
+		// nick already had it
+		assertEquals(List.of(), aqua.crystals());
+
+		Shaft jasper = shafts.get(1);
+		assertEquals(ExitReason.DEATH, jasper.exitReason());
+		assertEquals(0, jasper.exitPowder());
+		assertEquals(1, jasper.campfiresPlaced().size());
+		assertEquals(936, jasper.campfiresPlaced().get(0) / 1000);
+		assertEquals(List.of("Mining Speed"), jasper.mayhemBuffs());
+		assertEquals(682, jasper.pristineProcs());
+		assertEquals(28_876, jasper.pristineItems().get("Flawed Jasper Gemstone"));
+		assertTrue(jasper.caveInAt() > 0);
+	}
+
+	@Test
+	void recording2() throws IOException {
+		List<Shaft> shafts = shafts("2026-11-08_22-41-09.jsonl");
+		assertEquals(List.of("PERI_2", "JADE_1", "TOPA_1", "RUBY_2", "SAPP_1", "ONYX_2", "TOPA_1", "TITA_1",
+				"TOPA_1", "TOPA_1", "LITT_L", "ONYX_1", "AQUA_1", "RUBY_2", "JADE_1"), ids(shafts));
+		assertEquals(ExitReason.WARP, shafts.get(2).exitReason());
+
+		// research/06 says 4 MORE! shafts, recording has 5
+		assertEquals(45, shafts.stream().mapToInt(shaft -> shaft.corpses().size()).sum());
+		assertEquals(5, shafts.stream().filter(shaft -> shaft.extraCorpses() > 0).count());
+
+		Shaft jade = shafts.get(14);
+		assertEquals(ExitReason.DEATH, jade.exitReason());
+		assertEquals(747, jade.durationMillis() / 1000);
+		assertEquals(135_434, jade.sacksAdded().get("Rough Jade Gemstone"));
+		assertEquals(28_635, jade.sacksAdded().get("Flawed Jade Gemstone"));
+		assertEquals(1836, Math.round(jade.lastSacksAt() / 1000.0));
+		// incl unreported tail. research/06 says 25,462 but its 614 msgs add to 25,870
+		assertEquals(25_870, jade.pristineItems().get("Flawed Jade Gemstone"));
+		assertEquals(614, jade.pristineProcs());
+	}
+
+	// recording 3 (2026-11-11), checked vs live log
+	@Test
+	void recording3() throws IOException {
+		List<Shaft> shafts = shafts("2026-11-11_14-13-53.jsonl");
+		assertEquals(List.of("AQUA_C", "OPAL_1"), ids(shafts));
+
+		Shaft aqua = shafts.get(0);
+		assertEquals(ExitReason.BYE, aqua.exitReason());
+		assertEquals(1510, aqua.exitPowder());
+		assertEquals(14, aqua.durationMillis() / 1000);
+		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Lapis", true), new Corpse("Tungsten", false)),
+				aqua.corpses());
+		assertEquals(List.of("Pickaxe Ability cooldown"), aqua.mayhemBuffs());
+		assertEquals(new CorpseLoot("Lapis", true, List.of(new ItemCount("Goblin Egg", 1),
+				new ItemCount("Flawed Onyx Gemstone", 20), new ItemCount("Bejeweled Handle", 4),
+				new ItemCount("Flawed Citrine Gemstone", 40)), 5759), aqua.loots().get(0));
+		assertEquals(2, aqua.loots().size());
+
+		Shaft opal = shafts.get(1);
+		assertEquals(ExitReason.BYE, opal.exitReason());
+		assertEquals(1260, opal.exitPowder());
+		assertEquals(13, opal.durationMillis() / 1000);
+		assertEquals(List.of(new Corpse("Lapis", true), new Corpse("Umber", false), new Corpse("Tungsten", false)),
+				opal.corpses());
+		assertEquals(List.of("Cold Resistance"), opal.mayhemBuffs());
+		assertEquals(1, opal.loots().size());
+		assertEquals(5958, opal.loots().get(0).powder());
+	}
+
+	private static List<Shaft> shafts(String recording) throws IOException {
+		Path file = RecordingReplay.RECORDINGS.resolve(recording);
+		assumeTrue(Files.exists(file), "Recording not available: " + file);
+		return RecordingReplay.replay(file).stream()
+				.filter(ShaftLeft.class::isInstance)
+				.map(event -> ((ShaftLeft) event).shaft())
+				.toList();
+	}
+
+	private static List<String> ids(List<Shaft> shafts) {
+		return shafts.stream().map(shaft -> shaft.id().id()).toList();
+	}
+}

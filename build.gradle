@@ -56,7 +56,7 @@ spotless {
 	java {
 		target 'src/*/java/**/*.java'
 		removeUnusedImports()
-		importOrder('java|javax', '', 'dev.shaftjournal', '\\#')
+		importOrder('java|javax', '', 'dev.skysurveyor', '\\#')
 		trimTrailingWhitespace()
 		endWithNewline()
 		formatAnnotations()

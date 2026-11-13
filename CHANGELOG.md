@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.21.0 (2026-11-13)
+ShaftJournal is now **Surveyor**, with a new icon (a brass theodolite). Shafts come first, more mining features
+are planned. The journal itself is still called the Shaft Journal.
+- **Remove the old `shaftjournal-*.jar` from your mods folder.** The new jar is `skysurveyor-0.21.0.jar`. The game
+  won't start with both and says Surveyor is incompatible with ShaftJournal, so they can never both write your data.
+- **Your data moves over by itself.** On the first start, `.minecraft/shaftjournal/` is renamed to
+  `.minecraft/skysurveyor/` (or the old `shafttools/` folder, if that's the only one you have). Journal, HUD,
+  settings and recordings come through exactly as they were. If a `skysurveyor` folder already exists, nothing is
+  moved. If the move fails, Surveyor keeps using the old folder and tries again on the next start.
+- **New commands:** `/surveyor` and `/sv`. `/sj` and `/shaftjournal` still work. All of them open the journal.
+- **Your journal hotkey stays bound.** It's under "Surveyor" in the Controls screen now.
+- The settings page says "Surveyor Settings". New "Surveyor version" HUD lines show `Surveyor 0.21.0`; a version
+  line you already have keeps its text, since that's your own label.
+- The mod id is `skysurveyor` (plain `surveyor` is taken by Surveyor Map Framework).
+
 ## 0.20.0 (2026-11-13)
 Stats tab feedback round.
 - **Bars or a line.** Both charts have their own `< >` arrows (with dots showing which one you're on) to switch

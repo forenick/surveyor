@@ -1,22 +1,22 @@
 {
 	"schemaVersion": 1,
-	"id": "shaftjournal",
+	"id": "skysurveyor",
 	"version": "${version}",
-	"name": "ShaftJournal",
-	"description": "Information-only tools for Glacite Mineshaft grinding on Hypixel SkyBlock.",
+	"name": "Surveyor",
+	"description": "Information-only mining tools for Hypixel SkyBlock, starting with Glacite Mineshafts.",
 	"authors": [
 		"Nick"
 	],
 	"license": "All-Rights-Reserved",
-	"icon": "assets/shaftjournal/icon.png",
+	"icon": "assets/skysurveyor/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"dev.shaftjournal.ShaftJournal"
+			"dev.skysurveyor.Surveyor"
 		]
 	},
 	"mixins": [
-		"shaftjournal.mixins.json"
+		"skysurveyor.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.20.1",
@@ -24,5 +24,8 @@
 		"java": ">=25",
 		"fabric-api": "*",
 		"owo": ">=0.13.1"
+	},
+	"breaks": {
+		"shaftjournal": "*"
 	}
 }

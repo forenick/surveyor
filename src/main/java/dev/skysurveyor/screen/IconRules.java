@@ -1,0 +1,58 @@
+package dev.skysurveyor.screen;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+import dev.skysurveyor.util.Resources;
+
+public final class IconRules {
+	private static final Pattern COMMENT = Pattern.compile("\\s#.*$");
+
+	private static IconRules defaults;
+
+	private record Rule(Pattern pattern, String item) {
+		static Rule of(String pattern, String item) {
+			return new Rule(Pattern.compile(Pattern.quote(pattern).replace("*", "\\E.*\\Q")), item);
+		}
+
+		boolean matches(String name) {
+			return pattern.matcher(name).matches();
+		}
+	}
+
+	private final List<Rule> rules;
+	private final String fallback;
+
+	IconRules(List<String> lines) {
+		List<Rule> parsed = new ArrayList<>();
+		String defaultItem = "minecraft:paper";
+		for (String line : lines) {
+			line = COMMENT.matcher(line).replaceFirst("").strip();
+			if (line.isEmpty() || line.startsWith("#")) continue;
+			int eq = line.lastIndexOf('=');
+			if (eq < 0) continue;
+			String pattern = line.substring(0, eq).strip();
+			String item = line.substring(eq + 1).strip();
+			if (pattern.equals("default")) defaultItem = item;
+			else parsed.add(Rule.of(pattern, item));
+		}
+		rules = List.copyOf(parsed);
+		fallback = defaultItem;
+	}
+
+	public static synchronized IconRules defaults() {
+		if (defaults == null) {
+			List<String> lines = Resources.lines("/skysurveyor/item_icons.txt");
+			defaults = new IconRules(lines == null ? List.of() : lines);
+		}
+		return defaults;
+	}
+
+	public String itemId(String name) {
+		for (Rule rule : rules) {
+			if (rule.matches(name)) return rule.item();
+		}
+		return fallback;
+	}
+}
