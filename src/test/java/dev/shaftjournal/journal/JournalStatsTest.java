@@ -39,6 +39,27 @@ class JournalStatsTest {
 	}
 
 	@Test
+	void dropChancesFromTheRealSession() throws Exception {
+		JournalStats.Drops lapis = JournalStats.allTime(realJournal()).drops().get("Lapis");
+		// 7 lapis loot messages in the fixture, umber in 3, peridot 80+60
+		assertEquals(7, lapis.corpses());
+		assertEquals(new JournalStats.ItemDrop(3, 3), lapis.items().get("Enchanted Umber"));
+		assertEquals(new JournalStats.ItemDrop(2, 140), lapis.items().get("Flawed Peridot Gemstone"));
+		assertEquals(new JournalStats.ItemDrop(1, 1), lapis.items().get("Bejeweled Handle"));
+		assertEquals(3 / 7.0, lapis.items().get("Enchanted Umber").chance(lapis.corpses()), 1e-9);
+	}
+
+	@Test
+	void sameItemTwiceInOneCorpseCountsOnce() {
+		CorpseLoot loot = new CorpseLoot("Umber", false, List.of(new ItemCount("Enchanted Umber", 2),
+				new ItemCount("Enchanted Umber", 3)), 0);
+		JournalEntry entry = new JournalEntry(JournalEntry.VERSION, 0, "JADE_1", 0, 60_000, "BYE", 0, null, List.of(), 0,
+				List.of(loot), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		JournalStats.Drops umber = JournalStats.allTime(List.of(entry)).drops().get("Umber");
+		assertEquals(new JournalStats.ItemDrop(1, 5), umber.items().get("Enchanted Umber"));
+	}
+
+	@Test
 	void mergesGemsBelowFlawlessIntoFine() throws Exception {
 		JournalEntry amethyst = realJournal().get(2);
 		assertEquals("AMET_1", amethyst.shaftId());

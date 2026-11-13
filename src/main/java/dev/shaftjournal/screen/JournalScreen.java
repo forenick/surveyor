@@ -9,6 +9,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.DoubleFunction;
+import java.util.function.DoubleUnaryOperator;
 
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.BoxComponent;
@@ -46,6 +48,7 @@ import dev.shaftjournal.journal.JournalStats.AllTime;
 import dev.shaftjournal.journal.JournalStats.CorpseCount;
 import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.journal.LootSummary;
+import dev.shaftjournal.journal.StatsRange;
 import dev.shaftjournal.journal.SummaryText;
 import dev.shaftjournal.money.CoinBreakdown;
 import dev.shaftjournal.money.Coins;
@@ -80,7 +83,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Surface ROW_HOVER = Surface.flat(0x1AFFFFFF);
 	private static final Surface ROW_SELECTED = Surface.flat(0x26FFFFFF).and(Surface.outline(0x50FFFFFF));
 	private static final Surface SLOT = Surface.flat(0xFF8B8B8B).and(Surface.outline(0xFF373737));
-	private static final Color GREEN = Color.ofArgb(0xCC55FF55);
+	private static final int BAR_GREEN = 0xCC55FF55;
+	private static final Color GREEN = Color.ofArgb(BAR_GREEN);
 	private static final int ROW_HEIGHT = 12;
 	private static final int SPAWN_BAR = 26;
 	private static final int PADDING = 8;
@@ -103,6 +107,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Identifier STATS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/stats_icon.png");
 	private static final Identifier SETTINGS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/settings_icon.png");
 	private static final Identifier OPEN_ARROW = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/open_arrow.png");
+	private static final Identifier PREV_ARROW = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/prev_arrow.png");
 
 	// width 0 = measured per table, see measured()
 	private static final List<Column> SHAFT_COLUMNS = List.of(
@@ -138,6 +143,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private final List<FlowLayout> shaftRows = new ArrayList<>();
 	private final List<KeptScroll> scrolls = new ArrayList<>();
 	private final List<ShiftTip> shiftTips = new ArrayList<>();
+	// kept while the game runs, not saved
+	private static StatsRange statsRange = StatsRange.ALL_TIME;
+	private int statsShafts;
 	private boolean shiftShown;
 	private int moneyChanges = ShaftJournal.MONEY.changes();
 
@@ -258,7 +266,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 			case OVERVIEW -> footer.child(label("§8Click a session to open it"));
 			case STATS -> {
-				footer.child(label("§8Counted from your own " + entries.size() + " shafts"));
+				footer.child(label("§8Counted from your own " + statsShafts + " shafts"));
 				footer.child(label("§8Hover a row for details"));
 				footer.child(label("§8Click an arrow to open it"));
 			}
@@ -748,13 +756,25 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void buildStatsTab(FlowLayout content) {
-		AllTime stats = JournalStats.allTime(entries);
-		MoneyStats money = MoneyStats.of(entries, sessions, ShaftJournal.MONEY::value);
+		boolean all = statsRange == StatsRange.ALL_TIME;
+		List<SessionSummary> rangeSessions = statsRange.sessions(sessions, System.currentTimeMillis());
+		List<JournalEntry> rangeEntries = all ? entries : StatsRange.entries(rangeSessions);
+		statsShafts = rangeEntries.size();
 		FlowLayout columns = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fill(100));
 		columns.gap(GAP);
-
 		FlowLayout totals = column();
-		totals.child(header("All time"));
+		totals.child(rangeHeader());
+		if (rangeEntries.isEmpty()) {
+			totals.child(wrapped("§8No shafts in this range"));
+			columns.child(scrollColumn(Sizing.fill(STATS_LEFT), totals));
+			columns.child(scrollColumn(Sizing.expand(), column()));
+			columns.child(scrollColumn(Sizing.fill(STATS_RIGHT), column()));
+			content.child(columns);
+			return;
+		}
+		AllTime stats = JournalStats.allTime(rangeEntries);
+		MoneyStats money = MoneyStats.of(rangeEntries, rangeSessions, ShaftJournal.MONEY::value);
+
 		totals.child(coinsTotal(money, stats));
 		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
 		FlowLayout shafts = keyValue("Shafts", "§f" + stats.shafts());
@@ -763,7 +783,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(keyValue("Sessions", "§f" + stats.sessions()));
 		totals.child(keyValue("Time shafting", "§f" + SummaryText.duration(stats.timeMillis())));
 		totals.child(section("Corpses looted"));
-		for (String type : stats.corpsesSeen().keySet()) totals.child(corpseRow(type, stats.looted().getOrDefault(type, 0), money));
+		for (String type : stats.corpsesSeen().keySet()) {
+			totals.child(corpseRow(type, stats.looted().getOrDefault(type, 0), money, stats.drops().get(type)));
+		}
 		totals.child(section("Personal bests"));
 		JournalEntry fastest = stats.fastest();
 		totals.child(record("Fastest spawn", fastest == null ? null : spawn(fastest.searchMillis()),
@@ -796,19 +818,24 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 		FlowLayout spawn = column();
 		spawn.child(header("Spawn time"));
-		spawn.child(keyValue("All-time avg", stats.averageSearchMillis() == null ? "§8-"
-				: "§e" + SummaryText.duration(stats.averageSearchMillis())));
-		Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
-		if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
-			long difference = recent - stats.averageSearchMillis();
-			// durations show whole secs, <1s = same
-			String change = Math.abs(difference) < 1000 ? " §7(same)"
-					: difference < 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
-					: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
-			spawn.child(keyValue("Last " + RECENT_SESSIONS + " sessions", "§f" + SummaryText.duration(recent) + change));
+		if (all) {
+			spawn.child(keyValue("All-time avg", stats.averageSearchMillis() == null ? "§8-"
+					: "§e" + SummaryText.duration(stats.averageSearchMillis())));
+			Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
+			if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
+				spawn.child(keyValue("Last " + RECENT_SESSIONS + " sessions",
+						"§f" + SummaryText.duration(recent) + change(recent, stats.averageSearchMillis())));
+			}
+		} else {
+			Long average = stats.averageSearchMillis();
+			Long allTime = JournalStats.averageSearch(entries);
+			spawn.child(keyValue("Avg", average == null ? "§8-"
+					: "§e" + SummaryText.duration(average) + (allTime == null ? "" : change(average, allTime))));
+			spawn.child(keyValue("All-time avg", allTime == null ? "§8-" : "§f" + SummaryText.duration(allTime)));
 		}
+		String legend = all ? "all-time avg" : "avg";
 		spawn.child(section("Avg spawn per session"));
-		spawn.child(chart(stats.oldestFirst(), stats.averageSearchMillis()));
+		spawn.child(spawnChart(stats.oldestFirst(), stats.averageSearchMillis(), legend));
 		spawn.child(section("Corpse % per shaft"));
 		for (String type : stats.corpsesSeen().keySet()) {
 			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
@@ -820,6 +847,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 							+ " per shaft on average")));
 			spawn.child(row);
 		}
+		spawn.child(section("Coins / h per session"));
+		Double averageRate = money.coins() == null ? null : JournalStats.perHour(money.coins(), stats.timeMillis());
+		spawn.child(coinChart(stats.oldestFirst(), averageRate, money.coins() != null, legend));
 		columns.child(scrollColumn(Sizing.expand(), spawn));
 
 		FlowLayout odds = column();
@@ -838,6 +868,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			row.tooltip(tooltip);
 			odds.child(row);
 		}
+		typeCoins(odds, money);
 		columns.child(scrollColumn(Sizing.fill(STATS_RIGHT), odds));
 		content.child(columns);
 	}
@@ -851,12 +882,65 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return row;
 	}
 
-	private FlowLayout corpseRow(String type, int looted, MoneyStats money) {
+	private FlowLayout corpseRow(String type, int looted, MoneyStats money, JournalStats.Drops drops) {
 		MoneyStats.CorpseCoins corpse = money.corpses().get(type);
 		String value = corpseColor(type) + looted;
-		if (corpse == null) return keyValue(type, value);
-		FlowLayout row = keyValue(type, value + " §7(" + coins(corpse.each()) + " §7avg.)");
-		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, tooltipHeight())));
+		FlowLayout row = keyValue(type, corpse == null ? value : value + " §7(" + coins(corpse.each()) + " §7avg.)");
+		if (corpse == null && drops == null) return row;
+		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, drops, tooltipHeight())));
+	}
+
+	// best avg first
+	private void typeCoins(FlowLayout column, MoneyStats money) {
+		List<Map.Entry<String, MoneyStats.TypeCoins>> types = money.types().entrySet().stream()
+				.sorted(Comparator.comparingDouble((Map.Entry<String, MoneyStats.TypeCoins> e) -> -e.getValue().each())).toList();
+		if (types.isEmpty()) return;
+		column.child(section("Avg coins per shaft"));
+		double most = types.stream().mapToDouble(e -> e.getValue().each()).max().orElse(0);
+		int valueWidth = types.stream().mapToInt(e -> font.width(coins(e.getValue().each()))).max().orElse(0);
+		for (Map.Entry<String, MoneyStats.TypeCoins> type : types) {
+			String name = shaftNames.name(type.getKey());
+			double each = type.getValue().each();
+			FlowLayout row = barRow(name, most > 0 ? Math.max(0, each) / most : 0, coins(each),
+					0xFF000000 | shaftNames.rgb(type.getKey()), valueWidth);
+			column.child(withTips(row, TooltipLines.of(CoinBreakdown.shaftType(name, type.getValue(),
+					v -> capitalized(variantName(v))))));
+		}
+	}
+
+	private FlowLayout rangeHeader() {
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		row.verticalAlignment(VerticalAlignment.CENTER);
+		row.margins(Insets.bottom(3));
+		LabelComponent name = label("§f" + statsRange.displayName());
+		name.horizontalSizing(Sizing.expand());
+		row.child(name);
+		row.child(rangeArrow(PREV_ARROW, -1));
+		row.child(rangeArrow(OPEN_ARROW, 1));
+		return row;
+	}
+
+	// padding = bigger click area
+	private UIComponent rangeArrow(Identifier texture, int step) {
+		FlowLayout arrow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		arrow.padding(Insets.of(2, 2, 4, 4));
+		arrow.child(UIComponents.texture(texture, 0, 0, 3, 5, 3, 5).blend(true));
+		arrow.cursorStyle(CursorStyle.HAND);
+		arrow.tooltip(Component.literal("§7Show §f" + statsRange.next(step).displayName()));
+		arrow.mouseDown().subscribe((event, doubleClick) -> {
+			statsRange = statsRange.next(step);
+			rebuild();
+			return true;
+		});
+		return arrow;
+	}
+
+	// durations show whole secs, <1s = same
+	private static String change(long now, long before) {
+		long difference = now - before;
+		return Math.abs(difference) < 1000 ? " §7(same)"
+				: difference < 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
+				: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
 	}
 
 	// room for the tooltip's own border
@@ -939,92 +1023,137 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return "session from " + day(session.start()) + " " + clock(session.start());
 	}
 
-	private static final long[] AXIS_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
+	// seconds
+	private static final double[] SPAWN_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
+	// 1, 2, 5 x 10^n coins
+	private static final double[] COIN_STEPS = coinSteps();
+	private static final int BAR_GOLD = 0xCCFFAA00;
+	private static final int BAR_RED = 0xCCFF5555;
 
-	private FlowLayout chart(List<SessionSummary> oldestFirst, Long average) {
-		List<SessionSummary> timed = oldestFirst.stream().filter(s -> s.averageSearchMillis() != null).toList();
+	private static double[] coinSteps() {
+		double[] steps = new double[3 * 13];
+		for (int i = 0; i < steps.length; i++) steps[i] = new double[] {1, 2, 5}[i % 3] * Math.pow(10, i / 3);
+		return steps;
+	}
+
+	private record Bar(SessionSummary session, double value, int argb, List<Component> tooltip) {
+	}
+
+	private FlowLayout spawnChart(List<SessionSummary> oldestFirst, Long average, String legend) {
+		List<Bar> bars = new ArrayList<>();
+		for (SessionSummary session : oldestFirst) {
+			if (session.averageSearchMillis() == null) continue;
+			bars.add(new Bar(session, session.averageSearchMillis() / 1000.0, BAR_GREEN, List.of(
+					Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
+					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.timedSpawns() + " shafts"),
+					Component.literal("§8Click to open"))));
+		}
+		return barChart(bars, SPAWN_STEPS, seconds -> axisLabel(Math.round(seconds)), average == null ? null : average / 1000.0,
+				0xB0FFFF55, "§eYellow line §7" + legend, "§8No timed spawns yet");
+	}
+
+	private FlowLayout coinChart(List<SessionSummary> oldestFirst, Double average, boolean priced, String legend) {
+		List<Bar> bars = new ArrayList<>();
+		for (SessionSummary session : oldestFirst) {
+			Double rate = MoneyStats.perHour(session, ShaftJournal.MONEY::value);
+			if (rate == null) continue;
+			Double coins = MoneyStats.coins(session.entries(), ShaftJournal.MONEY::value);
+			bars.add(new Bar(session, rate, Math.round(rate) < 0 ? BAR_RED : BAR_GOLD, List.of(
+					Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
+					Component.literal("§7Coins / h " + coins(rate)),
+					Component.literal("§7Coins " + coinText(coins) + " §7in " + SummaryText.duration(session.lengthMillis())),
+					Component.literal("§7Shafts §f" + session.shafts()),
+					Component.literal("§8Click to open"))));
+		}
+		String empty = priced ? "§8Needs a session of " + JournalStats.MIN_RATE_MILLIS / 60_000 + "+ minutes" : "§8No prices yet";
+		return barChart(bars, COIN_STEPS, JournalScreen::axisCoins, average, 0xB0FFFFFF, "§fWhite line §7" + legend, empty);
+	}
+
+	private static String axisCoins(double coins) {
+		return Coins.format(coins).replace(".0", "");
+	}
+
+	// up to 4 steps, bars under 0 hang down from the 0 line
+	private FlowLayout barChart(List<Bar> all, double[] steps, DoubleFunction<String> axisText, Double average, int averageArgb,
+			String legend, String empty) {
 		FlowLayout wrapper = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
-		if (timed.isEmpty()) {
-			wrapper.child(label("§8No timed spawns yet"));
+		if (all.isEmpty()) {
+			wrapper.child(label(empty));
 			return wrapper;
 		}
 		int chartHeight = Math.clamp(height / 3, 50, 110);
-		long slowestSeconds = Math.max(1, (timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(1) + 999) / 1000);
-		long step = AXIS_STEPS[AXIS_STEPS.length - 1];
-		for (long candidate : AXIS_STEPS) {
-			if ((slowestSeconds + candidate - 1) / candidate <= 4) {
+		double highest = Math.max(0, all.stream().mapToDouble(Bar::value).max().orElse(0));
+		double lowest = Math.min(0, all.stream().mapToDouble(Bar::value).min().orElse(0));
+		double step = steps[steps.length - 1];
+		for (double candidate : steps) {
+			if (Math.ceil(highest / candidate) + Math.ceil(-lowest / candidate) <= 4) {
 				step = candidate;
 				break;
 			}
 		}
-		long topSeconds = Math.max(step, (slowestSeconds + step - 1) / step * step);
+		double top = Math.ceil(highest / step) * step;
+		double bottom = -Math.ceil(-lowest / step) * step;
+		if (top == bottom) top = step;
 		int axisWidth = 0;
-		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
-			axisWidth = Math.max(axisWidth, font.width(axisLabel(seconds)));
-		}
+		for (double value = bottom; value <= top + step / 2; value += step) axisWidth = Math.max(axisWidth, font.width(axisText.apply(value)));
 		axisWidth += 2;
 
 		int plotWidth = Math.max(60, width - 2 * PADDING - 2 * GAP - width * STATS_LEFT / 100 - width * STATS_RIGHT / 100
 				- 2 * COLUMN_PADDING - axisWidth - AXIS_GAP);
 		// display choice: bars up to 24 wide, gap grows w/ them
-		int barWidth = Math.clamp((plotWidth - 2) * 4 / 5 / timed.size(), 3, 24);
+		int barWidth = Math.clamp((plotWidth - 2) * 4 / 5 / all.size(), 3, 24);
 		int barGap = Math.clamp(barWidth / 4, 2, 6);
 		int maxBars = Math.max(1, (plotWidth - 2) / (barWidth + barGap));
-		if (timed.size() > maxBars) timed = timed.subList(timed.size() - maxBars, timed.size());
+		List<Bar> shown = all.size() > maxBars ? all.subList(all.size() - maxBars, all.size()) : all;
 
-		int top = 4;
+		int plotTop = 4;
 		int base = chartHeight - 5;
-		int plotHeight = base - top;
+		int plotHeight = base - plotTop;
+		double span = top - bottom;
+		DoubleUnaryOperator y = value -> base - (int) (plotHeight * (value - bottom) / span);
 		FlowLayout chart = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(chartHeight));
 		chart.gap(AXIS_GAP);
 		StackLayout axis = UIContainers.stack(Sizing.fixed(axisWidth), Sizing.fixed(chartHeight));
 		StackLayout plot = UIContainers.stack(Sizing.expand(), Sizing.fixed(chartHeight));
-		for (long seconds = 0; seconds <= topSeconds; seconds += step) {
-			int y = base - (int) (plotHeight * seconds / topSeconds);
-			LabelComponent tick = label("§8" + axisLabel(seconds));
+		for (double value = bottom; value <= top + step / 2; value += step) {
+			int lineY = (int) y.applyAsDouble(value);
+			LabelComponent tick = label("§8" + axisText.apply(value));
 			tick.horizontalSizing(Sizing.fixed(axisWidth));
 			tick.horizontalTextAlignment(HorizontalAlignment.RIGHT);
-			tick.positioning(Positioning.absolute(0, y - 4));
+			tick.positioning(Positioning.absolute(0, lineY - 4));
 			axis.child(tick);
-			plot.child(line(y, seconds == 0 ? 0x40FFFFFF : 0x18FFFFFF));
+			plot.child(line(lineY, Math.abs(value) < step / 2 ? 0x40FFFFFF : 0x18FFFFFF));
 		}
-		FlowLayout bars = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(base));
-		bars.verticalAlignment(VerticalAlignment.BOTTOM);
-		bars.gap(barGap);
-		bars.padding(Insets.left(2));
-		bars.positioning(Positioning.absolute(0, 0));
-		for (SessionSummary session : timed) {
-			int barHeight = Math.max(1, (int) (plotHeight * session.averageSearchMillis() / 1000.0 / topSeconds));
-			BoxComponent bar = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
-			bar.fill(true);
-			bar.color(GREEN);
-			bar.cursorStyle(CursorStyle.HAND);
-			bar.tooltip(List.of(Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
-					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.timedSpawns() + " shafts"),
-					Component.literal("§8Click to open")));
-			bar.mouseDown().subscribe((event, doubleClick) -> {
-				openSession(session);
+		int zero = (int) y.applyAsDouble(0);
+		for (int i = 0; i < shown.size(); i++) {
+			Bar bar = shown.get(i);
+			int end = (int) y.applyAsDouble(bar.value());
+			int barHeight = Math.max(1, Math.abs(zero - end));
+			BoxComponent box = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
+			box.fill(true);
+			box.color(Color.ofArgb(bar.argb()));
+			box.positioning(Positioning.absolute(2 + i * (barWidth + barGap), bar.value() < 0 ? zero + 1 : zero - barHeight));
+			box.cursorStyle(CursorStyle.HAND);
+			box.tooltip(bar.tooltip());
+			box.mouseDown().subscribe((event, doubleClick) -> {
+				openSession(bar.session());
 				return true;
 			});
-			bars.child(bar);
+			plot.child(box);
 		}
-		plot.child(bars);
-		if (average != null) {
-			int y = base - (int) Math.min(plotHeight, plotHeight * average / 1000.0 / topSeconds);
-			plot.child(line(y, 0xB0FFFF55));
-		}
+		if (average != null) plot.child(line((int) y.applyAsDouble(Math.clamp(average, bottom, top)), averageArgb));
 		chart.child(axis);
 		chart.child(plot);
 		wrapper.child(chart);
 
 		StackLayout dates = UIContainers.stack(Sizing.fill(100), Sizing.fixed(10));
-		LabelComponent first = label("§8" + day(timed.getFirst().start()));
+		LabelComponent first = label("§8" + day(shown.getFirst().session().start()));
 		first.positioning(Positioning.absolute(axisWidth + AXIS_GAP + 2, 1));
 		dates.child(first);
-		if (timed.size() > 1) {
-			String lastText = "§8" + day(timed.getLast().start());
-			int lastX = axisWidth + AXIS_GAP + 2 + (timed.size() - 1) * (barWidth + barGap) + barWidth - font.width(lastText);
-			int firstEnd = axisWidth + AXIS_GAP + 2 + font.width("§8" + day(timed.getFirst().start()));
+		if (shown.size() > 1) {
+			String lastText = "§8" + day(shown.getLast().session().start());
+			int lastX = axisWidth + AXIS_GAP + 2 + (shown.size() - 1) * (barWidth + barGap) + barWidth - font.width(lastText);
+			int firstEnd = axisWidth + AXIS_GAP + 2 + font.width("§8" + day(shown.getFirst().session().start()));
 			if (lastX > firstEnd + 6) {
 				LabelComponent last = label(lastText);
 				last.positioning(Positioning.absolute(lastX, 1));
@@ -1032,7 +1161,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 		}
 		wrapper.child(dates);
-		if (average != null) wrapper.child(label("§eYellow line §7all-time avg"));
+		if (average != null) wrapper.child(label(legend));
 		return wrapper;
 	}
 
@@ -1051,6 +1180,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private FlowLayout barRow(String name, double fraction, String value, int argb) {
+		return barRow(name, fraction, "§f" + value, argb, 26);
+	}
+
+	private FlowLayout barRow(String name, double fraction, String value, int argb, int valueWidth) {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(ROW_HEIGHT));
 		row.verticalAlignment(VerticalAlignment.CENTER);
 		row.gap(4);
@@ -1064,8 +1197,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		fill.color(Color.ofArgb(argb));
 		track.child(fill);
 		row.child(track);
-		LabelComponent valueLabel = label("§f" + value);
-		valueLabel.horizontalSizing(Sizing.fixed(26));
+		LabelComponent valueLabel = label(value);
+		valueLabel.horizontalSizing(Sizing.fixed(valueWidth));
 		valueLabel.horizontalTextAlignment(HorizontalAlignment.RIGHT);
 		row.child(valueLabel);
 		return row;

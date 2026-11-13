@@ -15,7 +15,7 @@ import dev.shaftjournal.money.ShaftValue.Part;
 // values null = no prices at all yet
 // parts = all-time total per part, in Part order, items = the same per item
 public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<String, CorpseCoins> corpses, Best bestShaft,
-		BestRate bestRate, Map<Part, Map<String, ItemCoins>> items) {
+		BestRate bestRate, Map<Part, Map<String, ItemCoins>> items, Map<String, TypeCoins> types) {
 	public record CorpseCoins(int corpses, double loot, double keys, int unpriced, Map<String, ItemCoins> items) {
 		public double net() {
 			return loot + keys;
@@ -23,6 +23,19 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 
 		public double each() {
 			return net() / corpses;
+		}
+	}
+
+	// per shaft type code, variants by variant letter
+	public record TypeCoins(int shafts, double coins, double best, Map<Part, Double> parts, Map<String, Average> variants) {
+		public double each() {
+			return coins / shafts;
+		}
+	}
+
+	public record Average(int shafts, double coins) {
+		public double each() {
+			return coins / shafts;
 		}
 	}
 
@@ -71,6 +84,7 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 		Map<Part, Double> parts = new EnumMap<>(Part.class);
 		Map<String, CorpseCoins> corpses = new LinkedHashMap<>();
 		Map<Part, Map<String, ItemCoins>> items = new EnumMap<>(Part.class);
+		Map<String, TypeCoins> types = new LinkedHashMap<>();
 		Best best = null;
 		for (JournalEntry entry : entries) {
 			ShaftValue value = values.apply(entry);
@@ -90,6 +104,8 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 								had.unpriced() + corpse.unpriced(), loot));
 			}
 			if (!value.lines().isEmpty() && (best == null || value.net() > best.coins())) best = new Best(entry, value.net());
+			String type = JournalStats.type(entry);
+			if (type != null) types.put(type, plus(types.get(type), JournalStats.variant(entry), value));
 		}
 		BestRate bestRate = null;
 		for (SessionSummary session : sessions) {
@@ -97,7 +113,21 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 			Double rate = perHour(session, values);
 			if (rate != null && (bestRate == null || rate > bestRate.perHour())) bestRate = new BestRate(session, rate);
 		}
-		return new MoneyStats(coins, valued, parts, corpses, best, bestRate, items);
+		return new MoneyStats(coins, valued, parts, corpses, best, bestRate, items, types);
+	}
+
+	private static TypeCoins plus(TypeCoins had, String variant, ShaftValue value) {
+		double net = value.net();
+		Map<Part, Double> parts = had == null ? new EnumMap<>(Part.class) : had.parts();
+		for (ShaftValue.Line line : value.lines()) {
+			if (line.coins() != null) parts.merge(line.part(), line.coins(), Double::sum);
+		}
+		Map<String, Average> variants = had == null ? new LinkedHashMap<>() : had.variants();
+		if (variant != null) {
+			variants.merge(variant, new Average(1, net), (a, b) -> new Average(a.shafts() + 1, a.coins() + net));
+		}
+		if (had == null) return new TypeCoins(1, net, net, parts, variants);
+		return new TypeCoins(had.shafts() + 1, had.coins() + net, Math.max(had.best(), net), parts, variants);
 	}
 
 	private static void add(Map<String, ItemCoins> items, ShaftValue.Line line) {

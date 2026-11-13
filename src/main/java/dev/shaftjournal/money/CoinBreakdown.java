@@ -3,11 +3,16 @@ package dev.shaftjournal.money;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 
+import dev.shaftjournal.journal.JournalStats.Drops;
+import dev.shaftjournal.journal.JournalStats.ItemDrop;
 import dev.shaftjournal.journal.SummaryText;
 import dev.shaftjournal.money.MoneyStats.CorpseCoins;
 import dev.shaftjournal.money.MoneyStats.ItemCoins;
+import dev.shaftjournal.money.MoneyStats.TypeCoins;
 import dev.shaftjournal.money.ShaftValue.Part;
 
 // stats tooltips as §-coded lines, "" = small gap, items cut until it fits maxHeight
@@ -61,7 +66,7 @@ public final class CoinBreakdown {
 			gap(lines);
 			lines.add("§f" + part.displayName() + " " + (total == null ? "§8no price" : coins(total)) + share);
 			List<Row> rows = part == Part.CORPSES ? corpseRows(money) : itemRows(part, partItems);
-			addRows(lines, rows, items, "  ");
+			addRows(lines, rows, items, "  ", true);
 		}
 		gap(lines);
 		if (Math.round(costs) != 0) {
@@ -100,36 +105,80 @@ public final class CoinBreakdown {
 		return lines;
 	}
 
-	public static List<String> corpse(String type, int looted, CorpseCoins corpse, int maxHeight) {
+	// corpse null = no prices, drops null = no loot seen
+	public static List<String> corpse(String type, int looted, CorpseCoins corpse, Drops drops, int maxHeight) {
 		List<String> lines = List.of();
 		for (int items = MOST_ITEMS * 2; items >= 0; items--) {
-			lines = corpseWith(type, looted, corpse, items);
+			lines = corpseWith(type, looted, corpse, drops, items);
 			if (height(lines) <= maxHeight) break;
 		}
 		return lines;
 	}
 
-	private static List<String> corpseWith(String type, int looted, CorpseCoins corpse, int items) {
+	private static List<String> corpseWith(String type, int looted, CorpseCoins corpse, Drops drops, int items) {
 		List<String> lines = new ArrayList<>();
 		lines.add("§f" + type + " corpses");
 		gap(lines);
-		String counted = corpse.corpses() == looted ? corpse.corpses() + " corpses"
-				: corpse.corpses() + " of " + looted + " with prices";
-		lines.add("§7Total " + coins(corpse.net()) + " §8(" + counted + ")");
-		lines.add("§7Avg " + coins(corpse.each()) + " §7each");
-		if (Math.round(corpse.keys()) != 0) {
-			lines.add("  §7Loot " + coins(corpse.loot() / corpse.corpses()) + " §7each");
-			lines.add("  §7Key " + coins(corpse.keys() / corpse.corpses()) + " §7each");
+		if (corpse != null) {
+			String counted = corpse.corpses() == looted ? corpse.corpses() + " corpses"
+					: corpse.corpses() + " of " + looted + " with prices";
+			lines.add("§7Total " + coins(corpse.net()) + " §8(" + counted + ")");
+			lines.add("§7Avg " + coins(corpse.each()) + " §7each");
+			if (Math.round(corpse.keys()) != 0) {
+				lines.add("  §7Loot " + coins(corpse.loot() / corpse.corpses()) + " §7each");
+				lines.add("  §7Key " + coins(corpse.keys() / corpse.corpses()) + " §7each");
+			}
+		} else {
+			lines.add("§8No prices yet");
 		}
-		if (!corpse.items().isEmpty() && items > 0) {
+		if (drops != null && !drops.items().isEmpty() && items > 0) {
 			gap(lines);
-			lines.add("§fLoot");
-			addRows(lines, itemRows(Part.CORPSES, corpse.items()), items, "");
+			lines.add("§fLoot §8drop chance" + (drops.corpses() == looted ? "" : " (" + drops.corpses() + " corpses seen)"));
+			List<Row> rows = new ArrayList<>();
+			drops.items().entrySet().stream()
+					.sorted(Comparator.comparingInt((Map.Entry<String, ItemDrop> e) -> -e.getValue().corpses()))
+					.forEach(e -> {
+						ItemCoins priced = corpse == null ? null : corpse.items().get(e.getKey());
+						rows.add(new Row("§b" + chance(e.getValue().chance(drops.corpses())) + " §7"
+								+ SummaryText.number(e.getValue().count()) + " " + e.getKey(), priced == null ? null : priced.coins()));
+					});
+			addRows(lines, rows, items, "", corpse != null);
 		}
-		if (corpse.unpriced() > 0) {
+		if (corpse != null && corpse.unpriced() > 0) {
 			lines.add("§c" + corpse.unpriced() + (corpse.unpriced() == 1 ? " item" : " items") + " without a price");
 		}
 		return lines;
+	}
+
+	public static List<String> shaftType(String name, TypeCoins type, Function<String, String> variantNames) {
+		List<String> lines = new ArrayList<>();
+		lines.add("§f" + name + " shafts");
+		gap(lines);
+		lines.add("§7Avg " + coins(type.each()) + " §7per shaft §8(" + type.shafts() + (type.shafts() == 1 ? " shaft)" : " shafts)"));
+		lines.add("§7Best " + coins(type.best()));
+		lines.add("§7Total " + coins(type.coins()));
+		List<String> parts = new ArrayList<>();
+		type.parts().forEach((part, coins) -> {
+			if (Math.round(coins / type.shafts()) != 0) parts.add("§7" + part.displayName() + " " + coins(coins / type.shafts()));
+		});
+		if (!parts.isEmpty()) {
+			gap(lines);
+			lines.add("§fPer shaft");
+			lines.addAll(parts);
+		}
+		if (type.variants().size() > 1) {
+			gap(lines);
+			lines.add("§fPer variant");
+			type.variants().forEach((variant, avg) -> lines.add("§7" + variantNames.apply(variant) + " " + coins(avg.each())
+					+ " §8(" + avg.shafts() + (avg.shafts() == 1 ? " shaft)" : " shafts)")));
+		}
+		return lines;
+	}
+
+	// under 10% w/ a decimal, rare drops matter
+	static String chance(double fraction) {
+		double percent = 100 * fraction;
+		return percent >= 9.95 ? Math.round(percent) + "%" : String.format(Locale.ROOT, "%.1f%%", percent);
 	}
 
 	private record Row(String text, Double coins) {
@@ -149,19 +198,20 @@ public final class CoinBreakdown {
 	}
 
 	// biggest first either way, no price last
-	private static void addRows(List<String> lines, List<Row> rows, int items, String indent) {
+	private static void addRows(List<String> lines, List<Row> rows, int items, String indent, boolean withCoins) {
 		if (items == 0) return;
 		List<Row> sorted = rows.stream().sorted(Comparator.comparing((Row r) -> r.coins() == null)
 				.thenComparing(r -> r.coins() == null ? 0 : -Math.abs(r.coins()))).toList();
 		// a "1 more" line would take the same room as the item
 		int shown = sorted.size() <= items + 1 ? sorted.size() : items;
 		for (Row row : sorted.subList(0, shown)) {
-			lines.add(indent + "§7" + row.text() + " " + (row.coins() == null ? "§8no price" : coins(row.coins())));
+			String coins = !withCoins ? "" : " " + (row.coins() == null ? "§8no price" : coins(row.coins()));
+			lines.add(indent + "§7" + row.text() + coins);
 		}
 		if (shown == sorted.size()) return;
 		Double rest = null;
 		for (Row row : sorted.subList(shown, sorted.size())) rest = MoneyStats.plus(rest, row.coins());
-		lines.add(indent + "§8" + (sorted.size() - shown) + " more " + (rest == null ? "" : coins(rest)));
+		lines.add(indent + "§8" + (sorted.size() - shown) + " more" + (rest == null || !withCoins ? "" : " " + coins(rest)));
 	}
 
 	private static String share(double fraction) {

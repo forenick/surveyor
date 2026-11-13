@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.19.0 (2026-11-13)
+More on the Stats tab.
+- **Pick a range.** The `<` `>` arrows next to the left column's title switch the whole Stats tab between
+  **All time**, **Last 7 days** and **Last 5 sessions**. Everything follows it: totals, corpses, personal bests,
+  both charts and the shaft types. In a range, the spawn column compares its average to your all-time average.
+  The range is remembered until you close the game.
+- **Average coins per shaft type** under "Shaft types seen", best first. Hover a type for its average, best and
+  total, the average per part (mined gems, corpse loot, keys and so on) and per variant (type 1, type 2, crystal).
+- **Drop chances in the corpse tooltips.** Each loot item shows how many of that type's corpses dropped it, like
+  `7.0% 12 Flawless Ruby Gemstone +20.7M`. Rare drops get a decimal (`0.6%`). These are counted from your own
+  corpses, so they get better the more you loot. Works without prices too.
+- **Coins / h per session chart** under the corpse bars: one bar per session, gold above 0 and red below, with a
+  white line for your average. Hover a bar for its coins, length and shafts, click it to open the session.
+
 ## 0.18.4 (2026-11-13)
 Stats tooltips are easier to read.
 - **Small gaps between groups** in the Coins and corpse tooltips, so each part (and its items) stands on its own.

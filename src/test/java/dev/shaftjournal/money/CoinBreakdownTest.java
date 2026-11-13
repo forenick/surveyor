@@ -1,5 +1,6 @@
 package dev.shaftjournal.money;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -7,12 +8,13 @@ import org.junit.jupiter.api.Test;
 
 import dev.shaftjournal.journal.JournalEntry;
 import dev.shaftjournal.journal.JournalStats;
+import dev.shaftjournal.journal.JournalStats.Drops;
+import dev.shaftjournal.journal.JournalStats.ItemDrop;
 import dev.shaftjournal.money.ShaftValue.CorpseValue;
 import dev.shaftjournal.money.ShaftValue.Line;
 import dev.shaftjournal.money.ShaftValue.Part;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // made up coins, not real ones
@@ -70,16 +72,57 @@ class CoinBreakdownTest {
 		assertTrue(cut.stream().anyMatch(l -> l.startsWith("  §8") && l.contains(" more ")), cut.toString());
 	}
 
+	// 2 umber corpses w/ loot seen, 3 looted
+	private static Drops drops() {
+		Map<String, ItemDrop> items = new LinkedHashMap<>();
+		items.put("Bejeweled Handle", new ItemDrop(2, 2));
+		items.put("Goblin Egg", new ItemDrop(2, 8));
+		items.put("Enchanted Umber", new ItemDrop(1, 4));
+		return new Drops(2, items);
+	}
+
 	@Test
 	void corpseKeepsTotal() {
 		MoneyStats stats = stats();
-		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 1000);
+		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 1000);
 		assertTrue(lines.contains("§7Total §6+404.0k §8(2 of 3 with prices)"), lines.toString());
 		assertTrue(lines.contains("§7Avg §6+202.0k §7each"));
 		assertTrue(lines.contains("  §7Key §c-400.0k §7each"));
-		assertEquals("§72 Bejeweled Handle §6+1.2M", lines.get(lines.indexOf("§fLoot") + 1), "biggest first");
-		assertTrue(lines.contains("§78 Goblin Egg §8no price"), "no price last");
-		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 60);
-		assertFalse(tiny.contains("§fLoot"));
+		int loot = lines.indexOf("§fLoot §8drop chance (2 corpses seen)");
+		assertTrue(loot > 0, lines.toString());
+		assertEquals("§7§b100% §72 Bejeweled Handle §6+1.2M", lines.get(loot + 1), "biggest first");
+		assertEquals("§7§b50% §74 Enchanted Umber §6+4.0k", lines.get(loot + 2));
+		assertEquals("§7§b100% §78 Goblin Egg §8no price", lines.get(loot + 3), "no price last");
+		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 60);
+		assertTrue(tiny.stream().noneMatch(l -> l.startsWith("§fLoot")));
+	}
+
+	@Test
+	void dropsWithoutPrices() {
+		List<String> lines = CoinBreakdown.corpse("Umber", 2, null, drops(), 1000);
+		assertTrue(lines.contains("§8No prices yet"));
+		assertTrue(lines.contains("§fLoot §8drop chance"));
+		// most common first when nothing has a price
+		assertEquals("§7§b100% §72 Bejeweled Handle", lines.get(lines.indexOf("§fLoot §8drop chance") + 1));
+		assertEquals("§7§b50% §74 Enchanted Umber", lines.getLast());
+	}
+
+	@Test
+	void chances() {
+		assertEquals("0.6%", CoinBreakdown.chance(1 / 172.0));
+		assertEquals("7.0%", CoinBreakdown.chance(0.07));
+		assertEquals("14%", CoinBreakdown.chance(1 / 7.0));
+		assertEquals("100%", CoinBreakdown.chance(1));
+	}
+
+	@Test
+	void shaftTypePerShaft() {
+		MoneyStats.TypeCoins jade = stats().types().get("JADE");
+		assertEquals(2, jade.shafts());
+		// 3M + 3.5k + 602k - 400k per shaft
+		assertEquals(3_205_500, jade.each(), 1e-6);
+		List<String> lines = CoinBreakdown.shaftType("Jade", jade, v -> "Type " + v);
+		assertEquals(List.of("§fJade shafts", "", "§7Avg §6+3.2M §7per shaft §8(2 shafts)", "§7Best §6+3.2M", "§7Total §6+6.4M", "",
+				"§fPer shaft", "§7Mined gems §6+3.0M", "§7Other drops §6+3.5k", "§7Corpse loot §6+602.0k", "§7Keys §c-400.0k"), lines);
 	}
 }

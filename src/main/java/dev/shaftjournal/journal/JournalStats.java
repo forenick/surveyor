@@ -9,6 +9,7 @@ import java.util.regex.Matcher;
 
 import dev.shaftjournal.detection.Corpse;
 import dev.shaftjournal.detection.CorpseLoot;
+import dev.shaftjournal.detection.ItemCount;
 import dev.shaftjournal.detection.TextPatterns;
 
 public final class JournalStats {
@@ -89,6 +90,16 @@ public final class JournalStats {
 	public record Best(JournalEntry entry, long value) {
 	}
 
+	// corpses = with loot seen, item corpses = how many of those dropped it
+	public record Drops(int corpses, Map<String, ItemDrop> items) {
+	}
+
+	public record ItemDrop(int corpses, long count) {
+		public double chance(int of) {
+			return corpses / (double) of;
+		}
+	}
+
 	public record AllTime(
 			int shafts,
 			int sessions,
@@ -106,7 +117,8 @@ public final class JournalStats {
 			JournalEntry mostGems,
 			Map<String, Map<String, Integer>> types,
 			Map<String, Integer> corpsesSeen,
-			Map<String, Integer> shaftsWithCorpse) {
+			Map<String, Integer> shaftsWithCorpse,
+			Map<String, Drops> drops) {
 		public int typedShafts() {
 			return types.values().stream().flatMap(v -> v.values().stream()).mapToInt(Integer::intValue).sum();
 		}
@@ -173,6 +185,8 @@ public final class JournalStats {
 		Map<String, Integer> seen = new LinkedHashMap<>();
 		Map<String, Map<String, Integer>> types = new LinkedHashMap<>();
 		Map<String, Integer> shaftsWithCorpse = new LinkedHashMap<>();
+		Map<String, Integer> lootSeen = new LinkedHashMap<>();
+		Map<String, Map<String, ItemDrop>> dropped = new LinkedHashMap<>();
 		JournalEntry fastest = null;
 		Best mostPowder = null;
 		Best mostLapis = null;
@@ -186,6 +200,14 @@ public final class JournalStats {
 			}
 			entry.corpses().stream().map(Corpse::type).distinct()
 					.forEach(type -> shaftsWithCorpse.merge(type, 1, Integer::sum));
+			for (CorpseLoot loot : entry.loots()) {
+				lootSeen.merge(loot.type(), 1, Integer::sum);
+				Map<String, ItemDrop> items = dropped.computeIfAbsent(loot.type(), t -> new LinkedHashMap<>());
+				Map<String, Long> once = new LinkedHashMap<>();
+				for (ItemCount item : loot.items()) once.merge(item.item(), item.count(), Long::sum);
+				once.forEach((item, count) -> items.merge(item, new ItemDrop(1, count),
+						(had, one) -> new ItemDrop(had.corpses() + 1, had.count() + count)));
+			}
 			String type = type(entry);
 			String variant = variant(entry);
 			if (type != null && variant != null) {
@@ -226,14 +248,21 @@ public final class JournalStats {
 		return new AllTime(entries.size(), sessions.size(),
 				sessions.stream().mapToLong(SessionSummary::lengthMillis).sum(), powder,
 				orderedMap(looted), averageSearch(entries), fastest, List.copyOf(oldestFirst),
-				mostPowder, mostLapis, bestRate, fastestSession, mostShafts, mostGems, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse));
+				mostPowder, mostLapis, bestRate, fastestSession, mostShafts, mostGems, byTotal(types), orderedMap(seen), orderedMap(shaftsWithCorpse),
+				drops(lootSeen, dropped));
+	}
+
+	private static Map<String, Drops> drops(Map<String, Integer> lootSeen, Map<String, Map<String, ItemDrop>> dropped) {
+		Map<String, Drops> drops = new LinkedHashMap<>();
+		for (String type : ordered(lootSeen.keySet())) drops.put(type, new Drops(lootSeen.get(type), dropped.get(type)));
+		return drops;
 	}
 
 	public static Long recentAverage(List<SessionSummary> newestFirst, int count) {
 		return averageSearch(newestFirst.stream().limit(count).flatMap(s -> s.entries().stream()).toList());
 	}
 
-	static Long averageSearch(List<JournalEntry> entries) {
+	public static Long averageSearch(List<JournalEntry> entries) {
 		long total = 0;
 		int timed = 0;
 		for (JournalEntry entry : entries) {
