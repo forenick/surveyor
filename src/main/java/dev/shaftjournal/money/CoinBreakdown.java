@@ -10,21 +10,37 @@ import dev.shaftjournal.money.MoneyStats.CorpseCoins;
 import dev.shaftjournal.money.MoneyStats.ItemCoins;
 import dev.shaftjournal.money.ShaftValue.Part;
 
-// stats tooltips as §-coded lines, items cut until it fits maxLines
+// stats tooltips as §-coded lines, "" = small gap, items cut until it fits maxHeight
 public final class CoinBreakdown {
+	public static final String SHIFT_HINT = "§7Hold §fShift §7for the short version";
+	// vanilla tooltip line, 2 px under the title
+	public static final int LINE_HEIGHT = 10;
+	private static final int TITLE_GAP = 2;
+	// display choice
+	public static final int GAP_HEIGHT = 4;
 	// display choice
 	private static final int MOST_ITEMS = 5;
 
 	private CoinBreakdown() {
 	}
 
-	public static List<String> detailed(MoneyStats money, Double perHour, long timeMillis, int maxLines) {
+	public static List<String> detailed(MoneyStats money, Double perHour, long timeMillis, int maxHeight) {
 		List<String> lines = List.of();
 		for (int items = MOST_ITEMS; items >= 0; items--) {
 			lines = detailedWith(money, perHour, timeMillis, items);
-			if (lines.size() <= maxLines) break;
+			if (height(lines) <= maxHeight) break;
 		}
 		return lines;
+	}
+
+	public static int height(List<String> lines) {
+		int height = lines.size() > 1 ? TITLE_GAP : 0;
+		for (String line : lines) height += line.isEmpty() ? GAP_HEIGHT : LINE_HEIGHT;
+		return height;
+	}
+
+	private static void gap(List<String> lines) {
+		if (!lines.isEmpty() && !lines.getLast().isEmpty()) lines.add("");
 	}
 
 	private static List<String> detailedWith(MoneyStats money, Double perHour, long timeMillis, int items) {
@@ -42,15 +58,17 @@ public final class CoinBreakdown {
 			Double total = money.parts().get(part);
 			if (total != null && Math.round(total) == 0 && partItems.values().stream().allMatch(i -> i.coins() != null)) continue;
 			String share = total != null && total > 0 && income > 0 ? " §8" + share(total / income) : "";
-			lines.add("§7" + part.displayName() + " " + (total == null ? "§8no price" : coins(total)) + share);
+			gap(lines);
+			lines.add("§f" + part.displayName() + " " + (total == null ? "§8no price" : coins(total)) + share);
 			List<Row> rows = part == Part.CORPSES ? corpseRows(money) : itemRows(part, partItems);
 			addRows(lines, rows, items, "  ");
 		}
-		lines.add("");
+		gap(lines);
 		if (Math.round(costs) != 0) {
 			lines.add("§7Earned " + coins(income));
 			lines.add("§7Spent " + coins(costs));
-			lines.add("§7Net " + coins(income + costs));
+			lines.add("§fNet " + coins(income + costs));
+			gap(lines);
 		}
 		if (money.perShaft() != null) {
 			lines.add("§7Avg per shaft " + coins(money.perShaft()) + " §8(" + money.valued() + " shafts)");
@@ -60,17 +78,19 @@ public final class CoinBreakdown {
 		}
 		long unpriced = money.items().values().stream().flatMap(m -> m.values().stream()).filter(i -> i.coins() == null).count();
 		if (unpriced > 0) lines.add("§c" + unpriced + (unpriced == 1 ? " item" : " items") + " without a price");
-		lines.add("§8Hold Shift for the short version");
+		gap(lines);
+		lines.add(SHIFT_HINT);
 		return lines;
 	}
 
 	public static List<String> basic(MoneyStats money, Double perHour, long timeMillis) {
 		List<String> lines = new ArrayList<>();
 		lines.add("§fWhere your coins came from");
+		gap(lines);
 		money.parts().forEach((part, coins) -> {
 			if (Math.round(coins) != 0) lines.add("§7" + part.displayName() + " " + coins(coins));
 		});
-		lines.add("");
+		gap(lines);
 		if (money.perShaft() != null) {
 			lines.add("§7Avg per shaft " + coins(money.perShaft()) + " §8(" + money.valued() + " shafts)");
 		}
@@ -80,11 +100,11 @@ public final class CoinBreakdown {
 		return lines;
 	}
 
-	public static List<String> corpse(String type, int looted, CorpseCoins corpse, int maxLines) {
+	public static List<String> corpse(String type, int looted, CorpseCoins corpse, int maxHeight) {
 		List<String> lines = List.of();
 		for (int items = MOST_ITEMS * 2; items >= 0; items--) {
 			lines = corpseWith(type, looted, corpse, items);
-			if (lines.size() <= maxLines) break;
+			if (height(lines) <= maxHeight) break;
 		}
 		return lines;
 	}
@@ -92,6 +112,7 @@ public final class CoinBreakdown {
 	private static List<String> corpseWith(String type, int looted, CorpseCoins corpse, int items) {
 		List<String> lines = new ArrayList<>();
 		lines.add("§f" + type + " corpses");
+		gap(lines);
 		String counted = corpse.corpses() == looted ? corpse.corpses() + " corpses"
 				: corpse.corpses() + " of " + looted + " with prices";
 		lines.add("§7Total " + coins(corpse.net()) + " §8(" + counted + ")");
@@ -101,7 +122,7 @@ public final class CoinBreakdown {
 			lines.add("  §7Key " + coins(corpse.keys() / corpse.corpses()) + " §7each");
 		}
 		if (!corpse.items().isEmpty() && items > 0) {
-			lines.add("");
+			gap(lines);
 			lines.add("§fLoot");
 			addRows(lines, itemRows(Part.CORPSES, corpse.items()), items, "");
 		}

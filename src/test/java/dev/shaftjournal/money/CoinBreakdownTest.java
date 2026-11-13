@@ -47,38 +47,39 @@ class CoinBreakdownTest {
 
 	@Test
 	void detailedSharesAndCosts() {
-		List<String> lines = CoinBreakdown.detailed(stats(), null, 0, 100);
+		List<String> lines = CoinBreakdown.detailed(stats(), null, 0, 1000);
 		// income 3M + 3.5k + 602k per shaft
-		assertTrue(lines.contains("§7Mined gems §6+6.0M §883%"), lines.toString());
+		assertTrue(lines.contains("§fMined gems §6+6.0M §883%"), lines.toString());
 		assertTrue(lines.contains("  §7≈201.0 Fine Jade Gemstone §6+6.0M"), lines.toString());
-		assertTrue(lines.contains("§7Other drops §6+7.0k §8<1%"), lines.toString());
+		assertTrue(lines.contains("§fOther drops §6+7.0k §8<1%"), lines.toString());
 		assertTrue(lines.contains("  §72 Umber corpses §6+1.2M"), lines.toString());
-		assertTrue(lines.contains("§7Keys §c-800.0k"), "no share on costs");
+		assertTrue(lines.contains("§fKeys §c-800.0k"), "no share on costs");
 		assertTrue(lines.contains("§7Spent §c-800.0k"));
 		assertTrue(lines.contains("§c1 item without a price"));
-		assertEquals("§8Hold Shift for the short version", lines.getLast());
+		assertEquals(CoinBreakdown.SHIFT_HINT, lines.getLast());
+		assertEquals("", lines.get(lines.size() - 2), "gap before the hint");
 	}
 
 	@Test
 	void itemsCutToFit() {
 		MoneyStats stats = stats();
-		List<String> all = CoinBreakdown.detailed(stats, null, 0, 100);
+		List<String> all = CoinBreakdown.detailed(stats, null, 0, 1000);
 		assertTrue(all.contains("  §71,280 Coal §6+2.0k"), "3 other drops all shown");
-		List<String> cut = CoinBreakdown.detailed(stats, null, 0, all.size() - 1);
-		assertTrue(cut.size() < all.size());
+		List<String> cut = CoinBreakdown.detailed(stats, null, 0, CoinBreakdown.height(all) - 1);
+		assertTrue(CoinBreakdown.height(cut) < CoinBreakdown.height(all));
 		assertTrue(cut.stream().anyMatch(l -> l.startsWith("  §8") && l.contains(" more ")), cut.toString());
 	}
 
 	@Test
 	void corpseKeepsTotal() {
 		MoneyStats stats = stats();
-		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 100);
+		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 1000);
 		assertTrue(lines.contains("§7Total §6+404.0k §8(2 of 3 with prices)"), lines.toString());
 		assertTrue(lines.contains("§7Avg §6+202.0k §7each"));
 		assertTrue(lines.contains("  §7Key §c-400.0k §7each"));
 		assertEquals("§72 Bejeweled Handle §6+1.2M", lines.get(lines.indexOf("§fLoot") + 1), "biggest first");
 		assertTrue(lines.contains("§78 Goblin Egg §8no price"), "no price last");
-		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 5);
+		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), 60);
 		assertFalse(tiny.contains("§fLoot"));
 	}
 }

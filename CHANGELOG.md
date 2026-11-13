@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.18.4 (2026-11-13)
+Stats tooltips are easier to read.
+- **Small gaps between groups** in the Coins and corpse tooltips, so each part (and its items) stands on its own.
+  The gaps are half a line, so they don't push items off small screens much.
+- **Part names are white**, their items stay gray underneath, and Net is white too.
+- **The Shift hint has a Shift arrow icon** and reads `Hold Shift for the short version` with Shift in white.
+
 ## 0.18.3 (2026-11-13)
 Stats tab tweaks.
 - **All time is Coins, Powder, then a gap, then Shafts, Sessions and Time shafting.**

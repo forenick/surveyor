@@ -30,6 +30,7 @@ import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -59,7 +60,7 @@ import dev.shaftjournal.settings.Setting;
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private enum Tab { OVERVIEW, SESSION, STATS }
 
-	private record ShiftTip(FlowLayout row, List<Component> normal, List<Component> shifted) {
+	private record ShiftTip(FlowLayout row, List<ClientTooltipComponent> normal, List<ClientTooltipComponent> shifted) {
 	}
 
 	// higher dropOrder hides first, 0 = never. extra = spare room handed out by fit()
@@ -845,7 +846,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		FlowLayout row = keyValue("Coins", coinText(money.coins()));
 		if (money.coins() == null) return row;
 		Double perHour = JournalStats.perHour(money.coins(), stats.timeMillis());
-		shiftTooltip(row, CoinBreakdown.detailed(money, perHour, stats.timeMillis(), tooltipLines()),
+		shiftTooltip(row, CoinBreakdown.detailed(money, perHour, stats.timeMillis(), tooltipHeight()),
 				CoinBreakdown.basic(money, perHour, stats.timeMillis()));
 		return row;
 	}
@@ -855,22 +856,24 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		String value = corpseColor(type) + looted;
 		if (corpse == null) return keyValue(type, value);
 		FlowLayout row = keyValue(type, value + " §7(" + coins(corpse.each()) + " §7avg.)");
-		return withTooltip(row, literals(CoinBreakdown.corpse(type, looted, corpse, tooltipLines())));
+		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, tooltipHeight())));
 	}
 
-	// tooltip lines are 10 px, 12 for padding + title gap
-	private int tooltipLines() {
-		return (height - 12) / 10;
-	}
-
-	private static List<Component> literals(List<String> lines) {
-		return lines.stream().<Component>map(Component::literal).toList();
+	// room for the tooltip's own border
+	private int tooltipHeight() {
+		return height - 10;
 	}
 
 	private void shiftTooltip(FlowLayout row, List<String> normal, List<String> shifted) {
-		ShiftTip tip = new ShiftTip(row, literals(normal), literals(shifted));
+		ShiftTip tip = new ShiftTip(row, TooltipLines.of(normal), TooltipLines.of(shifted));
 		shiftTips.add(tip);
-		withTooltip(row, shiftShown ? tip.shifted() : tip.normal());
+		withTips(row, shiftShown ? tip.shifted() : tip.normal());
+	}
+
+	private static FlowLayout withTips(FlowLayout row, List<ClientTooltipComponent> tooltip) {
+		row.tooltip(tooltip);
+		row.children().forEach(child -> child.tooltip(tooltip));
+		return row;
 	}
 
 	@Override
@@ -878,7 +881,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		boolean shift = minecraft.hasShiftDown();
 		if (shift != shiftShown) {
 			shiftShown = shift;
-			for (ShiftTip tip : shiftTips) withTooltip(tip.row(), shift ? tip.shifted() : tip.normal());
+			for (ShiftTip tip : shiftTips) withTips(tip.row(), shift ? tip.shifted() : tip.normal());
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, delta);
 	}
