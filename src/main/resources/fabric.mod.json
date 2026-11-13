@@ -7,7 +7,7 @@
 	"authors": [
 		"Nick"
 	],
-	"license": "All-Rights-Reserved",
+	"license": "LGPL-3.0-only",
 	"icon": "assets/skysurveyor/icon.png",
 	"environment": "client",
 	"entrypoints": {

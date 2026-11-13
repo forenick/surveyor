@@ -178,6 +178,11 @@ to your game.
 ```
 Needs a Java 25 JDK. The jar ends up in `build/libs/`.
 
+## License
+Surveyor is licensed under the [GNU LGPL v3.0 only](LICENSE) (it builds on the [GPL v3.0](COPYING)). You may use, change and share it, but changed
+versions you share must stay under the LGPL with their source code. The item IDs in `skyblock_items.txt` come from
+[NotEnoughUpdates-REPO](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO) (MIT), see [NOTICE.md](NOTICE.md).
+
 ## Credits
 Made by [forenick](https://github.com/forenick).
 

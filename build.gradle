@@ -51,6 +51,10 @@ test {
 	useJUnitPlatform()
 }
 
+jar {
+	from('LICENSE', 'COPYING', 'NOTICE.md')
+}
+
 // build fails until spotlessApply
 spotless {
 	java {

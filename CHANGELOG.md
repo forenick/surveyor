@@ -4,6 +4,12 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.21.1 (2026-11-13)
+- **Surveyor is open source under the GNU LGPL v3.0** (was all rights reserved). You may use, change and share it;
+  changed versions you share must stay under the LGPL with their source. `LICENSE`, `COPYING` and `NOTICE.md` are
+  in the jar too. The item IDs from NotEnoughUpdates-REPO (MIT) are credited in `NOTICE.md`.
+- No changes to how the mod works.
+
 ## 0.21.0 (2026-11-13)
 ShaftJournal is now **Surveyor**, with a new icon (a brass theodolite). Shafts come first, more mining features
 are planned. The journal itself is still called the Shaft Journal.
