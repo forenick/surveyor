@@ -59,7 +59,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int CARD_PADDING = 4;
 	private static final int CARD_GAP = 6;
 	private static final int BUTTON = 16;
-	private static final int CHOICE_GAP = 2;
+	private static final int OPTION = 11;
 	private static final int FIELD = 44;
 	// below this the control goes under the text
 	private static final int MIN_TEXT = 140;
@@ -69,6 +69,9 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int TYPE_DELAY = 10;
 	private static final Identifier SEARCH_ICON = icon("search_icon");
 	private static final Identifier RESET_ICON = icon("reset_icon");
+	private static final Identifier RESET_ALL_ICON = icon("reset_red_icon");
+	private static final Identifier RADIO_ON = icon("radio_on_icon");
+	private static final Identifier RADIO_OFF = icon("radio_off_icon");
 	private static final Identifier CHECK_ICON = icon("check_icon");
 	private static final Identifier CROSS_ICON = icon("cross_icon");
 	// owo's tooltips dont wrap or stay on screen
@@ -84,6 +87,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private FlowLayout main;
 	private KeptScroll mainScroll;
 	private TextBoxComponent search;
+	private FlowLayout categoryHead;
 	private ButtonComponent resetCategory;
 	private LabelComponent bazaarAge;
 	private LabelComponent binsAge;
@@ -253,6 +257,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		cards.clear();
 		tips.clear();
 		sectionHeads.clear();
+		categoryHead = null;
 		resetCategory = null;
 		bazaarAge = null;
 		binsAge = null;
@@ -333,15 +338,18 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void fillCategory(Category c) {
-		main.child(label("§e" + c.name()));
+		categoryHead = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.fixed(BUTTON));
+		categoryHead.verticalAlignment(VerticalAlignment.CENTER);
+		LabelComponent name = label("§e" + c.name());
+		name.horizontalSizing(Sizing.expand());
+		categoryHead.child(name);
+		main.child(categoryHead);
 		main.child(wrapped("§7" + c.description()));
 		sections(c);
 		if (c.id().equals(SettingsList.MONEY)) prices();
-		resetCategory = UIComponents.button(Component.literal("Reset " + c.name() + " to defaults"), b -> apply(c::reset));
-		resetCategory.horizontalSizing(Sizing.fixed(font.width("Reset " + c.name() + " to defaults") + 20));
+		resetCategory = new IconButton(Component.literal("§cReset all"), RESET_ALL_ICON, 8, 8, b -> apply(c::reset));
 		resetCategory.verticalSizing(Sizing.fixed(BUTTON));
-		resetCategory.margins(Insets.top(8));
-		main.child(resetCategory);
+		tip(resetCategory, "§fReset every " + c.name() + " setting to its default");
 	}
 
 	private void sections(Category c) {
@@ -433,7 +441,11 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 	private void refreshCards() {
 		for (Card card : cards) card.refresh();
-		if (resetCategory != null) resetCategory.active(!category(category).isDefault(settings));
+		if (resetCategory == null) return;
+		// only there when something isnt default, like the per setting ones
+		boolean show = !category(category).isDefault(settings);
+		if (show && !resetCategory.hasParent()) categoryHead.child(resetCategory);
+		else if (!show && resetCategory.hasParent()) categoryHead.removeChild(resetCategory);
 	}
 
 	private void tip(UIComponent c, String text) {
@@ -470,12 +482,37 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		return label;
 	}
 
+	// widest of all settings, so controls line up
+	private int controlWidth() {
+		int widest = toggleWidth();
+		for (Category c : SettingsList.CATEGORIES) {
+			for (Setting setting : c.settings()) {
+				int w = switch (setting) {
+					case Choice<?> choice -> {
+						int text = 0;
+						for (Option<?> option : choice.options()) text = Math.max(text, font.width(option.label()));
+						yield 2 + 8 + 4 + text + 2;
+					}
+					case Setting.Number number -> FIELD + 3 + font.width(number.unit());
+					case Setting.Toggle toggle -> toggleWidth();
+				};
+				widest = Math.max(widest, w);
+			}
+		}
+		return widest;
+	}
+
+	private int toggleWidth() {
+		return Math.max(font.width("On"), font.width("Off")) + 8 + 3 + 12;
+	}
+
 	private final class Card {
 		private final Setting setting;
 		private final FlowLayout nameRow;
 		private final FlowLayout extra;
 		private final IconButton reset;
-		private final List<ButtonComponent> buttons = new ArrayList<>();
+		private final List<FlowLayout> options = new ArrayList<>();
+		private int picked = -1;
 		private IconButton toggle;
 		private TextBoxComponent field;
 		private String lastText;
@@ -486,7 +523,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		Card(Setting setting) {
 			this.setting = setting;
 			int content = mainInner() - 2 * CARD_PADDING;
-			int controlWidth = controlWidth(content);
+			int controlWidth = controlWidth();
 			boolean beside = content - controlWidth - CARD_GAP >= MIN_TEXT;
 			int textWidth = beside ? content - controlWidth - CARD_GAP : content;
 
@@ -511,7 +548,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			extra = UIContainers.verticalFlow(Sizing.fixed(textWidth), Sizing.content());
 			text.child(extra);
 			box.child(text);
-			box.child(control(beside ? controlWidth : content, beside));
+			box.child(control(controlWidth));
 			main.child(box);
 
 			reset = new IconButton(Component.empty(), RESET_ICON, 8, 8, b -> apply(setting::reset));
@@ -520,34 +557,12 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			tip(reset, "§fReset to " + setting.defaultText());
 		}
 
-		private int controlWidth(int content) {
-			return switch (setting) {
-				case Choice<?> choice -> {
-					int n = choice.options().size();
-					int fair = ((width <= 640 ? 150 : 200) - CHOICE_GAP * (n - 1)) / n;
-					yield n * buttonWidth(choice, fair) + CHOICE_GAP * (n - 1);
-				}
-				case Setting.Number number -> FIELD + 3 + font.width(number.unit());
-				case Setting.Toggle toggle -> toggleWidth();
-			};
-		}
-
-		private int buttonWidth(Choice<?> choice, int fair) {
-			int widest = 0;
-			for (Option<?> option : choice.options()) widest = Math.max(widest, font.width(option.label()));
-			return Math.max(fair, widest + 12);
-		}
-
-		private int toggleWidth() {
-			return Math.max(font.width("On"), font.width("Off")) + 8 + 3 + 12;
-		}
-
-		private FlowLayout control(int available, boolean beside) {
-			FlowLayout control = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-			control.gap(CHOICE_GAP);
+		private FlowLayout control(int available) {
+			FlowLayout control = UIContainers.horizontalFlow(Sizing.fixed(available), Sizing.content());
+			control.gap(2);
 			control.verticalAlignment(VerticalAlignment.CENTER);
 			switch (setting) {
-				case Choice<?> choice -> choices(control, choice, available, beside);
+				case Choice<?> choice -> choices(control, choice, available);
 				case Setting.Number number -> {
 					field = UIComponents.textBox(Sizing.fixed(FIELD));
 					field.verticalSizing(Sizing.fixed(BUTTON));
@@ -573,19 +588,30 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			return control;
 		}
 
-		private <T> void choices(FlowLayout control, Choice<T> choice, int available, boolean beside) {
-			int n = choice.options().size();
-			int share = (available - CHOICE_GAP * (n - 1)) / n;
-			int buttonWidth = beside ? share : Math.max(share, buttonWidth(choice, 0));
+		private <T> void choices(FlowLayout control, Choice<T> choice, int available) {
+			FlowLayout list = UIContainers.verticalFlow(Sizing.fixed(available), Sizing.content());
 			for (Option<T> option : choice.options()) {
-				ButtonComponent button = UIComponents.button(Component.literal(option.label()),
-						b -> apply(s -> choice.set().apply(s, option.value())));
-				button.horizontalSizing(Sizing.fixed(buttonWidth));
-				button.verticalSizing(Sizing.fixed(BUTTON));
-				tip(button, "§e" + option.label() + "\n§7" + option.tip() + (choice.isDefault(option) ? "\n§8Default" : ""));
-				buttons.add(button);
-				control.child(button);
+				int index = options.size();
+				FlowLayout row = UIContainers.horizontalFlow(Sizing.fixed(available), Sizing.fixed(OPTION));
+				row.verticalAlignment(VerticalAlignment.CENTER);
+				row.padding(Insets.horizontal(2));
+				row.gap(4);
+				row.cursorStyle(CursorStyle.HAND);
+				row.mouseEnter().subscribe(() -> {
+					if (index != picked) row.surface(ROW_HOVER);
+				});
+				row.mouseLeave().subscribe(() -> row.surface(Surface.BLANK));
+				row.mouseDown().subscribe((event, doubleClick) -> {
+					if (index == picked) return false;
+					row.surface(Surface.BLANK);
+					apply(s -> choice.set().apply(s, option.value()));
+					return true;
+				});
+				tip(row, "§e" + option.label() + "\n§7" + option.tip() + (choice.isDefault(option) ? "\n§8Default" : ""));
+				options.add(row);
+				list.child(row);
 			}
+			control.child(list);
 		}
 
 		// polled bc caxton cancels onValueChange
@@ -645,13 +671,16 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 		private <T> void refreshChoice(Choice<T> choice) {
 			T value = choice.get().apply(settings);
-			for (int i = 0; i < buttons.size(); i++) {
+			picked = -1;
+			for (int i = 0; i < options.size(); i++) {
 				Option<T> option = choice.options().get(i);
 				boolean selected = option.value().equals(value);
-				ButtonComponent button = buttons.get(i);
-				// inactive = pressed look, yellow = picked
-				button.active(!selected);
-				button.setMessage(Component.literal((selected ? "§e" : "§f") + option.label()));
+				if (selected) picked = i;
+				FlowLayout row = options.get(i);
+				row.clearChildren();
+				row.cursorStyle(selected ? CursorStyle.POINTER : CursorStyle.HAND);
+				row.child(UIComponents.texture(selected ? RADIO_ON : RADIO_OFF, 0, 0, 8, 8, 8, 8));
+				row.child(label((selected ? "§e" : "§f") + option.label()));
 			}
 		}
 	}

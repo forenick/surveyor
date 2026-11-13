@@ -4,6 +4,13 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.18.2 (2026-11-13)
+Settings page tweaks.
+- **Choices are a list of radio options** instead of a row of wide buttons. Every setting's control (choices, the tax
+  box, toggles) starts at the same spot, so they line up from card to card. Hover an option for what it does.
+- **Reset all** sits at the top right of the category, next to its name, in red with a reset icon. It only shows when
+  something in that category isn't on its default, like the reset icon next to each setting.
+
 ## 0.18.1 (2026-11-13)
 Fixes from a code review of 0.18.0.
 - **Saving from the settings page only writes the setting you changed.** Before, every money setting was written
