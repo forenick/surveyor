@@ -1,4 +1,4 @@
-package dev.skysurveyor.screen;
+package dev.skysurveyor.data;
 
 import java.util.ArrayList;
 import java.util.List;

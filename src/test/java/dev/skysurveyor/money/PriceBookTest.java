@@ -10,6 +10,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
+import dev.skysurveyor.settings.MoneySettings;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -79,7 +81,7 @@ class PriceBookTest {
 
 	@Test
 	void settingsRepairHandEdits() {
-		MoneySettings broken = new MoneySettings(null, MoneySettings.GemTier.FINE, -3.0, null, null);
+		MoneySettings broken = new MoneySettings(null, MoneySettings.GemTier.FINE, -3.0, null, null, null);
 		MoneySettings repaired = broken.repaired();
 		assertEquals(MoneySettings.GemTier.FINE, repaired.gemTier());
 		assertEquals(MoneySettings.DEFAULTS.sellPrice(), repaired.sellPrice());

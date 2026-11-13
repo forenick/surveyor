@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 // owo only centres text, so icon + text centred here. icon has its shadow baked in
-final class IconButton extends ButtonComponent {
+final class IconButton extends PackButton {
 	private static final int GAP = 3;
 	private Identifier icon;
 	private final int iconWidth;

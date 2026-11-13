@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -53,8 +54,7 @@ class JournalStatsTest {
 	void sameItemTwiceInOneCorpseCountsOnce() {
 		CorpseLoot loot = new CorpseLoot("Umber", false, List.of(new ItemCount("Enchanted Umber", 2),
 				new ItemCount("Enchanted Umber", 3)), 0);
-		JournalEntry entry = new JournalEntry(JournalEntry.VERSION, 0, "JADE_1", 0, 60_000, "BYE", 0, null, List.of(), 0,
-				List.of(loot), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		JournalEntry entry = EntryBuilder.entry().loots(List.of(loot)).build();
 		JournalStats.Drops umber = JournalStats.allTime(List.of(entry)).drops().get("Umber");
 		assertEquals(new JournalStats.ItemDrop(1, 5), umber.items().get("Enchanted Umber"));
 	}
@@ -147,7 +147,23 @@ class JournalStatsTest {
 	}
 
 	private static JournalEntry entry(long session, long entered, String id, Long search, long exitPowder, List<Corpse> corpses) {
-		return new JournalEntry(JournalEntry.VERSION, session, id, entered, 20_000, "BYE", exitPowder, search,
-				corpses, 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, null, null, null);
+		return EntryBuilder.entry().sessionId(session).shaftId(id).enteredAt(entered).durationMillis(20_000).exitPowder(exitPowder)
+				.searchMillis(search).corpses(corpses).crystals(null).otherDrops(null).build();
+	}
+
+	@Test
+	void campfiresCountPlacedAndAverageKnownColds() {
+		JournalEntry old = withCampfires(List.of(1_000L), null);
+		JournalEntry two = withCampfires(List.of(1_000L, 2_000L), Arrays.asList(-94, null));
+		JournalEntry one = withCampfires(List.of(1_000L), List.of(-80));
+		JournalStats.Campfires campfires = JournalStats.campfires(List.of(old, two, one));
+		assertEquals(4, campfires.placed());
+		assertEquals(List.of(-94, -80), campfires.colds());
+		assertEquals(-87.0, campfires.averageCold());
+		assertNull(JournalStats.campfires(List.of(old)).averageCold());
+	}
+
+	private static JournalEntry withCampfires(List<Long> at, List<Integer> colds) {
+		return EntryBuilder.entry().shaftId("JASP_1").durationMillis(600_000).campfiresAt(at).campfireColds(colds).build();
 	}
 }

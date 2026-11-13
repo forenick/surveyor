@@ -28,11 +28,7 @@ public record LootSummary(GemGroup gems, List<ItemCount> items) {
 					continue;
 				}
 				gemCounts.merge(item.item(), item.count(), Long::sum);
-				fine += switch (m.group("quality")) {
-					case "Rough" -> item.count() / (double) (GemYield.RECIPE * GemYield.RECIPE);
-					case "Flawed" -> item.count() / (double) GemYield.RECIPE;
-					default -> item.count();
-				};
+				fine += GemYield.toFine(m.group("quality"), item.count());
 			}
 		}
 		GemGroup gems = gemCounts.isEmpty() ? null : new GemGroup(fine, sorted(gemCounts));

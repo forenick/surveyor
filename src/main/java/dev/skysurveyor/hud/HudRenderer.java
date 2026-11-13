@@ -58,7 +58,7 @@ public final class HudRenderer {
 		graphics.pose().scale(box.scale, box.scale);
 		switch (box.background) {
 			case DARK -> graphics.fill(0, 0, width, height, DARK);
-			case FRAME -> drawFrame(graphics, width, height);
+			case FRAME -> drawFrame(graphics, width, height, -1);
 			case NONE -> {
 			}
 		}
@@ -79,12 +79,12 @@ public final class HudRenderer {
 	}
 
 	// not via TooltipRenderUtil, iconographic recolours that w/ the last hovered item
-	private static void drawFrame(GuiGraphicsExtractor graphics, int width, int height) {
+	static void drawFrame(GuiGraphicsExtractor graphics, int width, int height, int color) {
 		int x = PADDING - FRAME_OVERHANG;
 		int w = width - 2 * PADDING + 2 * FRAME_OVERHANG;
 		int h = height - 2 * PADDING + 2 * FRAME_OVERHANG;
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BACKGROUND, x, x, w, h);
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BORDER, x, x, w, h);
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BACKGROUND, x, x, w, h, color);
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BORDER, x, x, w, h, color);
 	}
 
 	private static void drawLine(GuiGraphicsExtractor graphics, Font font, String line, int x, int y) {

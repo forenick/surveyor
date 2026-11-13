@@ -14,8 +14,8 @@ import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 
 // same order as on screen
-public final class HudText {
-	private HudText() {
+public final class GameText {
+	private GameText() {
 	}
 
 	public static List<String> scoreboardLines(Scoreboard scoreboard) {

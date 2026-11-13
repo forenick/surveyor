@@ -2,8 +2,26 @@
 
 [SemVer](https://semver.org). Betas are `X.Y.Z-beta.N` (GitHub pre-releases).
 
+## 0.22.0-beta.1 (2026-11-13)
+- Shaft summary as a toast. Chat, both or off in Settings.
+- Toast style, time and position, top right or anywhere in Edit HUD.
+- Ironman setting: coins from NPC sell prices.
+- Cold at each campfire use in the shaft view, Session table and Stats.
+- Mod icon with a midnight blue background.
+- Even gaps between the journal's top bar buttons.
+- Edit HUD button has a move icon.
+- Settings title is white with the settings icon.
+- Settings top bar is the same height as the journal's.
+- Buttons use the resource pack's button texture.
+- Buttons light up when picked with the keyboard.
+- Fixed campfires missing from the shaft view and Session table when some weren't used.
+- Fixed a broken character in the journal file hiding every shaft.
+- Fixed a journal line with missing fields breaking the HUD and journal on every start.
+- Fixed a cut off journal line losing the next shaft.
+- Fixed one broken setting in config.json resetting the settings after it.
+
 ## 0.21.3 (2026-11-13)
-- Fixed the HUD frame taking the colour of the last hovered item with Iconographic.
+- Fixed the HUD frame taking the colour of the last hovered item with Iconographic ([#1](https://github.com/forenick/Surveyor/issues/1), reported by @Raaf404).
 
 ## 0.21.2 (2026-11-13)
 - Bars / Line and range arrows keep the Stats tab's scroll.

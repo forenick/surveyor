@@ -1,4 +1,4 @@
-package dev.skysurveyor.screen;
+package dev.skysurveyor.data;
 
 import java.util.HashMap;
 import java.util.List;
@@ -10,6 +10,9 @@ import dev.skysurveyor.util.Resources;
 
 public final class ShaftNames {
 	public static final int DEFAULT_RGB = 0x55FFFF;
+	public static final String CRYSTAL = "C";
+	// littlefoots den, LITT_L
+	public static final String LITTLEFOOT = "L";
 
 	private static final Pattern COLOR = Pattern.compile("\\s*#([0-9A-Fa-f]{6})(?![0-9A-Za-z])");
 
@@ -37,6 +40,15 @@ public final class ShaftNames {
 			}
 			types.put(line.substring(0, eq).strip(), new Type(name.strip(), rgb));
 		}
+	}
+
+	public static String variantName(String variant) {
+		return switch (variant) {
+			case "1" -> "type 1";
+			case "2" -> "type 2";
+			case CRYSTAL -> "crystal";
+			default -> "_" + variant;
+		};
 	}
 
 	public static synchronized ShaftNames defaults() {

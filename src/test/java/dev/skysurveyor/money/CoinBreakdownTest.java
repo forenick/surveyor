@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import dev.skysurveyor.journal.EntryBuilder;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.Drops;
@@ -20,8 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 // made up coins, not real ones
 class CoinBreakdownTest {
 	private static JournalEntry entry(long entered) {
-		return new JournalEntry(JournalEntry.VERSION, 0, "JADE_1", entered, 60_000, "BYE", 0, null, List.of(), 0, List.of(),
-				List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		return EntryBuilder.entry().enteredAt(entered).build();
 	}
 
 	private static MoneyStats stats() {
@@ -34,7 +34,7 @@ class CoinBreakdownTest {
 				new Line(Part.KEYS, "Umber Key", 1, -400_000.0)),
 				List.of(new CorpseValue("Umber", 602_000, -400_000, 1, loot)));
 		List<JournalEntry> entries = List.of(entry(0), entry(120_000));
-		return MoneyStats.of(entries, JournalStats.sessions(entries), e -> value);
+		return MoneyStats.of(entries, JournalStats.sessions(entries), e -> value, false);
 	}
 
 	@Test
@@ -84,7 +84,7 @@ class CoinBreakdownTest {
 	@Test
 	void corpseKeepsTotal() {
 		MoneyStats stats = stats();
-		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 1000);
+		List<String> lines = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 1000, false);
 		assertTrue(lines.contains("§7Total §6+404.0k §8(2 of 3 with loot seen)"), lines.toString());
 		assertTrue(lines.contains("§7Avg §6+202.0k §7each"));
 		assertTrue(lines.contains("  §7Key §c-400.0k §7each"));
@@ -93,13 +93,13 @@ class CoinBreakdownTest {
 		assertEquals("§7§b100% §72 Bejeweled Handle §6+1.2M", lines.get(loot + 1), "biggest first");
 		assertEquals("§7§b50% §74 Enchanted Umber §6+4.0k", lines.get(loot + 2));
 		assertEquals("§7§b100% §78 Goblin Egg §8no price", lines.get(loot + 3), "no price last");
-		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 60);
+		List<String> tiny = CoinBreakdown.corpse("Umber", 3, stats.corpses().get("Umber"), drops(), 60, false);
 		assertTrue(tiny.stream().noneMatch(l -> l.startsWith("§fLoot")));
 	}
 
 	@Test
 	void dropsWithoutPrices() {
-		List<String> lines = CoinBreakdown.corpse("Umber", 2, null, drops(), 1000);
+		List<String> lines = CoinBreakdown.corpse("Umber", 2, null, drops(), 1000, false);
 		assertTrue(lines.contains("§8No prices yet"));
 		assertTrue(lines.contains("§fLoot §8drop chance"));
 		// most common first when nothing has a price

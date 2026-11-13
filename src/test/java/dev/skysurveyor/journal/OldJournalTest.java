@@ -25,8 +25,8 @@ import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.journal.JournalStats.AllTime;
 import dev.skysurveyor.money.ItemIds;
 import dev.skysurveyor.money.ItemPrice;
-import dev.skysurveyor.money.MoneySettings;
 import dev.skysurveyor.money.ShaftValue;
+import dev.skysurveyor.settings.MoneySettings;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

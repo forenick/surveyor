@@ -14,6 +14,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 
+import dev.skysurveyor.data.IconRules;
+import dev.skysurveyor.data.SkyblockItems;
+
 // screen only
 // skyblock id in custom_data like hypixel, so texture mods may find it??
 final class ItemIcons {

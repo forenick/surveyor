@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.mixin.PlayerTabOverlayAccessor;
 import dev.skysurveyor.util.DataFolder;
-import dev.skysurveyor.util.HudText;
+import dev.skysurveyor.util.GameText;
 import dev.skysurveyor.util.TextUtil;
 
 // dev tool. read only, never sends anything to the server
@@ -165,7 +165,7 @@ public final class ShaftRecorder {
 	}
 
 	private void recordScoreboard(Scoreboard scoreboard) {
-		List<String> lines = HudText.scoreboardLines(scoreboard);
+		List<String> lines = GameText.scoreboardLines(scoreboard);
 		if (!lines.equals(lastScoreboard)) {
 			lastScoreboard = lines;
 			writer.write(linesEvent("scoreboard", lines));
@@ -174,7 +174,7 @@ public final class ShaftRecorder {
 
 	private void recordTabList(Minecraft client) {
 		if (client.getConnection() == null) return;
-		List<String> lines = HudText.tabListLines(client);
+		List<String> lines = GameText.tabListLines(client);
 		if (!lines.equals(lastTabList)) {
 			lastTabList = lines;
 			writer.write(linesEvent("tablist", lines));

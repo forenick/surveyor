@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import dev.skysurveyor.hud.HudValue.Kind;
 import dev.skysurveyor.money.Coins;
+import dev.skysurveyor.util.Format;
 
 public final class HudFormat {
 	public static final String MISSING = "-";
@@ -148,13 +149,13 @@ public final class HudFormat {
 			case 1 -> Math.abs(value) >= 999_950 ? one(value / 1e6) + "M"
 					: Math.abs(value) >= 1_000 ? one(value / 1e3) + "k" : Long.toString(value);
 			case 2 -> Long.toString(value);
-			default -> String.format(Locale.ROOT, "%,d", value);
+			default -> Format.number(value);
 		};
 	}
 
 	private static String coins(double value, int format) {
 		return switch (format) {
-			case 1 -> String.format(Locale.ROOT, "%,d", Math.round(value));
+			case 1 -> Format.number(Math.round(value));
 			case 2 -> Long.toString(Math.round(value));
 			default -> Coins.format(value);
 		};
@@ -169,6 +170,6 @@ public final class HudFormat {
 	}
 
 	private static String one(double value) {
-		return String.format(Locale.ROOT, "%.1f", value);
+		return Format.decimal(value);
 	}
 }

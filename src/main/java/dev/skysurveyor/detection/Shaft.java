@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import dev.skysurveyor.detection.ShaftEvent.CampfirePlaced;
+import dev.skysurveyor.detection.ShaftEvent.CampfireUsed;
 import dev.skysurveyor.detection.ShaftEvent.CaveIn;
 import dev.skysurveyor.detection.ShaftEvent.CorpseLooted;
 import dev.skysurveyor.detection.ShaftEvent.CrystalFound;
@@ -34,15 +35,17 @@ public final class Shaft {
 	private long leftAt = -1;
 	private ExitReason exitReason;
 	boolean confirmed;
-	ShaftId id;
+	private ShaftId id;
 	private ExitReason pendingExit;
 	private long exitPowder;
-	Integer cold;
-	List<Corpse> corpses = List.of();
+	private Integer cold;
+	private List<Corpse> corpses = List.of();
 	private int extraCorpses;
 	private final List<CorpseLoot> loots = new ArrayList<>();
 	private final List<String> mayhemBuffs = new ArrayList<>();
 	private final List<Long> campfiresPlaced = new ArrayList<>();
+	// scoreboard still shows the cold from before the -50 (recording 1)
+	private final List<Integer> campfireColds = new ArrayList<>();
 	private long caveInAt = -1;
 	private int scrapFound;
 	private final List<String> crystals = new ArrayList<>();
@@ -55,7 +58,7 @@ public final class Shaft {
 	// corpse loot + supercrafts wait here until a sacks msg reports them
 	private final Map<String, Long> notMinedPending = new LinkedHashMap<>();
 	private final Map<String, Long> notMinedInSacks = new LinkedHashMap<>();
-	// goes up on every event, so callers can cache
+	// goes up on every change but cold, so callers can cache
 	private int version;
 
 	Shaft(long enteredAt) {
@@ -80,6 +83,7 @@ public final class Shaft {
 			}
 			case Supercraft craft -> add(notMinedPending, craft.result());
 			case CampfirePlaced placed -> campfiresPlaced.add(now);
+			case CampfireUsed used -> campfireColds.add(cold);
 			case ScrapFound scrap -> scrapFound++;
 			case CrystalFound crystal -> crystals.add(crystal.item());
 			case CrystalOwned owned -> {
@@ -101,6 +105,21 @@ public final class Shaft {
 			default -> {
 			}
 		}
+	}
+
+	void setId(ShaftId id) {
+		version++;
+		this.id = id;
+	}
+
+	// no version bump, cold changes every few secs and never changes coins
+	void setCold(Integer cold) {
+		this.cold = cold;
+	}
+
+	void setCorpses(List<Corpse> corpses) {
+		version++;
+		this.corpses = corpses;
 	}
 
 	void leave(long now) {
@@ -166,6 +185,11 @@ public final class Shaft {
 
 	public List<Long> campfiresPlaced() {
 		return Collections.unmodifiableList(campfiresPlaced);
+	}
+
+	// null = cold line wasnt there
+	public List<Integer> campfireColds() {
+		return Collections.unmodifiableList(campfireColds);
 	}
 
 	public long caveInAt() {

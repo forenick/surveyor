@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import dev.skysurveyor.journal.EntryBuilder;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.SessionSummary;
@@ -21,8 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 // made up coins, not real ones
 class MoneyStatsTest {
 	private static JournalEntry entry(long session, long entered) {
-		return new JournalEntry(JournalEntry.VERSION, session, "JADE_1", entered, 60_000, "BYE", 0, null, List.of(), 0,
-				List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		return EntryBuilder.entry().sessionId(session).enteredAt(entered).build();
 	}
 
 	private static ShaftValue worth(double net, CorpseValue... corpses) {
@@ -51,7 +51,7 @@ class MoneyStatsTest {
 		values.put(empty, new ShaftValue(List.of(), List.of()));
 
 		List<SessionSummary> sessions = JournalStats.sessions(entries);
-		MoneyStats stats = MoneyStats.of(entries, sessions, values::get);
+		MoneyStats stats = MoneyStats.of(entries, sessions, values::get, false);
 		assertEquals(14_000_000, stats.coins(), 1e-6);
 		assertEquals(7, stats.valued(), "the one without prices is left out, the empty one counts");
 		assertEquals(2_000_000, stats.perShaft(), 1e-6);
@@ -73,7 +73,7 @@ class MoneyStatsTest {
 	@Test
 	void noPricesAtAll() {
 		List<JournalEntry> entries = List.of(entry(0, 0), entry(0, 120_000));
-		MoneyStats stats = MoneyStats.of(entries, JournalStats.sessions(entries), e -> null);
+		MoneyStats stats = MoneyStats.of(entries, JournalStats.sessions(entries), e -> null, false);
 		assertNull(stats.coins());
 		assertNull(stats.perShaft());
 		assertNull(stats.bestShaft());

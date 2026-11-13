@@ -24,7 +24,21 @@ public record GemYield(String gem, long rough, long flawed, long fine, long tail
 	}
 
 	private static double toFine(long rough, long flawed, long fine) {
-		return rough / (double) (RECIPE * RECIPE) + flawed / (double) RECIPE + fine;
+		return toFine("Rough", rough) + toFine("Flawed", flawed) + fine;
+	}
+
+	// quality from gem.item, anything else counts as fine
+	public static double toFine(String quality, long count) {
+		return count / countPerFine(quality);
+	}
+
+	// how many of this quality make 1 fine
+	public static double countPerFine(String quality) {
+		return switch (quality) {
+			case "Rough" -> (double) (RECIPE * RECIPE);
+			case "Flawed" -> (double) RECIPE;
+			default -> 1;
+		};
 	}
 
 	public static GemYield of(Shaft shaft, TextPatterns patterns) {

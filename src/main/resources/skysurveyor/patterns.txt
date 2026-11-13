@@ -2,7 +2,7 @@
 # leading spaces stay, hypixel indents w/ them. first match per key wins
 # parsers read the named groups, dont rename them
 # \p{Co} = hypixels private use icon chars
-# all confirmed in recordings (research/05, 06)
+# confirmed in recordings (research/05, 06) unless marked
 
 # finder gets both
 spawn.found            ^WOW! You found a Glacite Mineshaft portal!$

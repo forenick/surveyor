@@ -1,0 +1,19 @@
+{
+  "money": {
+    "sellPrice": "sell_offer",
+    "gemTier": "flawless",
+    "bazaarTax": 1.125,
+    "oldShafts": "that_day",
+    "crystals": "perfect_minus_flawless",
+    "ironman": true
+  },
+  "journal": {
+    "byDay": true
+  },
+  "summary": {
+    "show": "both",
+    "style": "frame",
+    "position": "movable",
+    "seconds": 8.0
+  }
+}

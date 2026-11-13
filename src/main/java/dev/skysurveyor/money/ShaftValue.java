@@ -5,31 +5,21 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 
+import dev.skysurveyor.data.CorpseType;
 import dev.skysurveyor.detection.CorpseLoot;
 import dev.skysurveyor.detection.ItemCount;
 import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.journal.GemYield;
 import dev.skysurveyor.journal.JournalEntry;
-import dev.skysurveyor.journal.JournalStats;
-import dev.skysurveyor.money.MoneySettings.Crystals;
-import dev.skysurveyor.money.MoneySettings.GemTier;
-import dev.skysurveyor.money.MoneySettings.SellPrice;
+import dev.skysurveyor.settings.MoneySettings;
+import dev.skysurveyor.settings.MoneySettings.Crystals;
+import dev.skysurveyor.settings.MoneySettings.GemTier;
 
 // rules in docs/money-design.md
 public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
-	// key per corpse (research/01)
-	private static final Map<String, String> KEYS = Map.of("Umber", "Umber Key", "Tungsten", "Tungsten Key",
-			"Vanguard", "Skeleton Key");
-	// portable campfire recipe (research/01)
-	private static final int CAMPFIRE_MATCH_STICKS = 16;
-	// perfect = 5 flawless + crystal (research/01)
-	private static final int PERFECT_FLAWLESS = 5;
-
 	public enum Part {
 		MINED("Mined gems"),
 		OTHER("Other drops"),
@@ -88,19 +78,19 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 	}
 
 	public static ShaftValue of(JournalEntry entry, Prices prices, MoneySettings settings, ItemIds ids, TextPatterns patterns) {
-		Valuer v = new Valuer(prices, settings, ids, patterns);
+		PriceRules v = new PriceRules(prices, settings, ids, patterns);
 		List<Line> lines = new ArrayList<>();
 
 		if (entry.gems() != null && entry.gems().fineEquivalent() > 0) {
 			double fine = entry.gems().fineEquivalent();
 			String gem = entry.gems().gem();
-			boolean flawless = settings.gemTier() == GemTier.FLAWLESS;
+			boolean flawless = !settings.isIronman() && settings.gemTier() == GemTier.FLAWLESS;
 			Double perFine = v.gemPerFine(gem);
 			lines.add(new Line(Part.MINED, (flawless ? "Flawless " : "Fine ") + gem + " Gemstone",
 					flawless ? fine / GemYield.RECIPE : fine, perFine == null ? null : perFine * fine));
 		}
 
-		otherDrops(entry, patterns).forEach((item, count) -> lines.add(v.line(Part.OTHER, item, count)));
+		otherDrops(entry, patterns).forEach((item, count) -> lines.add(line(v, Part.OTHER, item, count)));
 
 		Map<String, Long> loot = new LinkedHashMap<>();
 		Map<String, Long> keys = new LinkedHashMap<>();
@@ -111,40 +101,38 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 			List<Line> items = new ArrayList<>();
 			for (ItemCount item : corpse.items()) {
 				loot.merge(item.item(), item.count(), Long::sum);
-				Line line = v.line(Part.CORPSES, item.item(), item.count());
+				Line line = line(v, Part.CORPSES, item.item(), item.count());
 				items.add(line);
 				if (line.coins() == null) unpriced++;
 				else lootCoins += line.coins();
 			}
-			String key = KEYS.get(corpse.type());
+			String key = CorpseType.key(corpse.type());
 			Double keyCost = null;
 			if (key != null) {
 				keys.merge(key, 1L, Long::sum);
-				keyCost = v.buy(ids.id(key));
+				keyCost = v.key(key);
 				if (keyCost == null) unpriced++;
 			}
 			corpses.add(new CorpseValue(corpse.type(), lootCoins, keyCost == null ? 0 : -keyCost, unpriced, List.copyOf(items)));
 		}
-		loot.forEach((item, count) -> lines.add(v.line(Part.CORPSES, item, count)));
+		loot.forEach((item, count) -> lines.add(line(v, Part.CORPSES, item, count)));
 
-		if (entry.scrapFound() > 0) lines.add(v.line(Part.SCRAP, "Suspicious Scrap", entry.scrapFound()));
+		if (entry.scrapFound() > 0) lines.add(line(v, Part.SCRAP, "Suspicious Scrap", entry.scrapFound()));
 
 		if (entry.crystals() != null) {
 			Map<String, Long> crystals = new LinkedHashMap<>();
 			for (String crystal : entry.crystals()) crystals.merge(crystal, 1L, Long::sum);
-			crystals.forEach((item, count) -> lines.add(v.line(Part.CRYSTALS, item, count)));
+			crystals.forEach((item, count) -> lines.add(line(v, Part.CRYSTALS, item, count)));
 		}
 
 		keys.forEach((key, count) -> {
-			Double each = v.buy(ids.id(key));
+			Double each = v.key(key);
 			lines.add(new Line(Part.KEYS, key, count, each == null ? null : -each * count));
 		});
 
 		int campfires = entry.campfiresAt().size();
 		if (campfires > 0) {
-			Double umber = v.buy("REFINED_UMBER");
-			Double sticks = v.buy("MATCH_STICKS");
-			Double each = umber == null || sticks == null ? null : umber + CAMPFIRE_MATCH_STICKS * sticks;
+			Double each = v.campfireCost();
 			lines.add(new Line(Part.CAMPFIRES, "Portable Campfire", campfires, each == null ? null : -each * campfires));
 		}
 		return new ShaftValue(List.copyOf(lines), List.copyOf(corpses));
@@ -159,7 +147,9 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 			return prices.get(id);
 		};
 		for (GemTier tier : GemTier.values()) {
-			of(entry, recording, settings.withGemTier(tier).withCrystals(Crystals.PERFECT_MINUS_FLAWLESS), ids, patterns);
+			// ironman uses a subset of these ids
+			of(entry, recording, settings.withGemTier(tier).withCrystals(Crystals.PERFECT_MINUS_FLAWLESS).withIronman(false), ids,
+					patterns);
 		}
 		Map<String, ItemPrice> saved = new HashMap<>();
 		for (String id : used) {
@@ -178,67 +168,13 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 			for (ItemCount item : corpse.items()) drops.merge(item.item(), -item.count(), Long::sum);
 		}
 		if (entry.sacksRemoved() != null) entry.sacksRemoved().forEach((item, count) -> drops.merge(item, -count, Long::sum));
-		String type = JournalStats.type(entry);
+		String type = entry.shaftType();
 		drops.entrySet().removeIf(e -> e.getValue() <= 0 || GemYield.isShaftGem(e.getKey(), type, patterns));
 		return drops;
 	}
 
-	private record Valuer(Prices prices, MoneySettings settings, ItemIds ids, TextPatterns patterns) {
-		Line line(Part part, String item, long count) {
-			Double each = each(item);
-			return new Line(part, item, count, each == null ? null : each * count);
-		}
-
-		Double each(String item) {
-			Matcher m = patterns.match("gem.item", item);
-			if (m != null) {
-				Double perFine = gemPerFine(m.group("gem"));
-				int steps = switch (m.group("quality")) {
-					case "Rough" -> 2;
-					case "Flawed" -> 1;
-					default -> 0;
-				};
-				return perFine == null ? null : perFine / Math.pow(GemYield.RECIPE, steps);
-			}
-			if ((m = patterns.match("crystal.item", item)) != null) return crystal(m.group("gem"));
-			return sell(ids.id(item));
-		}
-
-		Double gemPerFine(String gem) {
-			if (settings.gemTier() == GemTier.FINE) return sell(gemId("FINE", gem));
-			Double flawless = sell(gemId("FLAWLESS", gem));
-			return flawless == null ? null : flawless / GemYield.RECIPE;
-		}
-
-		Double crystal(String gem) {
-			if (settings.crystals() == Crystals.ZERO) return 0.0;
-			Double perfect = sell(gemId("PERFECT", gem));
-			Double flawless = sell(gemId("FLAWLESS", gem));
-			if (perfect == null || flawless == null) return null;
-			return Math.max(0, perfect - PERFECT_FLAWLESS * flawless);
-		}
-
-		// bazaar w/ tax, else lowest bin, else npc (soulbound mob drops, empty order books)
-		Double sell(String id) {
-			if (id == null) return null;
-			ItemPrice price = prices.get(id);
-			if (price == null) return null;
-			Double side = settings.sellPrice() == SellPrice.INSTA_SELL ? price.buyOrder() : price.sellOffer();
-			if (side != null) return side * settings.taxFactor();
-			if (!price.onBazaar() && price.lowestBin() != null) return price.lowestBin();
-			return price.npcSell();
-		}
-
-		// insta-buy
-		Double buy(String id) {
-			if (id == null) return null;
-			ItemPrice price = prices.get(id);
-			if (price == null) return null;
-			return price.onBazaar() ? price.sellOffer() : price.lowestBin();
-		}
-
-		private static String gemId(String tier, String gem) {
-			return tier + "_" + gem.toUpperCase(Locale.ROOT) + "_GEM";
-		}
+	private static Line line(PriceRules v, Part part, String item, long count) {
+		Double each = v.each(item);
+		return new Line(part, item, count, each == null ? null : each * count);
 	}
 }

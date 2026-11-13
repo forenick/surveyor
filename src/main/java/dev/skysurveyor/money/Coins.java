@@ -1,6 +1,6 @@
 package dev.skysurveyor.money;
 
-import java.util.Locale;
+import dev.skysurveyor.util.Format;
 
 public final class Coins {
 	private Coins() {
@@ -27,6 +27,6 @@ public final class Coins {
 	}
 
 	private static String one(double value) {
-		return String.format(Locale.ROOT, "%.1f", value);
+		return Format.decimal(value);
 	}
 }

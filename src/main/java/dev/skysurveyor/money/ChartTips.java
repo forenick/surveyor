@@ -6,7 +6,7 @@ import java.util.List;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.SessionSummary;
-import dev.skysurveyor.journal.SummaryText;
+import dev.skysurveyor.util.Format;
 
 // tooltips for the stats charts' avg lines, "" = small gap
 public final class ChartTips {
@@ -25,13 +25,13 @@ public final class ChartTips {
 		List<String> lines = new ArrayList<>();
 		if (shafts.isEmpty()) return lines;
 		long average = Math.round(shafts.stream().mapToLong(Long::longValue).average().orElse(0));
-		lines.add("§fAvg spawn §e" + SummaryText.duration(average));
+		lines.add("§fAvg spawn §e" + Format.duration(average));
 		lines.add("");
 		lines.add("§7From §f" + shafts.size() + " §7timed shafts in §f" + timed.size() + (timed.size() == 1 ? " §7session" : " §7sessions"));
-		lines.add("§7Median shaft §f" + SummaryText.duration(Math.round(median(shafts))));
+		lines.add("§7Median shaft §f" + Format.duration(Math.round(median(shafts))));
 		if (shafts.size() >= 4) {
-			lines.add("§7Middle half §f" + SummaryText.duration(shafts.get(shafts.size() / 4)) + " §7to §f"
-					+ SummaryText.duration(shafts.get((shafts.size() * 3 - 1) / 4)));
+			lines.add("§7Middle half §f" + Format.duration(shafts.get(shafts.size() / 4)) + " §7to §f"
+					+ Format.duration(shafts.get((shafts.size() * 3 - 1) / 4)));
 		}
 		lines.add("");
 		long fasterSessions = timed.stream().filter(s -> s.averageSearchMillis() < average).count();
@@ -41,14 +41,14 @@ public final class ChartTips {
 		long fastest = timed.stream().mapToLong(SessionSummary::averageSearchMillis).min().orElse(0);
 		long slowest = timed.stream().mapToLong(SessionSummary::averageSearchMillis).max().orElse(0);
 		if (timed.size() > 1) {
-			lines.add("§7Fastest session §a" + SummaryText.duration(fastest) + "§7, slowest §c" + SummaryText.duration(slowest));
+			lines.add("§7Fastest session §a" + Format.duration(fastest) + "§7, slowest §c" + Format.duration(slowest));
 		}
 		// latest only if it has a spawn time, else it'd be an older one
 		if (timed.size() > 1 && average > 0 && timed.getLast() == oldestFirst.getLast()) {
 			long latest = timed.getLast().averageSearchMillis();
 			double change = (average - latest) / (double) average;
 			lines.add("");
-			lines.add("§7Latest session §f" + SummaryText.duration(latest) + " §7(" + (Math.round(change * 100) == 0 ? "same as avg"
+			lines.add("§7Latest session §f" + Format.duration(latest) + " §7(" + (Math.round(change * 100) == 0 ? "same as avg"
 					: change > 0 ? "§a" + percent(change) + " faster§7" : "§c" + percent(-change) + " slower§7") + ")");
 		}
 		return lines;
@@ -68,7 +68,7 @@ public final class ChartTips {
 		if (average == null || rated.isEmpty()) return lines;
 		lines.add("§fAvg coins / h " + CoinBreakdown.coins(average));
 		lines.add("");
-		lines.add("§7Coins " + CoinBreakdown.coins(total) + " §7in §f" + SummaryText.duration(totalMillis) + " §8(total / time shafting)");
+		lines.add("§7Coins " + CoinBreakdown.coins(total) + " §7in §f" + Format.duration(totalMillis) + " §8(total / time shafting)");
 		List<Double> rates = rated.stream().map(SessionCoins::perHour).sorted().toList();
 		lines.add("§7Median session " + CoinBreakdown.coins(median(rates)) + " §7/ h");
 		if (rates.size() > 1) {

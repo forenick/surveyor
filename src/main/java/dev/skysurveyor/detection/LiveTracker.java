@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.skysurveyor.detection.ShaftEvent.ShaftEntered;
 import dev.skysurveyor.detection.ShaftEvent.ShaftLeft;
-import dev.skysurveyor.util.HudText;
+import dev.skysurveyor.util.GameText;
 import dev.skysurveyor.util.TextUtil;
 
 // same data and rate as the recorder, so replays act like live
@@ -55,8 +55,8 @@ public final class LiveTracker {
 			tracker.onWorldChange(now);
 		}
 		if (client.level == null || tick % 10 != 0) return;
-		tracker.onScoreboard(now, HudText.scoreboardLines(client.level.getScoreboard()));
-		tracker.onTabList(now, HudText.tabListLines(client));
+		tracker.onScoreboard(now, GameText.scoreboardLines(client.level.getScoreboard()));
+		tracker.onTabList(now, GameText.tabListLines(client));
 	}
 
 	private void onEvent(ShaftEvent event) {

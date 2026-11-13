@@ -20,6 +20,7 @@ public final class HudLayout {
 	public static final float MIN_SCALE = 0.5f;
 	public static final float MAX_SCALE = 2;
 	public static final String COLOR_CODES = "0123456789abcdef";
+	public static final String TOAST_ID = "toast";
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	enum Visibility {
@@ -167,6 +168,8 @@ public final class HudLayout {
 
 	public int version = VERSION;
 	public List<Box> boxes = new ArrayList<>();
+	// movable shaft toast spot, null = never moved (defaultToast). only position + scale count
+	public Box toast;
 
 	// from Docs/mockups/hud-v1.html
 	public static HudLayout defaults() {
@@ -178,6 +181,20 @@ public final class HudLayout {
 	}
 
 	public record Preset(String name, String description, Supplier<Box> box) {
+	}
+
+	// display choice: top middle, under the boss bar
+	public static Box defaultToast() {
+		Box box = new Box();
+		box.id = TOAST_ID;
+		box.anchorX = Anchor.MIDDLE;
+		box.anchorY = Anchor.START;
+		box.offsetY = 26;
+		return box;
+	}
+
+	public Box toastOrDefault() {
+		return toast != null ? toast : defaultToast();
 	}
 
 	// nicks picks (2026-11-12), lines matter more than looks
@@ -279,9 +296,14 @@ public final class HudLayout {
 		if (layout == null || layout.boxes == null) throw new JsonParseException("No boxes in the HUD file");
 		layout.boxes.removeIf(box -> box == null);
 		Set<String> ids = new HashSet<>();
+		ids.add(TOAST_ID);
+		if (layout.toast != null) {
+			repair(layout.toast);
+			layout.toast.id = TOAST_ID;
+		}
 		for (Box box : layout.boxes) {
 			repair(box);
-			// share codes find boxes by id
+			// editor finds boxes by id after undo
 			if (box.id == null || box.id.isBlank() || !ids.add(box.id)) {
 				int n = 1;
 				while (!ids.add("box" + n)) n++;

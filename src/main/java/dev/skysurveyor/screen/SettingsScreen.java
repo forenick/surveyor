@@ -65,7 +65,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int MIN_TEXT = 140;
 	private static final int TIP_WIDTH = 200;
 	private static final int TIP_MARGIN = 5;
-	// typed tax applies after this many quiet ticks or on click away
+	// typed number applies after this many quiet ticks or on click away
 	private static final int TYPE_DELAY = 10;
 	private static final Identifier SEARCH_ICON = icon("search_icon");
 	private static final Identifier RESET_ICON = icon("reset_icon");
@@ -79,7 +79,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			clamp(x + 12 + w <= screenW - TIP_MARGIN ? x + 12 : x - 12 - w, w, screenW), clamp(y - 12, h, screenH));
 
 	private final Screen parent;
-	private Settings settings = current();
+	private Settings settings = Surveyor.SETTINGS.get();
 	private String query = "";
 	private String category = SettingsList.MONEY;
 	private FlowLayout root;
@@ -111,10 +111,6 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 	private static Identifier icon(String name) {
 		return Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/" + name + ".png");
-	}
-
-	private static Settings current() {
-		return new Settings(Surveyor.MONEY.settings(), Surveyor.MONEY.byDay());
 	}
 
 	@Override
@@ -159,7 +155,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		}
 		for (Card card : List.copyOf(cards)) card.poll();
 		// hand edit picked up on the io thread
-		Settings now = current();
+		Settings now = Surveyor.SETTINGS.get();
 		if (!now.equals(settings)) {
 			settings = now;
 			refreshCards();
@@ -217,8 +213,12 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		bar.padding(Insets.of(BAR_PADDING));
 		bar.gap(BAR_GAP);
 		bar.verticalAlignment(VerticalAlignment.CENTER);
-		LabelComponent title = label("§bSurveyor §7Settings");
+		FlowLayout title = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		title.gap(3);
+		title.verticalAlignment(VerticalAlignment.CENTER);
 		title.margins(Insets.left(2));
+		title.child(UIComponents.texture(JournalScreen.SETTINGS_ICON, 0, 0, 8, 8, 8, 8));
+		title.child(label("§fSurveyor §7Settings"));
 		bar.child(title);
 		bar.child(UIContainers.horizontalFlow(Sizing.expand(), Sizing.content()));
 		bar.child(UIComponents.texture(SEARCH_ICON, 0, 0, 8, 8, 8, 8));
@@ -230,10 +230,9 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		search.setHint(Component.literal("Search settings").setStyle(EditBox.SEARCH_HINT_STYLE));
 		homeFields.add(search);
 		bar.child(search);
-		ButtonComponent back = UIComponents.button(Component.literal("Back"), b -> onClose());
+		ButtonComponent back = PackButton.button(Component.literal("Back"), b -> onClose());
 		// same as owo's content(6)
 		back.horizontalSizing(Sizing.fixed(font.width("Back") + 20));
-		back.verticalSizing(Sizing.fixed(BUTTON + 2));
 		back.margins(Insets.left(2));
 		bar.child(back);
 		return bar;
@@ -398,7 +397,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void updateSaveNote() {
-		String text = Surveyor.MONEY.saveError() == null ? "§8Saved in config.json" : "§cCould not save config.json, see the log";
+		String text = Surveyor.SETTINGS.saveError() == null ? "§8Saved in config.json" : "§cCould not save config.json, see the log";
 		if (!text.equals(saveText)) saveNote.text(Component.literal(saveText = text));
 	}
 
@@ -423,12 +422,9 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 	// built on memory now, not a stale copy. true = cards refreshed
 	private boolean apply(Function<Settings, Settings> change) {
-		// a click lands before the tick, keep tax typed right before it
+		// a click lands before the tick, keep a number typed right before it
 		flushTyped();
-		Settings base = current();
-		Settings next = change.apply(base);
-		if (!next.money().equals(base.money())) Surveyor.MONEY.setSettings(next.money());
-		if (next.byDay() != base.byDay()) Surveyor.MONEY.setByDay(next.byDay());
+		Settings next = Surveyor.SETTINGS.change(change);
 		if (next.equals(settings)) return false;
 		settings = next;
 		refreshCards();

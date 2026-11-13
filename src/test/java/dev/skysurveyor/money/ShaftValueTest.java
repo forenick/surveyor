@@ -10,15 +10,17 @@ import org.junit.jupiter.api.Test;
 import dev.skysurveyor.detection.CorpseLoot;
 import dev.skysurveyor.detection.ItemCount;
 import dev.skysurveyor.detection.TextPatterns;
+import dev.skysurveyor.journal.EntryBuilder;
 import dev.skysurveyor.journal.GemYield;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.SummaryText;
-import dev.skysurveyor.money.MoneySettings.Crystals;
-import dev.skysurveyor.money.MoneySettings.GemTier;
-import dev.skysurveyor.money.MoneySettings.OldShafts;
-import dev.skysurveyor.money.MoneySettings.SellPrice;
 import dev.skysurveyor.money.ShaftValue.Line;
 import dev.skysurveyor.money.ShaftValue.Part;
+import dev.skysurveyor.settings.MoneySettings;
+import dev.skysurveyor.settings.MoneySettings.Crystals;
+import dev.skysurveyor.settings.MoneySettings.GemTier;
+import dev.skysurveyor.settings.MoneySettings.OldShafts;
+import dev.skysurveyor.settings.MoneySettings.SellPrice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,9 +63,9 @@ class ShaftValueTest {
 		Map<String, Long> other = new HashMap<>();
 		other.put("Rough Sapphire Gemstone", 6_400L);
 		other.put("Glossy Gemstone", 2L);
-		return new JournalEntry(JournalEntry.VERSION, 0, "JADE_1", 0, 600_000, "BYE", 1_000, null, List.of(), 0, loots,
-				List.of(), List.of(300_000L), null, 2, 0, Map.of(), Map.of(), Map.of(),
-				new GemYield("Jade", 0, 800, 0, 0, 0), List.of("Jade Crystal"), other, null);
+		return EntryBuilder.entry().durationMillis(600_000).exitPowder(1_000).loots(loots).campfiresAt(List.of(300_000L))
+				.scrapFound(2).gems(new GemYield("Jade", 0, 800, 0, 0, 0)).crystals(List.of("Jade Crystal")).otherDrops(other)
+				.build();
 	}
 
 	private static ShaftValue value(MoneySettings settings) {
@@ -121,12 +123,12 @@ class ShaftValueTest {
 		assertTrue(value(fine).unpriced().stream().anyMatch(l -> l.item().equals("Flawed Onyx Gemstone")), "no fine onyx price");
 
 		MoneySettings offer = new MoneySettings(SellPrice.SELL_OFFER, GemTier.FLAWLESS, 1.125, OldShafts.THAT_DAY,
-				Crystals.PERFECT_MINUS_FLAWLESS);
+				Crystals.PERFECT_MINUS_FLAWLESS, false);
 		assertEquals(325_000 * TAX, value(offer).total(Part.MINED), 1e-6);
 		assertEquals(-2_800_000, value(offer).total(Part.KEYS), 1e-6, "keys stay insta-buy");
 
 		MoneySettings noTax = new MoneySettings(SellPrice.INSTA_SELL, GemTier.FLAWLESS, 0.0, OldShafts.THAT_DAY,
-				Crystals.ZERO);
+				Crystals.ZERO, false);
 		assertEquals(300_000, value(noTax).total(Part.MINED), 1e-6);
 		assertEquals(0, value(noTax).total(Part.CRYSTALS), 1e-6);
 		assertFalse(value(noTax).unpriced().stream().anyMatch(l -> l.part() == Part.CRYSTALS));
@@ -136,14 +138,13 @@ class ShaftValueTest {
 	void npcPriceOnlyWhenNothingElse() {
 		JournalEntry e = entry();
 		Map<String, Long> drops = Map.of("Redstone Dust", 100L, "Pixie Dust", 2L);
-		JournalEntry withDrops = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(),
-				e.exit(), e.exitPowder(), null, e.corpses(), 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(),
-				Map.of(), null, List.of(), drops, null);
+		JournalEntry withDrops = EntryBuilder.from(e).loots(List.of()).campfiresAt(List.of()).scrapFound(0).gems(null)
+				.crystals(List.of()).otherDrops(drops).build();
 		ShaftValue value = ShaftValue.of(withDrops, PRICES::get, MoneySettings.DEFAULTS, IDS, PATTERNS);
 		// npc, no bazaar tax
 		assertEquals(100 + 10, value.total(Part.OTHER), 1e-6);
 		MoneySettings offer = new MoneySettings(SellPrice.SELL_OFFER, GemTier.FLAWLESS, 1.125, OldShafts.THAT_DAY,
-				Crystals.ZERO);
+				Crystals.ZERO, false);
 		assertEquals(400 * TAX + 10, ShaftValue.of(withDrops, PRICES::get, offer, IDS, PATTERNS).total(Part.OTHER), 1e-6);
 	}
 
@@ -170,9 +171,7 @@ class ShaftValueTest {
 	void oldEntriesGuessOtherDrops() {
 		JournalEntry e = entry();
 		Map<String, Long> sacks = Map.of("Rough Jade Gemstone", 1_000L, "Flawed Onyx Gemstone", 20L, "Glossy Gemstone", 2L);
-		JournalEntry old = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(), e.exit(),
-				e.exitPowder(), null, e.corpses(), 0, e.loots(), e.mayhemBuffs(), e.campfiresAt(), null, 2, 0, Map.of(), sacks,
-				Map.of(), e.gems(), null, null, null);
+		JournalEntry old = EntryBuilder.from(e).sacksAdded(sacks).crystals(null).otherDrops(null).build();
 		ShaftValue value = ShaftValue.of(old, PRICES::get, MoneySettings.DEFAULTS, IDS, PATTERNS);
 		assertEquals(List.of(new Line(Part.OTHER, "Glossy Gemstone", 2, 100_000 * TAX)),
 				value.lines().stream().filter(l -> l.part() == Part.OTHER).toList());
@@ -185,9 +184,8 @@ class ShaftValueTest {
 		// 160 glacite supercrafted into 1 enchanted, made up counts
 		Map<String, Long> added = Map.of("Glacite", 160L, "Enchanted Glacite", 1L, "Glossy Gemstone", 2L);
 		Map<String, Long> removed = Map.of("Glacite", 160L);
-		JournalEntry old = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(), e.exit(),
-				e.exitPowder(), null, e.corpses(), 0, List.of(), e.mayhemBuffs(), e.campfiresAt(), null, 2, 0, Map.of(), added,
-				removed, e.gems(), null, null, null);
+		JournalEntry old = EntryBuilder.from(e).loots(List.of()).sacksAdded(added).sacksRemoved(removed).crystals(null)
+				.otherDrops(null).build();
 		assertEquals(Map.of("Enchanted Glacite", 1L, "Glossy Gemstone", 2L), ShaftValue.otherDrops(old, PATTERNS));
 	}
 
@@ -198,9 +196,8 @@ class ShaftValueTest {
 		ItemIds ids = ItemIds.bundled(Map.of("Frozen Crystal", "FROZEN_CRYSTAL"));
 		Map<String, ItemPrice> prices = new HashMap<>(PRICES);
 		prices.put("FROZEN_CRYSTAL", bz(1_000, 1_100));
-		JournalEntry withDrops = new JournalEntry(e.version(), e.sessionId(), e.shaftId(), e.enteredAt(), e.durationMillis(),
-				e.exit(), e.exitPowder(), null, e.corpses(), 0, List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(),
-				Map.of(), null, List.of(), Map.of("Frozen Crystal", 3L), null);
+		JournalEntry withDrops = EntryBuilder.from(e).loots(List.of()).campfiresAt(List.of()).scrapFound(0).gems(null)
+				.crystals(List.of()).otherDrops(Map.of("Frozen Crystal", 3L)).build();
 		MoneySettings zero = MoneySettings.DEFAULTS.withCrystals(Crystals.ZERO);
 		assertEquals(3_000 * TAX, ShaftValue.of(withDrops, prices::get, zero, ids, PATTERNS).total(Part.OTHER), 1e-6);
 	}
@@ -233,10 +230,47 @@ class ShaftValueTest {
 
 	@Test
 	void chatSummaryLine() {
-		List<String> lines = SummaryText.lines(entry(), null, value(MoneySettings.DEFAULTS));
+		List<String> lines = SummaryText.lines(entry(), null, value(MoneySettings.DEFAULTS), false);
 		String coins = lines.stream().filter(l -> l.contains("Coins")).findFirst().orElseThrow();
 		assertEquals(" §7Coins §6+58.4M §8(gems 296.6k, other 98.9k, corpses 60.1M, scrap 276.9k, crystals 3.0M, keys -2.8M,"
 				+ " campfires -2.5M) §c1 item without a price", coins);
 		assertNull(lines.stream().filter(l -> l.contains("no prices")).findFirst().orElse(null));
+	}
+
+	@Test
+	void ironmanUsesNpcPricesOnly() {
+		Map<String, ItemPrice> npc = new HashMap<>(PRICES);
+		npc.put("FINE_JADE_GEM", new ItemPrice(28_000.0, 30_000.0, null, 19_200.0));
+		npc.put("FINE_ONYX_GEM", new ItemPrice(30_000.0, 33_000.0, null, 25_600.0));
+		npc.put("GOBLIN_EGG", new ItemPrice(3_000.0, 4_000.0, null, 10.0));
+		MoneySettings ironman = MoneySettings.DEFAULTS.withIronman(true);
+		ShaftValue value = ShaftValue.of(entry(), npc::get, ironman, IDS, PATTERNS);
+		// 10 fine at npc, flawless setting ignored
+		assertEquals(192_000, value.total(Part.MINED), 1e-6);
+		assertTrue(value.lines().stream().anyMatch(l -> l.item().equals("Fine Jade Gemstone") && l.count() == 10));
+		// 20 flawed onyx = 1/4 fine = 6,400 + 4 eggs at 10, no tax. tungsten + wisp have no npc price
+		assertEquals(6_440, value.total(Part.CORPSES), 1e-6);
+		assertEquals(0, value.total(Part.KEYS), 1e-6);
+		assertEquals(0, value.total(Part.CAMPFIRES), 1e-6);
+		assertEquals(1, value.lines().stream().filter(l -> l.part() == Part.KEYS && l.coins() != null).count(), "key shows as used");
+		assertTrue(value.unpriced().stream().anyMatch(l -> l.part() == Part.CRYSTALS), "crystal listed w/o coins");
+		assertTrue(value.unpriced().stream().anyMatch(l -> l.item().equals("Caged Wisp")));
+		assertTrue(value.unpriced().stream().anyMatch(l -> l.part() == Part.SCRAP));
+		assertEquals(0, value.corpses().get(1).key(), 1e-6);
+	}
+
+	@Test
+	void ironmanSnapshotStillSavesBazaarPrices() {
+		MoneySettings ironman = MoneySettings.DEFAULTS.withIronman(true);
+		Map<String, ItemPrice> saved = ShaftValue.snapshot(entry(), PRICES::get, ironman, IDS, PATTERNS);
+		assertTrue(saved.containsKey("FLAWLESS_JADE_GEM"), "turning ironman off later keeps that days prices");
+		assertTrue(saved.containsKey("TUNGSTEN_KEY"));
+	}
+
+	@Test
+	void ironmanWordingIsNotAWarning() {
+		assertEquals("§8no NPC price", CoinBreakdown.noPrice(true));
+		assertEquals("§82 items with no NPC price", CoinBreakdown.unpriced(2, true));
+		assertEquals("§c1 item without a price", CoinBreakdown.unpriced(1, false));
 	}
 }

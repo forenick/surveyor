@@ -3,6 +3,7 @@ package dev.skysurveyor.journal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -12,21 +13,31 @@ import org.slf4j.LoggerFactory;
 import dev.skysurveyor.detection.ShaftEvent;
 import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.money.LiveMoney;
+import dev.skysurveyor.settings.LiveSettings;
+import dev.skysurveyor.settings.SummarySettings;
 import dev.skysurveyor.util.DataFolder;
 
-// summary only goes to local chat, nothing sent to the server
+// summary only goes to local chat or a toast, nothing sent to the server
 public final class LiveJournal {
 	private static final Logger LOGGER = LoggerFactory.getLogger("Surveyor");
 
 	private final Journal journal;
 	private final LiveMoney money;
+	private final LiveSettings settings;
 	// client thread only
 	private final List<JournalEntry> entries = new ArrayList<>();
 	private JournalFile file;
+	private Consumer<ToastText> toasts = text -> {
+	};
 
-	public LiveJournal(BooleanSupplier inMiningArea, LiveMoney money) {
+	public LiveJournal(BooleanSupplier inMiningArea, LiveMoney money, LiveSettings settings) {
 		journal = new Journal(TextPatterns.defaults(), inMiningArea, this::onEntry);
 		this.money = money;
+		this.settings = settings;
+	}
+
+	public void onToast(Consumer<ToastText> listener) {
+		toasts = listener;
 	}
 
 	public void start(Minecraft client) {
@@ -100,9 +111,13 @@ public final class LiveJournal {
 		JournalEntry entry = money.withPrices(finished);
 		entries.add(entry);
 		if (file != null) file.append(entry);
-		var chat = Minecraft.getInstance().gui.hud.getChat();
-		for (String line : SummaryText.lines(entry, journal.session(), money.value(entry))) {
-			chat.addClientSystemMessage(Component.literal(line));
+		SummarySettings.Show show = settings.get().summary().show();
+		if (show.chat()) {
+			var chat = Minecraft.getInstance().gui.hud.getChat();
+			for (String line : SummaryText.lines(entry, journal.session(), money.value(entry), money.settings().isIronman())) {
+				chat.addClientSystemMessage(Component.literal(line));
+			}
 		}
+		if (show.toast()) toasts.accept(ToastText.of(entry, journal.session(), money.value(entry), money.settings().isIronman()));
 	}
 }

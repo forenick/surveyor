@@ -2,7 +2,6 @@ package dev.skysurveyor.journal;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +15,7 @@ class StatsRangeTest {
 	private static final long DAY = 24 * 3_600_000L;
 
 	private static JournalEntry entry(long session, long entered) {
-		return new JournalEntry(JournalEntry.VERSION, session, "JADE_1", entered, 60_000, "BYE", 0, null, List.of(), 0,
-				List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		return EntryBuilder.entry().sessionId(session).enteredAt(entered).build();
 	}
 
 	private static List<SessionSummary> tenDays() {

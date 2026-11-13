@@ -1,4 +1,4 @@
-package dev.skysurveyor.screen;
+package dev.skysurveyor.data;
 
 import java.util.HashMap;
 import java.util.List;

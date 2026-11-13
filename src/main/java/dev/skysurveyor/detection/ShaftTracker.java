@@ -59,8 +59,8 @@ public final class ShaftTracker {
 		if (id != null) {
 			Shaft candidate = candidate(now);
 			candidate.confirmed = true;
-			if (candidate.id == null) {
-				candidate.id = id;
+			if (candidate.id() == null) {
+				candidate.setId(id);
 				listener.accept(new ShaftEntered(candidate));
 			}
 		}
@@ -68,7 +68,7 @@ public final class ShaftTracker {
 		Integer newCold = scoreboard.cold(lines);
 		if (newCold != null && !newCold.equals(cold)) {
 			cold = newCold;
-			if (shaft != null) shaft.cold = newCold;
+			if (shaft != null) shaft.setCold(newCold);
 			listener.accept(new ColdChanged(newCold));
 		}
 	}
@@ -81,7 +81,7 @@ public final class ShaftTracker {
 		List<Corpse> newCorpses = tabList.corpses(lines);
 		if (!newCorpses.isEmpty() && !newCorpses.equals(corpses)) {
 			corpses = newCorpses;
-			if (shaft != null) shaft.corpses = newCorpses;
+			if (shaft != null) shaft.setCorpses(newCorpses);
 			listener.accept(new CorpsesChanged(newCorpses));
 		}
 	}

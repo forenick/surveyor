@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +40,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 import dev.skysurveyor.Surveyor;
+import dev.skysurveyor.data.CorpseType;
+import dev.skysurveyor.data.ShaftNames;
 import dev.skysurveyor.detection.CorpseLoot;
 import dev.skysurveyor.detection.ItemCount;
 import dev.skysurveyor.detection.TextPatterns;
@@ -55,12 +58,13 @@ import dev.skysurveyor.journal.SummaryText;
 import dev.skysurveyor.money.ChartTips;
 import dev.skysurveyor.money.CoinBreakdown;
 import dev.skysurveyor.money.Coins;
-import dev.skysurveyor.money.MoneySettings;
 import dev.skysurveyor.money.MoneyStats;
 import dev.skysurveyor.money.ShaftValue;
 import dev.skysurveyor.money.ShaftValue.Line;
 import dev.skysurveyor.money.ShaftValue.Part;
+import dev.skysurveyor.settings.MoneySettings;
 import dev.skysurveyor.settings.Setting;
+import dev.skysurveyor.util.Format;
 
 // mc font only so pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
@@ -106,12 +110,17 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Surface ROW_SELECTED = Surface.flat(0x26FFFFFF).and(Surface.outline(0x50FFFFFF));
 	private static final Surface SLOT = Surface.flat(0xFF8B8B8B).and(Surface.outline(0xFF373737));
 	private static final int BAR_GREEN = 0xCC55FF55;
+	private static final int BAR_GOLD = 0xCCFFAA00;
+	private static final int BAR_RED = 0xCCFF5555;
 	private static final Color GREEN = Color.ofArgb(BAR_GREEN);
 	private static final int ROW_HEIGHT = 12;
 	private static final int SPAWN_BAR = 26;
 	private static final int PADDING = 8;
 	private static final int GAP = 5;
 	private static final int COLUMN_PADDING = 6;
+	private static final int COLUMN_GAP = 6;
+	// table padding + row padding + scrollbar
+	private static final int TABLE_CHROME = 10 + 4 + 4;
 	// in %, middle gets the rest
 	private static final int STATS_LEFT = 32;
 	private static final int STATS_RIGHT = 27;
@@ -127,9 +136,20 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Identifier OVERVIEW_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/overview_icon.png");
 	private static final Identifier SESSION_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/session_icon.png");
 	private static final Identifier STATS_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/stats_icon.png");
-	private static final Identifier SETTINGS_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/settings_icon.png");
+	static final Identifier SETTINGS_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/settings_icon.png");
+	private static final Identifier MOVE_ICON = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/move_icon.png");
 	private static final Identifier OPEN_ARROW = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/open_arrow.png");
 	private static final Identifier PREV_ARROW = Identifier.fromNamespaceAndPath("skysurveyor", "textures/gui/prev_arrow.png");
+	private static final int RECENT_SESSIONS = 5;
+	// seconds
+	private static final double[] SPAWN_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
+	// 1, 2, 5 x 10^n coins
+	private static final double[] COIN_STEPS = coinSteps();
+	private static final ZoneId ZONE = ZoneId.systemDefault();
+	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
+	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
+	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
+	private static final DateTimeFormatter DAY_YEAR = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH);
 
 	// width 0 = measured per table, see measured()
 	private static final List<Column> SHAFT_COLUMNS = List.of(
@@ -137,7 +157,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			new Column("time", "Time", 32, false, 3), new Column("spawn", "Spawn", 66, false, 0),
 			new Column("inside", "Inside", 0, true, 2), new Column("corpses", "Corpses", 0, false, 0),
 			new Column("powder", "Powder", 44, true, 1), new Column("gems", "Gems", 40, true, 4),
-			new Column("coins", "Coins", 0, true, 0));
+			new Column("coins", "Coins", 0, true, 0), new Column("campfire", "Campfire", 0, false, 6));
 	// by day: start time goes under the days date, no start column
 	private static final List<Column> SESSION_COLUMNS = List.of(
 			new Column("date", "Date", 56, false, 0), new Column("start", "Start", 32, false, 5),
@@ -155,7 +175,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private boolean viewing;
 	private final boolean current;
 	private final boolean started;
-	private boolean byDay = Surveyor.MONEY.byDay();
+	private boolean byDay = byDaySetting();
 	private int sessionIndex;
 	private int selected;
 	private FlowLayout root;
@@ -228,10 +248,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	// by day lives on the settings page now
 	private boolean byDayChanged() {
-		if (Surveyor.MONEY.byDay() == byDay) return false;
-		byDay = Surveyor.MONEY.byDay();
+		if (byDaySetting() == byDay) return false;
+		byDay = byDaySetting();
 		moneyChanges = Surveyor.MONEY.changes();
 		return true;
+	}
+
+	private static boolean byDaySetting() {
+		return Surveyor.SETTINGS.get().journal().byDay();
 	}
 
 	private void rebuild() {
@@ -310,11 +334,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		title.margins(Insets.of(0, 0, 2, 8));
 		List<ButtonComponent> tabs = List.of(tabButton("Overview", Tab.OVERVIEW), tabButton("Session", Tab.SESSION),
 				tabButton("Stats", Tab.STATS));
-		ButtonComponent editHud = UIComponents.button(Component.literal("Edit HUD"),
+		IconButton editHud = new IconButton(Component.literal("Edit HUD"), MOVE_ICON, 8, 8,
 				b -> minecraft.gui.setScreen(new EditHudScreen(this, Surveyor.HUD)));
-		// same as owo's content(6)
-		editHud.horizontalSizing(Sizing.fixed(font.width("Edit HUD") + 20));
-		editHud.margins(Insets.left(6));
 		IconButton settings = new IconButton(Component.literal("§fSettings"), SETTINGS_ICON, 8, 8,
 				b -> minecraft.gui.setScreen(new SettingsScreen(this)));
 		settings.margins(Insets.left(6));
@@ -326,10 +347,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		if (viewing) {
 			int date = font.width(day(sessions.get(sessionIndex).start()));
 			// 480 wide: title steps aside first, then "<" goes, so the date still fits
-			showTitle = navRoom(withTitle(items, title), backButton("Back")) >= date;
+			showTitle = navRoom(withTitle(items, title), backWidth("Back")) >= date;
 			if (showTitle) items = withTitle(items, title);
-			back = backButton("< Back");
-			if (navRoom(items, back) < date) back = backButton("Back");
+			back = backButton(navRoom(items, backWidth("< Back")) < date ? "Back" : "< Back");
 		} else {
 			items = withTitle(items, title);
 		}
@@ -344,10 +364,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			SessionSummary shown = sessions.get(sessionIndex);
 			nav.child(back);
 			nav.child(button("<", sessionIndex < sessions.size() - 1, () -> showSession(sessionIndex + 1)));
-			nav.child(label("§f" + sessionRange(shown, navRoom(items, back))));
+			nav.child(label("§f" + sessionRange(shown, navRoom(items, fixedWidth(back)))));
 			nav.child(button(">", sessionIndex > 0, () -> showSession(sessionIndex - 1)));
 		} else if (tab == Tab.SESSION && current) {
-			nav.child(label("§f" + sessionRange(sessions.getFirst(), navRoom(items, null))));
+			nav.child(label("§f" + sessionRange(sessions.getFirst(), navRoom(items, 0))));
 		}
 		bar.child(nav);
 		bar.child(settings);
@@ -362,13 +382,18 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private ButtonComponent backButton(String text) {
-		ButtonComponent back = UIComponents.button(Component.literal(text), b -> {
+		ButtonComponent back = PackButton.button(Component.literal(text), b -> {
 			viewing = false;
 			rebuild();
 		});
 		back.horizontalSizing(Sizing.fixed(font.width(text) + 12));
 		back.margins(Insets.right(4));
 		return back;
+	}
+
+	// backButton() width + margin, w/o building one
+	private int backWidth(String text) {
+		return font.width(text) + 12 + 4;
 	}
 
 	private ButtonComponent tabButton(String name, Tab target) {
@@ -404,7 +429,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private ButtonComponent button(String text, boolean active, Runnable action) {
-		ButtonComponent button = UIComponents.button(Component.literal(text), b -> action.run());
+		ButtonComponent button = PackButton.button(Component.literal(text), b -> action.run());
 		button.active(active);
 		button.horizontalSizing(Sizing.fixed(ARROW_WIDTH));
 		return button;
@@ -448,16 +473,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		int tileWidth = (width - 2 * PADDING - 5 * GAP) / 6;
 		tiles.child(tile(tileWidth, "Shafts", "§f" + session.shafts()));
 		tiles.child(tile(tileWidth, "Avg spawn", spawn(session.averageSearchMillis())));
-		tiles.child(tile(tileWidth, "Per hour", rate == null ? "§8-" : "§f" + decimal(rate)));
-		tiles.child(tile(tileWidth, "Powder", "§b" + number(session.powder())));
-		tiles.child(tile(tileWidth, "Lapis looted", "§9" + session.looted("Lapis")));
+		tiles.child(tile(tileWidth, "Per hour", rate == null ? "§8-" : "§f" + Format.decimal(rate)));
+		tiles.child(tile(tileWidth, "Powder", "§b" + Format.number(session.powder())));
+		tiles.child(tile(tileWidth, "Lapis looted", "§9" + session.looted(CorpseType.LAPIS.label())));
 		FlowLayout coinsTile = tile(tileWidth, "Coins", coinText(sessionCoins));
 		if (sessionCoins != null) {
 			Double perHour = session.perHour(sessionCoins, session.end());
 			withTooltip(coinsTile, List.of(Component.literal("§fCoins this session"),
-					Component.literal("§7Per shaft " + coins(sessionCoins / session.shafts())),
+					Component.literal("§7Per shaft " + CoinBreakdown.coins(sessionCoins / session.shafts())),
 					Component.literal("§7Per hour " + (perHour == null ? "§8after " + JournalStats.MIN_RATE_MILLIS / 60_000 + " minutes"
-							: coins(perHour)))));
+							: CoinBreakdown.coins(perHour)))));
 		}
 		tiles.child(coinsTile);
 		content.child(tiles);
@@ -470,9 +495,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		int detailWidth = Math.clamp(width * 30 / 100, 140, 230);
 		List<Double> shaftCoins = session.entries().stream().map(e -> MoneyStats.net(Surveyor.MONEY.value(e))).toList();
 		List<Column> measured = measured(SHAFT_COLUMNS, "inside",
-				session.entries().stream().map(e -> SummaryText.duration(e.durationMillis())).toList());
+				session.entries().stream().map(e -> Format.duration(e.durationMillis())).toList());
 		measured = measured(measured, "corpses", session.entries().stream().map(JournalScreen::corpses).toList());
 		measured = measured(measured, "coins", shaftCoins.stream().map(JournalScreen::coinText).toList());
+		if (session.entries().stream().allMatch(e -> campfires(e) == 0)) {
+			measured = measured.stream().filter(c -> !c.key().equals("campfire")).toList();
+		} else {
+			measured = measured(measured, "campfire", session.entries().stream().map(JournalScreen::campfireCell).toList());
+		}
 		List<Column> columns = fit(measured, width - 2 * PADDING - GAP - detailWidth - TABLE_CHROME);
 		FlowLayout rows = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		for (int i = 0; i < session.entries().size(); i++) {
@@ -484,11 +514,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 					case "shaft" -> cell(column, "§b" + (entry.shaftId() == null ? "?" : entry.shaftId()));
 					case "time" -> cell(column, "§7" + clock(entry.enteredAt()));
 					case "spawn" -> barCell(column, entry.searchMillis(), slowest);
-					case "inside" -> cell(column, "§f" + SummaryText.duration(entry.durationMillis()));
+					case "inside" -> cell(column, "§f" + Format.duration(entry.durationMillis()));
 					case "corpses" -> cell(column, corpses(entry));
-					case "powder" -> cell(column, "§f" + number(JournalStats.powder(entry)));
+					case "powder" -> cell(column, "§f" + Format.number(JournalStats.powder(entry)));
 					case "coins" -> cell(column, coinText(shaftCoins.get(i)));
-					default -> cell(column, entry.gems() == null ? "§8-" : "§f≈" + decimal(entry.gems().fineEquivalent()));
+					case "campfire" -> cell(column, campfireCell(entry));
+					default -> cell(column, entry.gems() == null ? "§8-" : "§f≈" + Format.decimal(entry.gems().fineEquivalent()));
 				});
 			}
 			int index = i;
@@ -536,19 +567,22 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		ShaftValue value = Surveyor.MONEY.value(entry);
 
 		String id = entry.shaftId() == null ? "Unknown shaft" : entry.shaftId();
-		detail.child(wrapped("§b" + id + ("C".equals(JournalStats.variant(entry)) ? " §7(crystal)" : "")));
+		detail.child(wrapped("§b" + id + (ShaftNames.CRYSTAL.equals(entry.variant()) ? " §7(crystal)" : "")));
 		detail.child(spacer(4));
 		detail.child(keyValue("Entered", "§f" + time(entry.enteredAt())));
-		detail.child(keyValue("Exit", "§f" + SummaryText.exitName(entry.exit())));
+		detail.child(keyValue("Exit", "§f" + SummaryText.exitName(entry.exitReason())));
 		detail.child(keyValue("Spawned in", entry.searchMillis() == null ? "§8not timed" : spawn(entry.searchMillis())));
-		detail.child(keyValue("Inside", "§f" + SummaryText.duration(entry.durationMillis())));
+		detail.child(keyValue("Inside", "§f" + Format.duration(entry.durationMillis())));
 		if (!entry.mayhemBuffs().isEmpty()) detail.child(keyValue("Mayhem", "§e" + String.join(", ", entry.mayhemBuffs())));
-		String powder = "§b" + number(JournalStats.powder(entry));
+		String powder = "§b" + Format.number(JournalStats.powder(entry));
 		if (entry.corpsePowder() > 0 && entry.exitPowder() > 0) {
-			powder += " §8(" + number(entry.corpsePowder()) + " corpses + " + number(entry.exitPowder()) + " exit)";
+			powder += " §8(" + Format.number(entry.corpsePowder()) + " corpses + " + Format.number(entry.exitPowder()) + " exit)";
 		}
 		detail.child(keyValue("Powder", powder));
-		if (!entry.campfiresAt().isEmpty()) detail.child(keyValue("Campfires", "§f" + entry.campfiresAt().size()));
+		if (campfires(entry) > 0) {
+			String colds = colds(entry);
+			detail.child(keyValue("Campfires", "§f" + campfires(entry) + (colds == null ? "" : " §7at " + colds)));
+		}
 		if (entry.coldAtExit() != null) detail.child(keyValue("Cold at exit", "§b" + entry.coldAtExit() + "❄"));
 
 		detail.child(section(lootTitle(entry.loots())));
@@ -561,13 +595,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			if (loot.gems() != null) {
 				List<Component> tooltip = new ArrayList<>();
 				tooltip.add(Component.literal("§fGemstones §7≈ " + fine(loot.gems().fine()) + " Fine"));
-				for (ItemCount part : loot.gems().parts()) tooltip.add(Component.literal("§7" + number(part.count()) + " " + part.item()));
+				for (ItemCount part : loot.gems().parts()) tooltip.add(Component.literal("§7" + Format.number(part.count()) + " " + part.item()));
 				// parts sorted, first = most common
 				grid.child(slot(loot.gems().parts().getFirst().item(), compact(loot.gems().fine()), tooltip));
 			}
 			for (ItemCount item : loot.items()) {
-				grid.child(slot(item.item(), number(item.count()),
-						List.of(Component.literal("§f" + item.item()), Component.literal("§7× " + number(item.count())))));
+				grid.child(slot(item.item(), Format.number(item.count()),
+						List.of(Component.literal("§f" + item.item()), Component.literal("§7× " + Format.number(item.count())))));
 			}
 			detail.child(grid);
 		}
@@ -576,7 +610,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		if (entry.gems() == null) {
 			detail.child(wrapped("§8None"));
 		} else {
-			detail.child(wrapped("§f≈" + decimal(entry.gems().fineEquivalent()) + " Fine " + entry.gems().gem()));
+			detail.child(wrapped("§f≈" + Format.decimal(entry.gems().fineEquivalent()) + " Fine " + entry.gems().gem()));
 			if (entry.pristineProcs() > 0) detail.child(wrapped("§8" + entry.pristineProcs() + " pristine procs"));
 		}
 		coinsSection(entry, value);
@@ -584,7 +618,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private void coinsSection(JournalEntry entry, ShaftValue value) {
 		boolean worth = value != null && !value.lines().isEmpty();
-		FlowLayout heading = section("Coins" + (worth ? " " + coins(value.net()) : ""));
+		FlowLayout heading = section("Coins" + (worth ? " " + CoinBreakdown.coins(value.net()) : ""));
 		detail.child(heading);
 		if (value == null) {
 			detail.child(wrapped("§8No prices yet. They load when you enter a shaft or open the journal."));
@@ -594,52 +628,80 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			detail.child(wrapped("§8Nothing worth coins"));
 			return;
 		}
+		MoneySettings settings = Surveyor.MONEY.settings();
+		boolean ironman = settings.isIronman();
 		for (Part part : Part.values()) {
 			List<Line> lines = value.lines().stream().filter(l -> l.part() == part).toList();
 			if (lines.isEmpty()) continue;
+			// ironman keys + campfires cost 0, show them as used
+			boolean used = ironman && (part == Part.KEYS || part == Part.CAMPFIRES);
 			boolean priced = lines.stream().anyMatch(l -> l.coins() != null);
 			List<Component> tooltip = new ArrayList<>();
 			tooltip.add(Component.literal("§f" + part.displayName()));
 			for (Line line : lines) {
 				tooltip.add(Component.literal("§7" + count(line) + " " + line.item() + "  "
-						+ (line.coins() == null ? "§8no price" : coins(line.coins()))));
+						+ (used ? "§8used" : line.coins() == null ? CoinBreakdown.noPrice(ironman) : CoinBreakdown.coins(line.coins()))));
 			}
-			FlowLayout row = tipRow(part.displayName(), priced ? coins(value.total(part)) : "§8no price", tooltip);
+			String total = used ? "§7" + Math.round(lines.stream().mapToDouble(Line::count).sum()) + " used"
+					: priced ? CoinBreakdown.coins(value.total(part)) : CoinBreakdown.noPrice(ironman);
+			FlowLayout row = tipRow(part.displayName(), total, tooltip);
 			// indented = breakdown of the net above
 			row.margins(Insets.left(INDENT));
 			detail.child(row);
 		}
-		MoneySettings settings = Surveyor.MONEY.settings();
-		List<Component> how = List.of(Component.literal("§fHow coins are counted"),
-				Component.literal("§7Gems as " + (settings.gemTier() == MoneySettings.GemTier.FINE ? "Fine" : "Flawless")),
-				Component.literal("§7Sold by " + (settings.sellPrice() == MoneySettings.SellPrice.INSTA_SELL ? "insta-sell" : "sell offer")
-						+ ", " + Setting.Number.format(settings.bazaarTax()) + "% Bazaar tax"),
-				Component.literal("§7Keys and campfires at insta-buy"),
-				Component.literal("§8Change it in Settings"));
+		List<Component> how = ironman
+				? List.of(Component.literal("§fHow coins are counted"),
+						Component.literal("§7Ironman: NPC sell prices"),
+						Component.literal("§7Gems as Fine"),
+						Component.literal("§7Keys and campfires cost nothing"),
+						Component.literal("§8Change it in Settings"))
+				: List.of(Component.literal("§fHow coins are counted"),
+						Component.literal("§7Gems as " + (settings.gemTier() == MoneySettings.GemTier.FINE ? "Fine" : "Flawless")),
+						Component.literal("§7Sold by " + (settings.sellPrice() == MoneySettings.SellPrice.INSTA_SELL ? "insta-sell" : "sell offer")
+								+ ", " + Setting.Number.format(settings.bazaarTax()) + "% Bazaar tax"),
+						Component.literal("§7Keys and campfires at insta-buy"),
+						Component.literal("§8Change it in Settings"));
 		withTooltip(heading, how);
 		int unpriced = value.unpriced().size();
-		if (unpriced > 0) detail.child(wrapped("§c" + unpriced + (unpriced == 1 ? " item has" : " items have") + " no price"));
+		if (unpriced > 0) detail.child(wrapped(CoinBreakdown.unpriced(unpriced, ironman)));
 		boolean saved = Surveyor.MONEY.usesSavedPrices(entry);
 		long end = entry.enteredAt() + entry.durationMillis();
 		detail.child(wrapped("§8" + (saved ? "Prices from " + day(end) + " " + clock(end) : "Today's prices")));
+	}
+
+	// cold at use, count for shafts from before 0.22.0 or when some werent used
+	private static String campfireCell(JournalEntry entry) {
+		int count = campfires(entry);
+		if (count == 0) return "§8-";
+		String colds = colds(entry);
+		if (colds == null) return "§f" + count;
+		return count > entry.campfireColds().size() ? "§f" + count + " §7at " + colds : colds;
+	}
+
+	// placed or used, whichever saw more
+	private static int campfires(JournalEntry entry) {
+		return Math.max(entry.campfiresAt().size(), entry.campfireColds() == null ? 0 : entry.campfireColds().size());
+	}
+
+	// null = no cold saved
+	private static String colds(JournalEntry entry) {
+		if (entry.campfireColds() == null) return null;
+		List<String> colds = entry.campfireColds().stream().map(c -> c == null ? "§8?" : "§b" + c + "❄").toList();
+		return colds.isEmpty() ? null : String.join("§7, ", colds);
 	}
 
 	private static FlowLayout tipRow(String key, String value, List<Component> tooltip) {
 		return withTooltip(keyValue(key, value), tooltip);
 	}
 
-	private static String coins(double coins) {
-		return CoinBreakdown.coins(coins);
-	}
-
 	private static String count(Line line) {
-		if (line.part() == Part.MINED) return "≈" + decimal(line.count());
-		return number(Math.round(line.count()));
+		if (line.part() == Part.MINED) return "≈" + Format.decimal(line.count());
+		return Format.number(Math.round(line.count()));
 	}
 
 	private static String lootTitle(List<CorpseLoot> loots) {
 		if (loots.isEmpty()) return "Corpse loot";
-		Map<String, Integer> byType = new java.util.LinkedHashMap<>();
+		Map<String, Integer> byType = new LinkedHashMap<>();
 		for (CorpseLoot loot : loots) byType.merge(loot.type(), 1, Integer::sum);
 		List<String> parts = new ArrayList<>();
 		byType.forEach((type, count) -> parts.add(count + " " + type));
@@ -724,14 +786,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 					row.child(switch (column.key()) {
 						case "date" -> byDay ? indented(column, "§7" + clock(session.start())) : cell(column, "§f" + day(session.start()));
 						case "start" -> cell(column, "§7" + clock(session.start()));
-						case "length" -> cell(column, "§f" + SummaryText.duration(session.lengthMillis()));
+						case "length" -> cell(column, "§f" + Format.duration(session.lengthMillis()));
 						case "shafts" -> cell(column, "§f" + session.shafts());
 						case "spawn" -> barCell(column, session.averageSearchMillis(), slowest);
-						case "rate" -> cell(column, rate == null ? "§8-" : "§f" + decimal(rate));
-						case "powder" -> cell(column, "§b" + number(session.powder()));
+						case "rate" -> cell(column, rate == null ? "§8-" : "§f" + Format.decimal(rate));
+						case "powder" -> cell(column, "§b" + Format.number(session.powder()));
 						case "coins" -> cell(column, coinText(sessionCoins.get(i)));
 						case "coinRate" -> cell(column, rateText(coinRates.get(i)));
-						default -> cell(column, "§9" + session.looted("Lapis"));
+						default -> cell(column, "§9" + session.looted(CorpseType.LAPIS.label()));
 					});
 				}
 				int index = i;
@@ -755,10 +817,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		for (Column column : columns) {
 			row.child(switch (column.key()) {
 				case "date" -> cell(column, "§f" + day(day.start()));
-				case "length" -> cell(column, "§f" + SummaryText.duration(day.millis()));
+				case "length" -> cell(column, "§f" + Format.duration(day.millis()));
 				case "shafts" -> cell(column, "§f" + day.shafts());
 				case "spawn" -> cell(column, "§7" + count + (count == 1 ? " session" : " sessions"));
-				case "powder" -> cell(column, "§b" + number(day.powder()));
+				case "powder" -> cell(column, "§b" + Format.number(day.powder()));
 				case "coins" -> cell(column, coinText(day.coins()));
 				case "coinRate" -> cell(column, dayRate(day));
 				default -> cell(column, "");
@@ -797,15 +859,21 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			return;
 		}
 		AllTime stats = JournalStats.allTime(rangeEntries);
-		MoneyStats money = MoneyStats.of(rangeEntries, rangeSessions, Surveyor.MONEY::value);
+		MoneyStats money = MoneyStats.of(rangeEntries, rangeSessions, Surveyor.MONEY::value, Surveyor.MONEY.settings().isIronman());
 
 		totals.child(coinsTotal(money, stats));
-		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
+		totals.child(keyValue("Powder", "§b" + Format.number(stats.powder())));
 		FlowLayout shafts = keyValue("Shafts", "§f" + stats.shafts());
 		shafts.margins(Insets.top(LINE_GAP));
 		totals.child(shafts);
 		totals.child(keyValue("Sessions", "§f" + stats.sessions()));
-		totals.child(keyValue("Time shafting", "§f" + SummaryText.duration(stats.timeMillis())));
+		totals.child(keyValue("Time shafting", "§f" + Format.duration(stats.timeMillis())));
+		JournalStats.Campfires campfires = JournalStats.campfires(rangeEntries);
+		if (campfires.placed() > 0) {
+			Double cold = campfires.averageCold();
+			totals.child(keyValue("Campfires", "§f" + campfires.placed()
+					+ (cold == null ? "" : " §7avg at §b" + Math.round(cold) + "❄")));
+		}
 		totals.child(section("Corpses looted"));
 		for (String type : stats.corpsesSeen().keySet()) {
 			totals.child(corpseRow(type, stats.looted().getOrDefault(type, 0), money, stats.drops().get(type)));
@@ -818,7 +886,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(record("Fastest session", fastestSession == null ? null : spawn(fastestSession.averageSearchMillis()) + " §7avg",
 				fastestSession == null ? null : () -> openSession(fastestSession), fastestSession == null ? null : sessionName(fastestSession)));
 		SessionSummary bestRate = stats.bestRate();
-		totals.child(record("Shafts / h", bestRate == null ? null : "§f" + decimal(bestRate.shaftsPerHour()),
+		totals.child(record("Shafts / h", bestRate == null ? null : "§f" + Format.decimal(bestRate.shaftsPerHour()),
 				bestRate == null ? null : () -> openSession(bestRate), bestRate == null ? null : sessionName(bestRate)));
 		SessionSummary mostShafts = stats.mostShafts();
 		totals.child(record("Shafts / session", mostShafts == null ? null : "§f" + mostShafts.shafts(),
@@ -827,16 +895,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		totals.child(record("Lapis / shaft", lapis == null ? null : "§9" + lapis.value(),
 				lapis == null ? null : () -> openShaft(lapis.entry()), lapis == null ? null : lapis.entry().shaftId()));
 		JournalStats.Best powder = stats.mostPowder();
-		totals.child(record("Powder / shaft", powder == null ? null : "§b" + number(powder.value()),
+		totals.child(record("Powder / shaft", powder == null ? null : "§b" + Format.number(powder.value()),
 				powder == null ? null : () -> openShaft(powder.entry()), powder == null ? null : powder.entry().shaftId()));
 		JournalEntry gems = stats.mostGems();
-		totals.child(record("Gems / shaft", gems == null ? null : "§f≈" + decimal(gems.gems().fineEquivalent()) + " Fine",
+		totals.child(record("Gems / shaft", gems == null ? null : "§f≈" + Format.decimal(gems.gems().fineEquivalent()) + " Fine",
 				gems == null ? null : () -> openShaft(gems), gems == null ? null : gems.shaftId()));
 		MoneyStats.Best richest = money.bestShaft();
-		totals.child(record("Coins / shaft", richest == null ? null : coins(richest.coins()),
+		totals.child(record("Coins / shaft", richest == null ? null : CoinBreakdown.coins(richest.coins()),
 				richest == null ? null : () -> openShaft(richest.entry()), richest == null ? null : richest.entry().shaftId()));
 		MoneyStats.BestRate coinRate = money.bestRate();
-		totals.child(record("Coins / h", coinRate == null ? null : coins(coinRate.perHour()),
+		totals.child(record("Coins / h", coinRate == null ? null : CoinBreakdown.coins(coinRate.perHour()),
 				coinRate == null ? null : () -> openSession(coinRate.session()), coinRate == null ? null : sessionName(coinRate.session())));
 		columns.child(scrollColumn(Sizing.fill(STATS_LEFT), totals));
 
@@ -844,18 +912,18 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		spawn.child(header("Spawn time"));
 		if (all) {
 			spawn.child(keyValue("All-time avg", stats.averageSearchMillis() == null ? "§8-"
-					: "§e" + SummaryText.duration(stats.averageSearchMillis())));
+					: "§e" + Format.duration(stats.averageSearchMillis())));
 			Long recent = JournalStats.recentAverage(sessions, RECENT_SESSIONS);
 			if (recent != null && stats.averageSearchMillis() != null && sessions.size() > RECENT_SESSIONS) {
 				spawn.child(keyValue("Last " + RECENT_SESSIONS + " sessions",
-						"§f" + SummaryText.duration(recent) + change(recent, stats.averageSearchMillis())));
+						"§f" + Format.duration(recent) + change(recent, stats.averageSearchMillis())));
 			}
 		} else {
 			Long average = stats.averageSearchMillis();
 			Long allTime = JournalStats.averageSearch(entries);
 			spawn.child(keyValue("Avg", average == null ? "§8-"
-					: "§e" + SummaryText.duration(average) + (allTime == null ? "" : change(average, allTime))));
-			spawn.child(keyValue("All-time avg", allTime == null ? "§8-" : "§f" + SummaryText.duration(allTime)));
+					: "§e" + Format.duration(average) + (allTime == null ? "" : change(average, allTime))));
+			spawn.child(keyValue("All-time avg", allTime == null ? "§8-" : "§f" + Format.duration(allTime)));
 		}
 		String legend = all ? "all-time avg" : "avg";
 		spawn.child(chartSection("Avg spawn per session", spawnChartType, step -> spawnChartType = spawnChartType.next(step)));
@@ -863,8 +931,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		spawn.child(section("Corpse % per shaft"));
 		for (String type : stats.corpsesSeen().keySet()) {
 			int with = stats.shaftsWithCorpse().getOrDefault(type, 0);
-			FlowLayout row = barRow(corpseColor(type) + type, with / (double) stats.shafts(),
-					Math.round(100.0 * with / stats.shafts()) + "%", corpseArgb(type));
+			FlowLayout row = barRow(CorpseType.color(type) + type, with / (double) stats.shafts(),
+					Math.round(100.0 * with / stats.shafts()) + "%", CorpseType.argb(type));
 			row.tooltip(List.of(Component.literal("§f" + type + " corpses"),
 					Component.literal("§7In " + with + " of " + stats.shafts() + " shafts"),
 					Component.literal("§7" + String.format(Locale.ROOT, "%.2f", stats.corpsesSeen().get(type) / (double) stats.shafts())
@@ -887,7 +955,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			List<Component> tooltip = new ArrayList<>();
 			tooltip.add(Component.literal("§f" + name + " shafts §7" + total));
 			type.getValue().forEach((variant, count) -> {
-				if (!variant.equals("L")) tooltip.add(Component.literal("§7" + capitalized(variantName(variant)) + " §f" + count));
+				if (!variant.equals(ShaftNames.LITTLEFOOT)) tooltip.add(Component.literal("§7" + capitalized(ShaftNames.variantName(variant)) + " §f" + count));
 			});
 			row.tooltip(tooltip);
 			odds.child(row);
@@ -908,10 +976,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 	private FlowLayout corpseRow(String type, int looted, MoneyStats money, JournalStats.Drops drops) {
 		MoneyStats.CorpseCoins corpse = money.corpses().get(type);
-		String value = corpseColor(type) + looted;
-		FlowLayout row = keyValue(type, corpse == null ? value : value + " §7(" + coins(corpse.each()) + " §7avg.)");
+		String value = CorpseType.color(type) + looted;
+		FlowLayout row = keyValue(type, corpse == null ? value : value + " §7(" + CoinBreakdown.coins(corpse.each()) + " §7avg.)");
 		if (corpse == null && drops == null) return row;
-		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, drops, tooltipHeight())));
+		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, drops, tooltipHeight(),
+				Surveyor.MONEY.settings().isIronman())));
 	}
 
 	// best avg first, bar = share of the coins all types made
@@ -921,14 +990,14 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		if (types.isEmpty()) return;
 		column.child(section("Avg coins per shaft"));
 		double made = types.stream().mapToDouble(e -> Math.max(0, e.getValue().coins())).sum();
-		int valueWidth = types.stream().mapToInt(e -> font.width(coins(e.getValue().each()))).max().orElse(0);
+		int valueWidth = types.stream().mapToInt(e -> font.width(CoinBreakdown.coins(e.getValue().each()))).max().orElse(0);
 		for (Map.Entry<String, MoneyStats.TypeCoins> type : types) {
 			String name = shaftNames.name(type.getKey());
 			Double share = made > 0 ? Math.max(0, type.getValue().coins()) / made : null;
-			FlowLayout row = barRow(name, share == null ? 0 : share, coins(type.getValue().each()),
+			FlowLayout row = barRow(name, share == null ? 0 : share, CoinBreakdown.coins(type.getValue().each()),
 					0xFF000000 | shaftNames.rgb(type.getKey()), valueWidth);
 			column.child(withTips(row, TooltipLines.of(CoinBreakdown.shaftType(name, type.getValue(), share,
-					v -> capitalized(variantName(v))))));
+					v -> capitalized(ShaftNames.variantName(v))))));
 		}
 	}
 
@@ -1009,8 +1078,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static String change(long now, long before) {
 		long difference = now - before;
 		return Math.abs(difference) < 1000 ? " §7(same)"
-				: difference < 0 ? " §7(§a" + SummaryText.duration(-difference) + " faster§7)"
-				: " §7(§c" + SummaryText.duration(difference) + " slower§7)";
+				: difference < 0 ? " §7(§a" + Format.duration(-difference) + " faster§7)"
+				: " §7(§c" + Format.duration(difference) + " slower§7)";
 	}
 
 	// room for the tooltip's own border
@@ -1059,10 +1128,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static String coinText(Double coins, String color) {
 		if (coins == null) return "§8-";
 		if (Math.round(coins) == 0) return "§80";
-		return color == null ? coins(coins) : color + Coins.signed(coins);
+		return color == null ? CoinBreakdown.coins(coins) : color + Coins.signed(coins);
 	}
-
-	private static final int RECENT_SESSIONS = 5;
 
 	private FlowLayout record(String key, String value, Runnable open, String target) {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
@@ -1092,13 +1159,6 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static String sessionName(SessionSummary session) {
 		return "session from " + day(session.start()) + " " + clock(session.start());
 	}
-
-	// seconds
-	private static final double[] SPAWN_STEPS = {5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
-	// 1, 2, 5 x 10^n coins
-	private static final double[] COIN_STEPS = coinSteps();
-	private static final int BAR_GOLD = 0xCCFFAA00;
-	private static final int BAR_RED = 0xCCFF5555;
 
 	private static double[] coinSteps() {
 		double[] steps = new double[3 * 13];
@@ -1133,8 +1193,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			if (rate == null) continue;
 			bars.add(new Bar(session, rate, Math.round(rate) < 0 ? BAR_RED : BAR_GOLD, List.of(
 					Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
-					Component.literal("§7Coins / h " + coins(rate)),
-					Component.literal("§7Coins " + coinText(coins) + " §7in " + SummaryText.duration(session.lengthMillis())),
+					Component.literal("§7Coins / h " + CoinBreakdown.coins(rate)),
+					Component.literal("§7Coins " + coinText(coins) + " §7in " + Format.duration(session.lengthMillis())),
 					Component.literal("§7Shafts §f" + session.shafts()),
 					Component.literal("§8Click to open"))));
 		}
@@ -1315,11 +1375,6 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return row;
 	}
 
-	// table padding + row padding + scrollbar
-	private static final int TABLE_CHROME = 10 + 4 + 4;
-
-	private static final int COLUMN_GAP = 6;
-
 	private static List<Column> fit(List<Column> columns, int available) {
 		List<Column> visible = new ArrayList<>(columns);
 		while (visible.stream().mapToInt(Column::width).sum() + COLUMN_GAP * (visible.size() - 1) > available) {
@@ -1391,7 +1446,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			cell.child(label("§8-"));
 			return cell;
 		}
-		LabelComponent text = label("§f" + SummaryText.duration(millis));
+		LabelComponent text = label("§f" + Format.duration(millis));
 		text.horizontalSizing(Sizing.fixed(column.width() - SPAWN_BAR - 3));
 		cell.child(text);
 		int barMax = SPAWN_BAR + column.extra();
@@ -1482,39 +1537,10 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<String> parts = new ArrayList<>();
 		for (Map.Entry<String, CorpseCount> e : JournalStats.corpses(entry).entrySet()) {
 			CorpseCount count = e.getValue();
-			String color = count.looted() > 0 ? corpseColor(e.getKey()) : "§8";
+			String color = count.looted() > 0 ? CorpseType.color(e.getKey()) : "§8";
 			parts.add(color + count.looted() + "/" + count.total() + " " + e.getKey().charAt(0));
 		}
 		return parts.isEmpty() ? "§8-" : String.join(" ", parts);
-	}
-
-	private static String corpseColor(String type) {
-		return switch (type) {
-			case "Lapis" -> "§9";
-			case "Umber" -> "§6";
-			case "Tungsten" -> "§7";
-			case "Vanguard" -> "§b";
-			default -> "§f";
-		};
-	}
-
-	private static int corpseArgb(String type) {
-		return switch (type) {
-			case "Lapis" -> 0xFF5555FF;
-			case "Umber" -> 0xFFFFAA00;
-			case "Tungsten" -> 0xFFAAAAAA;
-			case "Vanguard" -> 0xFF55FFFF;
-			default -> 0xFFFFFFFF;
-		};
-	}
-
-	private static String variantName(String variant) {
-		return switch (variant) {
-			case "1" -> "type 1";
-			case "2" -> "type 2";
-			case "C" -> "crystal";
-			default -> "_" + variant;
-		};
 	}
 
 	private static String capitalized(String text) {
@@ -1522,14 +1548,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static String spawn(Long millis) {
-		return millis == null ? "§8-" : "§a" + SummaryText.duration(millis);
+		return millis == null ? "§8-" : "§a" + Format.duration(millis);
 	}
-
-	private static final ZoneId ZONE = ZoneId.systemDefault();
-	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
-	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
-	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
-	private static final DateTimeFormatter DAY_YEAR = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.ENGLISH);
 
 	private static String clock(long millis) {
 		return CLOCK.format(Instant.ofEpochMilli(millis).atZone(ZONE));
@@ -1560,11 +1580,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	// room left for the date: top bar minus its items, gaps, back and the < > arrows
-	private int navRoom(List<UIComponent> items, ButtonComponent back) {
+	// backWidth 0 = no back button
+	private int navRoom(List<UIComponent> items, int backWidth) {
 		// nav is one more bar item
 		int used = 2 * PADDING + 2 * BAR_PADDING + BAR_GAP * items.size() + 2 * ARROW_WIDTH + 2 * BAR_GAP;
 		for (UIComponent item : items) used += fixedWidth(item);
-		if (back != null) used += fixedWidth(back) + BAR_GAP;
+		if (backWidth > 0) used += backWidth + BAR_GAP;
 		return width - used;
 	}
 
@@ -1574,20 +1595,12 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return component.horizontalSizing().get().value + margins.left() + margins.right();
 	}
 
-	private static String number(long value) {
-		return SummaryText.number(value);
-	}
-
-	private static String decimal(double value) {
-		return SummaryText.decimal(value);
-	}
-
 	private static String fine(double value) {
-		return value > 0 && value < 0.05 ? "<0.1" : decimal(value);
+		return value > 0 && value < 0.05 ? "<0.1" : Format.decimal(value);
 	}
 
 	private static String compact(double value) {
-		if (value >= 9.95 || value == Math.rint(value)) return number(Math.round(value));
+		if (value >= 9.95 || value == Math.rint(value)) return Format.number(Math.round(value));
 		return fine(value);
 	}
 }

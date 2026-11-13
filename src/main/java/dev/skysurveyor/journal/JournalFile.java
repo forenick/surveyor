@@ -2,6 +2,9 @@ package dev.skysurveyor.journal;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,7 +58,9 @@ public final class JournalFile {
 		io.execute(() -> {
 			try {
 				Files.createDirectories(file.getParent());
-				Files.writeString(file, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+				// cut off write left no newline, dont glue onto it
+				String text = endsMidLine() ? "\n" + line : line;
+				Files.writeString(file, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 			} catch (IOException e) {
 				LOGGER.error("Could not write to {}", file, e);
 			}
@@ -74,7 +79,8 @@ public final class JournalFile {
 	List<JournalEntry> read() throws IOException {
 		List<JournalEntry> entries = new ArrayList<>();
 		if (!Files.exists(file)) return entries;
-		try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+		// replaces bad utf-8, newBufferedReader throws and one cut off char would hide every line
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8))) {
 			String line;
 			int number = 0;
 			while ((line = reader.readLine()) != null) {
@@ -83,13 +89,36 @@ public final class JournalFile {
 				try {
 					JournalEntry entry = gson.fromJson(line, JournalEntry.class);
 					// "null" parses to null
-					if (entry != null) entries.add(entry);
-					else LOGGER.warn("Skipping empty line {} of {}", number, file);
+					if (entry == null) LOGGER.warn("Skipping empty line {} of {}", number, file);
+					// f.e. {} from a hand edit, line stays in the file
+					else if (!complete(entry)) LOGGER.warn("Skipping line {} of {}: fields missing", number, file);
+					else entries.add(entry);
 				} catch (JsonParseException e) {
 					LOGGER.warn("Skipping unreadable line {} of {}: {}", number, file, e.getMessage());
 				}
 			}
 		}
 		return entries;
+	}
+
+	// in every entry since 0.2.x, null = npe in hud and stats
+	private static boolean complete(JournalEntry entry) {
+		return entry.exit() != null && entry.corpses() != null && entry.loots() != null && entry.mayhemBuffs() != null
+				&& entry.campfiresAt() != null && entry.pristineItems() != null && entry.sacksAdded() != null
+				&& entry.sacksRemoved() != null;
+	}
+
+	// cant tell = true, a blank line is skipped on read
+	private boolean endsMidLine() {
+		if (!Files.exists(file)) return false;
+		try (SeekableByteChannel channel = Files.newByteChannel(file, StandardOpenOption.READ)) {
+			long size = channel.size();
+			if (size == 0) return false;
+			ByteBuffer last = ByteBuffer.allocate(1);
+			channel.position(size - 1);
+			return channel.read(last) != 1 || last.get(0) != '\n';
+		} catch (IOException e) {
+			return true;
+		}
 	}
 }

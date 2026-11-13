@@ -3,6 +3,7 @@ package dev.skysurveyor;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -34,6 +35,7 @@ import dev.skysurveyor.money.LiveMoney;
 import dev.skysurveyor.recorder.ShaftRecorder;
 import dev.skysurveyor.screen.JournalScreen;
 import dev.skysurveyor.screen.SettingsScreen;
+import dev.skysurveyor.settings.LiveSettings;
 import dev.skysurveyor.util.DataFolder;
 
 /**
@@ -54,13 +56,12 @@ public class Surveyor implements ClientModInitializer {
 
 	public static final ShaftRecorder RECORDER = new ShaftRecorder();
 	public static final LiveTracker TRACKER = new LiveTracker();
-	public static final LiveMoney MONEY = new LiveMoney();
-	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea, MONEY);
-	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL, MONEY);
+	public static final LiveSettings SETTINGS = new LiveSettings();
+	public static final LiveMoney MONEY = new LiveMoney(SETTINGS);
+	public static final LiveJournal JOURNAL = new LiveJournal(TRACKER::inMiningArea, MONEY, SETTINGS);
+	public static final LiveHud HUD = new LiveHud(TRACKER, JOURNAL, MONEY, SETTINGS);
 
-	private final ShaftRecorder recorder = RECORDER;
-
-	// unbound, only opens our own screen
+	// unbound, only opens our own screen. old key name on purpose, options.txt saves by name
 	private static final KeyMapping JOURNAL_KEY = new KeyMapping("key.shaftjournal.journal", InputConstants.Type.KEYSYM,
 			InputConstants.UNKNOWN.getValue(), KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main")));
 
@@ -71,30 +72,36 @@ public class Surveyor implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		moveOldDataFolder();
-		ClientTickEvents.END_CLIENT_TICK.register(recorder::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(RECORDER::onTick);
 		ClientTickEvents.END_CLIENT_TICK.register(TRACKER::onTick);
 		KeyMappingHelper.registerKeyMapping(JOURNAL_KEY);
 		ClientTickEvents.END_CLIENT_TICK.register(this::openJournalIfAsked);
-		ClientLifecycleEvents.CLIENT_STARTED.register(client -> MONEY.start(DataFolder.in(client.gameDirectory.toPath()), modVersion()));
+		ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+			Path folder = DataFolder.in(client.gameDirectory.toPath());
+			// moneys io thread, config saves + reloads stay in order w/ price refreshes
+			SETTINGS.start(folder, MONEY::run);
+			MONEY.start(folder, Objects.requireNonNullElse(modVersion(), "dev"));
+		});
 		ClientLifecycleEvents.CLIENT_STARTED.register(JOURNAL::start);
 		ClientLifecycleEvents.CLIENT_STARTED.register(HUD::start);
 		ClientTickEvents.END_CLIENT_TICK.register(HUD::onTick);
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(MOD_ID, "hud"), HUD::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
-			recorder.stop();
+			RECORDER.stop();
 			// before journal.close, else the shaft ur in is lost
 			TRACKER.onQuit();
 			JOURNAL.close();
 			HUD.close();
 			MONEY.close();
 		});
+		JOURNAL.onToast(HUD::showToast);
 		TRACKER.addListener(JOURNAL::onEvent);
 		TRACKER.addListener(MONEY::onEvent);
 		// own hits only, PASS = never changes the hit
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
 			if (level.isClientSide()) {
 				JOURNAL.onBlockHit();
-				recorder.onBlockHit(pos);
+				RECORDER.onBlockHit(pos);
 			}
 			return InteractionResult.PASS;
 		});
@@ -151,14 +158,14 @@ public class Surveyor implements ClientModInitializer {
 		client.gui.setScreen(settings ? new SettingsScreen(journal) : journal);
 	}
 
-	private static String modVersion() {
+	public static String modVersion() {
 		return FabricLoader.getInstance().getModContainer(MOD_ID)
-				.map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("dev");
+				.map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse(null);
 	}
 
 	private int startRecording(CommandContext<FabricClientCommandSource> context) {
 		try {
-			Path file = recorder.start(context.getSource().getClient());
+			Path file = RECORDER.start(context.getSource().getClient());
 			context.getSource().sendFeedback(Component.literal("§a[Surveyor] Recording to " + file.getFileName()));
 		} catch (IOException e) {
 			context.getSource().sendError(Component.literal("[Surveyor] Could not start recording: " + e.getMessage()));
@@ -167,7 +174,7 @@ public class Surveyor implements ClientModInitializer {
 	}
 
 	private int stopRecording(CommandContext<FabricClientCommandSource> context) {
-		Path file = recorder.stop();
+		Path file = RECORDER.stop();
 		context.getSource().sendFeedback(Component.literal(file == null
 				? "§e[Surveyor] Not recording."
 				: "§a[Surveyor] Saved " + file.toAbsolutePath()));
@@ -181,11 +188,11 @@ public class Surveyor implements ClientModInitializer {
 	}
 
 	private int mark(CommandContext<FabricClientCommandSource> context) {
-		if (!recorder.isRecording()) {
+		if (!RECORDER.isRecording()) {
 			context.getSource().sendError(Component.literal("[Surveyor] Not recording."));
 			return 0;
 		}
-		recorder.mark(StringArgumentType.getString(context, "note"));
+		RECORDER.mark(StringArgumentType.getString(context, "note"));
 		context.getSource().sendFeedback(Component.literal("§7[Surveyor] Marked."));
 		return 1;
 	}

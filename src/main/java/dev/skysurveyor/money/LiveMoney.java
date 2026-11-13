@@ -3,7 +3,6 @@ package dev.skysurveyor.money;
 import java.nio.file.Path;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -13,10 +12,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import dev.skysurveyor.detection.Shaft;
 import dev.skysurveyor.detection.ShaftEvent;
-import dev.skysurveyor.detection.ShaftId;
 import dev.skysurveyor.detection.TextPatterns;
 import dev.skysurveyor.journal.JournalEntry;
-import dev.skysurveyor.money.MoneySettings.OldShafts;
+import dev.skysurveyor.settings.LiveSettings;
+import dev.skysurveyor.settings.MoneySettings;
+import dev.skysurveyor.settings.MoneySettings.OldShafts;
 
 // prices refresh on shaft entry + journal open, not on a timer, so no traffic when not shafting
 public final class LiveMoney {
@@ -24,8 +24,6 @@ public final class LiveMoney {
 	static final long SNAPSHOT_MAX_AGE = 60 * 60_000L;
 	public static final long BAZAAR_MAX_AGE = PriceFeed.BAZAAR_MAX_AGE;
 	public static final long BINS_MAX_AGE = PriceFeed.BINS_MAX_AGE;
-	// journal groups sessions by day, nicks pick (2026-11-12)
-	public static final boolean BY_DAY_DEFAULT = true;
 
 	private final ExecutorService io = Executors.newSingleThreadExecutor(task -> {
 		Thread thread = new Thread(task, "Surveyor prices");
@@ -34,21 +32,28 @@ public final class LiveMoney {
 	});
 	private final AtomicBoolean refreshing = new AtomicBoolean();
 	private final AtomicInteger changes = new AtomicInteger();
+	private final LiveSettings config;
 	private PriceFeed feed;
-	private MoneyConfig config;
 	// client thread only, saved entries only (live ones would pile up). cleared when changes() moves
 	private final Map<JournalEntry, ShaftValue> values = new IdentityHashMap<>();
 	private int valuesAt = -1;
 	// client thread only, live value until the shaft or prices change
 	private Shaft liveShaft;
 	private int liveVersion;
-	private ShaftId liveId;
 	private int liveAt = -1;
 	private ShaftValue liveValue;
 
+	public LiveMoney(LiveSettings config) {
+		this.config = config;
+		// page changes, a hand edit is seen by refresh()
+		config.onChange((before, after) -> {
+			if (!after.money().equals(before.money())) changes.incrementAndGet();
+		});
+	}
+
+	// after config.start, its file loads on this io thread
 	public void start(Path folder, String version) {
 		feed = new PriceFeed(folder, version);
-		config = new MoneyConfig(folder);
 		run(() -> {
 			config.reloadIfChanged();
 			feed.loadCache();
@@ -60,12 +65,12 @@ public final class LiveMoney {
 		if (feed == null || !refreshing.compareAndSet(false, true)) return;
 		run(() -> {
 			try {
-				MoneySettings settings = config.settings();
+				MoneySettings settings = settings();
 				PriceBook book = feed.book();
 				config.reloadIfChanged();
 				long now = System.currentTimeMillis();
 				if (feed.stale(now)) feed.fetchStale(now);
-				if (!config.settings().equals(settings) || feed.book() != book) changes.incrementAndGet();
+				if (!settings().equals(settings) || feed.book() != book) changes.incrementAndGet();
 			} finally {
 				refreshing.set(false);
 			}
@@ -81,38 +86,12 @@ public final class LiveMoney {
 		return changes.get();
 	}
 
-	// journal setting, lives in config.json too
-	public boolean byDay() {
-		return config == null ? BY_DAY_DEFAULT : config.byDay();
-	}
-
-	public void setByDay(boolean value) {
-		if (config == null) return;
-		config.byDay(value);
-		run(() -> config.saveByDay(value));
-	}
-
-	// settings page, saved on the io thread
-	public void setSettings(MoneySettings value) {
-		if (config == null) return;
-		MoneySettings before = config.settings();
-		if (value.equals(before)) return;
-		config.settings(value);
-		changes.incrementAndGet();
-		run(() -> config.saveMoney(before, value));
-	}
-
-	// null = saved fine
-	public String saveError() {
-		return config == null ? null : config.saveError();
-	}
-
 	public boolean refreshing() {
 		return refreshing.get();
 	}
 
 	public MoneySettings settings() {
-		return config == null ? MoneySettings.DEFAULTS : config.settings();
+		return config.get().money();
 	}
 
 	public PriceBook book() {
@@ -150,11 +129,10 @@ public final class LiveMoney {
 	// shaft still going, todays prices
 	public ShaftValue live(Shaft shaft) {
 		int now = changes.get();
-		if (shaft != liveShaft || shaft.version() != liveVersion || !Objects.equals(shaft.id(), liveId) || now != liveAt) {
+		if (shaft != liveShaft || shaft.version() != liveVersion || now != liveAt) {
 			liveValue = compute(JournalEntry.of(shaft, 0, null, TextPatterns.defaults()));
 			liveShaft = shaft;
 			liveVersion = shaft.version();
-			liveId = shaft.id();
 			liveAt = now;
 		}
 		return liveValue;
@@ -190,7 +168,8 @@ public final class LiveMoney {
 		}
 	}
 
-	private void run(Runnable task) {
+	// config saves queue here too, behind a price fetch
+	public void run(Runnable task) {
 		try {
 			io.execute(task);
 		} catch (RejectedExecutionException e) {

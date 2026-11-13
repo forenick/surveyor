@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -48,12 +49,16 @@ import net.minecraft.util.Util;
 import org.joml.Vector2i;
 import org.lwjgl.glfw.GLFW;
 
+import dev.skysurveyor.Surveyor;
 import dev.skysurveyor.hud.HudLayout.Align;
 import dev.skysurveyor.hud.HudLayout.Anchor;
 import dev.skysurveyor.hud.HudLayout.Background;
 import dev.skysurveyor.hud.HudLayout.Box;
 import dev.skysurveyor.hud.HudLayout.Line;
+import dev.skysurveyor.journal.ToastText;
+import dev.skysurveyor.screen.PackButton;
 import dev.skysurveyor.screen.SafeLabel;
+import dev.skysurveyor.settings.SummarySettings;
 
 public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	// opaque, boxes behind it bled through the text
@@ -147,6 +152,8 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private final Screen parent;
 	private final LiveHud hud;
 	private final Map<Box, HudRenderer.Bounds> drawn = new IdentityHashMap<>();
+	// one instance till its moved, drawn is by identity
+	private Box defaultToast;
 	private FlowLayout root;
 	private FlowLayout toolbar;
 	private LabelComponent toolbarTitle;
@@ -166,7 +173,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private final List<TextBoxComponent> homeFields = new ArrayList<>();
 	private Box panelBox;
 	private final List<FlowLayout> lineRows = new ArrayList<>();
-	private final List<List<UIComponent>> lineHandles = new ArrayList<>();
+	private final List<UIComponent> lineHandles = new ArrayList<>();
 	private int lineDrag = -1;
 	private int lineGap;
 	private boolean mouseHeld;
@@ -302,6 +309,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			if (!hud.visible(box)) drawHidden(graphics, bounds);
 			graphics.outline(bounds.x() - 1, bounds.y() - 1, bounds.width() + 2, bounds.height() + 2,
 					box == selected ? OUTLINE_SELECTED : OUTLINE);
+		}
+		Box toast = toastBox();
+		if (toast != null) {
+			ToastText example = ToastText.example();
+			ToastRenderer.Size size = ToastRenderer.size(font, example, toastStyle());
+			HudRenderer.Bounds bounds = ToastRenderer.bounds(size, toast, width, height);
+			drawn.put(toast, bounds);
+			ToastRenderer.draw(graphics, font, example, toastStyle(), size, toast, bounds, 1);
+			graphics.outline(bounds.x() - 1, bounds.y() - 1, bounds.width() + 2, bounds.height() + 2,
+					toast == selected ? OUTLINE_SELECTED : OUTLINE);
 		}
 		for (HudSnap.Guide guide : guides) {
 			graphics.fill(guide.x(), guide.y(), guide.x() + guide.width(), guide.y() + guide.height(), GUIDE);
@@ -458,6 +475,16 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			HudRenderer.Bounds bounds = drawn.get(box);
 			if (bounds != null && bounds.contains(click.x(), click.y())) hit = box;
 		}
+		Box toast = toastBox();
+		HudRenderer.Bounds toastBounds = toast == null ? null : drawn.get(toast);
+		if (toastBounds != null && toastBounds.contains(click.x(), click.y())) {
+			// never moved = default spot, becomes a real one now
+			if (hud.layout().toast == null) {
+				hud.layout().toast = toast;
+				defaultToast = null;
+			}
+			hit = toast;
+		}
 		if (hit != selected) scrollLeft = 0;
 		selected = hit;
 		if (hit != null) {
@@ -559,7 +586,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			int dy = key.isUp() ? -step : key.isDown() ? step : 0;
 			if (dx != 0 || dy != 0) {
 				// measured now, key repeat beats frame rate
-				HudRenderer.Bounds bounds = HudRenderer.bounds(font, selected, lines(selected), width, height);
+				HudRenderer.Bounds bounds = boundsOf(selected);
 				int x = Anchor.clamp(bounds.x() + dx, bounds.width(), width);
 				int y = Anchor.clamp(bounds.y() + dy, bounds.height(), height);
 				selected.offsetX = selected.anchorX.offset(x, bounds.width(), width);
@@ -614,7 +641,10 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 				return;
 			}
 			armReset(false);
-			hud.setLayout(HudLayout.defaults());
+			HudLayout reset = HudLayout.defaults();
+			// boxes only, toast spot stays
+			reset.toast = hud.layout().toast;
+			hud.setLayout(reset);
 			// set here so it doesnt look like a late file load
 			shownLayout = hud.layout();
 			selected = null;
@@ -778,6 +808,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		for (Box box : layout.boxes) {
 			if (box.id.equals(selectedId)) selected = box;
 		}
+		if (HudLayout.TOAST_ID.equals(selectedId)) selected = layout.toast;
 		// lines moved, the index may point at another line now
 		if (selected != null && !lineValues(selected).equals(lineValues)) editedIndex = -1;
 		dragging = null;
@@ -786,6 +817,34 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		if (resetArmed) armReset(false);
 		rebuildPanel();
 		hud.save();
+	}
+
+	// null = toast isnt movable, nothing to place
+	private Box toastBox() {
+		if (!Surveyor.SETTINGS.get().summary().movableToast()) return null;
+		if (hud.layout().toast != null) return hud.layout().toast;
+		if (defaultToast == null) defaultToast = HudLayout.defaultToast();
+		return defaultToast;
+	}
+
+	private static SummarySettings.Style toastStyle() {
+		return Surveyor.SETTINGS.get().summary().style();
+	}
+
+	private HudRenderer.Bounds boundsOf(Box box) {
+		if (HudLayout.TOAST_ID.equals(box.id)) return ToastRenderer.bounds(font, ToastText.example(), toastStyle(), box, width, height);
+		return HudRenderer.bounds(font, box, lines(box), width, height);
+	}
+
+	private void buildToastPage() {
+		panel.child(label("§fShaft toast"));
+		LabelComponent what = label("§7Shows for a few seconds when you leave a shaft. Drag it to move it, scroll on it to resize it.");
+		what.horizontalSizing(Sizing.fixed(inner()));
+		panel.child(what);
+		LabelComponent where = label("§7Style, time and Top right or Movable are in Settings, Journal.");
+		where.horizontalSizing(Sizing.fixed(inner()));
+		where.margins(Insets.top(4));
+		panel.child(where);
 	}
 
 	private List<String> lines(Box box) {
@@ -1050,10 +1109,11 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		panelScroll.scrollbarThiccness(2);
 		panelScroll.offset(scrollMemory.getOrDefault(panelKey, 0.0));
 		// measured now, after undo the box wasnt drawn yet
-		HudRenderer.Bounds bounds = HudRenderer.bounds(font, box, lines(box), width, height);
+		HudRenderer.Bounds bounds = boundsOf(box);
 		boolean boxOnRight = bounds.x() + bounds.width() / 2 > width / 2;
 		panelScroll.positioning(Positioning.relative(boxOnRight ? 0 : 100, 100));
-		if (picking) buildPicker(box);
+		if (box == hud.layout().toast) buildToastPage();
+		else if (picking) buildPicker(box);
 		else if (editedIndex >= 0) buildLinePage(box, editedIndex);
 		else buildBoxPage(box);
 		// after the content, owo lays out right away and would clamp the offset to 0
@@ -1244,7 +1304,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 			return true;
 		});
 		lineRows.add(row);
-		lineHandles.add(List.of(grip));
+		lineHandles.add(grip);
 		return row;
 	}
 
@@ -1656,9 +1716,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		// rows scrolled out of view keep their bounds, under the toolbar on narrow screens
 		if (!inPanel(x, y)) return -1;
 		for (int i = 0; i < lineHandles.size(); i++) {
-			for (UIComponent handle : lineHandles.get(i)) {
-				if (handle.isInBoundingBox(x, y)) return i;
-			}
+			if (lineHandles.get(i).isInBoundingBox(x, y)) return i;
 		}
 		return -1;
 	}
@@ -1671,7 +1729,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		button.verticalSizing(Sizing.fixed(CHOICE));
 		button.horizontalSizing(Sizing.fixed(4 + 8 + 3 + font.width(text) + 4));
 		button.renderer((graphics, b, delta) -> {
-			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
+			PackButton.RENDERER.draw(graphics, b, delta);
 			int x = b.getX() + 4;
 			int y = b.getY() + (b.getHeight() - 8) / 2;
 			graphics.fill(x - 1, y - 1, x + 9, y + 9, 0xFF000000);
@@ -1821,7 +1879,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return flow;
 	}
 
-	private FlowLayout row(String name, io.wispforest.owo.ui.core.UIComponent... children) {
+	private FlowLayout row(String name, UIComponent... children) {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		row.gap(2);
 		row.verticalAlignment(VerticalAlignment.CENTER);
@@ -1873,7 +1931,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent button = drawnButton(redo ? "Redo" : "Undo", action);
 		button.horizontalSizing(Sizing.fixed(BUTTON + 4));
 		button.renderer((graphics, b, delta) -> {
-			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
+			PackButton.RENDERER.draw(graphics, b, delta);
 			drawIcon(graphics, UNDO_ICON, b.getX() + (b.getWidth() - 8) / 2, b.getY() + (b.getHeight() - UNDO_ICON.length) / 2,
 					redo, b.isActive() ? 0xFFFFFFFF : 0xFF707070);
 		});
@@ -1897,7 +1955,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		ButtonComponent button = drawnButton(text.isEmpty() ? name : text, action);
 		button.horizontalSizing(Sizing.fixed(text.isEmpty() ? CHOICE + 2 : 5 + 8 + 4 + font.width(text) + 5));
 		button.renderer((graphics, b, delta) -> {
-			ButtonComponent.Renderer.VANILLA.draw(graphics, b, delta);
+			PackButton.RENDERER.draw(graphics, b, delta);
 			int x = text.isEmpty() ? b.getX() + (b.getWidth() - 8) / 2 : b.getX() + 5;
 			icon.draw(graphics, x, b.getY(), b.getHeight());
 			if (!text.isEmpty()) graphics.text(font, text, x + 12, b.getY() + (b.getHeight() - 8) / 2, 0xFFFFFFFF, true);
@@ -1920,7 +1978,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static ButtonComponent button(String text, Consumer<ButtonComponent> action) {
-		ButtonComponent button = UIComponents.button(Component.literal(text), action);
+		ButtonComponent button = PackButton.button(Component.literal(text), action);
 		button.horizontalSizing(Sizing.content(4));
 		button.verticalSizing(Sizing.fixed(BUTTON));
 		return button;
@@ -1934,7 +1992,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 		return button;
 	}
 
-	private static final class DrawnButton extends ButtonComponent {
+	private static final class DrawnButton extends PackButton {
 		private final String name;
 
 		DrawnButton(String name, Consumer<ButtonComponent> action) {
@@ -1963,7 +2021,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static String name(Enum<?> option) {
-		String lower = option.name().toLowerCase(java.util.Locale.ROOT);
+		String lower = option.name().toLowerCase(Locale.ROOT);
 		return option == Align.CENTER ? "Centre" : Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
 	}
 }

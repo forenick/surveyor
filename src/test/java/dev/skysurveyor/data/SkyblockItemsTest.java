@@ -1,4 +1,4 @@
-package dev.skysurveyor.screen;
+package dev.skysurveyor.data;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import dev.skysurveyor.screen.SkyblockItems.Info;
+import dev.skysurveyor.data.SkyblockItems.Info;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

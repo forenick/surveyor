@@ -2,10 +2,10 @@ package dev.skysurveyor.money;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import dev.skysurveyor.journal.EntryBuilder;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.SessionSummary;
@@ -17,8 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 // made up spawns and coins
 class ChartTipsTest {
 	private static JournalEntry entry(long session, long entered, long search) {
-		return new JournalEntry(JournalEntry.VERSION, session, "JADE_1", entered, 60_000, "BYE", 0, search, List.of(), 0,
-				List.of(), List.of(), List.of(), null, 0, 0, Map.of(), Map.of(), Map.of(), null, List.of(), Map.of(), null);
+		return EntryBuilder.entry().sessionId(session).enteredAt(entered).searchMillis(search).build();
 	}
 
 	@Test

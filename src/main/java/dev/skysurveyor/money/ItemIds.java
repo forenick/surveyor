@@ -9,8 +9,8 @@ import java.util.function.Function;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import dev.skysurveyor.data.SkyblockItems;
 import dev.skysurveyor.detection.TextPatterns;
-import dev.skysurveyor.screen.SkyblockItems;
 
 // chat item name -> skyblock id. skyblock_items.txt first, then hypixels item list
 public final class ItemIds {

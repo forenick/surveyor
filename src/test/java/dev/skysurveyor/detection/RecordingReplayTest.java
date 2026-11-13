@@ -34,6 +34,8 @@ class RecordingReplayTest {
 		assertEquals(0, jasper.exitPowder());
 		assertEquals(1, jasper.campfiresPlaced().size());
 		assertEquals(936, jasper.campfiresPlaced().get(0) / 1000);
+		// placed at -94 cold, went to -44 (research/05)
+		assertEquals(List.of(-94), jasper.campfireColds());
 		assertEquals(List.of("Mining Speed"), jasper.mayhemBuffs());
 		assertEquals(682, jasper.pristineProcs());
 		assertEquals(28_876, jasper.pristineItems().get("Flawed Jasper Gemstone"));

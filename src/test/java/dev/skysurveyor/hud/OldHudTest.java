@@ -26,6 +26,8 @@ class OldHudTest {
 			JsonObject old = JsonParser.parseString(json).getAsJsonObject();
 			JsonObject now = JsonParser.parseString(HudLayout.fromJson(json).toJson()).getAsJsonObject();
 			OldSaves.assertKept(old.get("boxes"), now.get("boxes"), "boxes", CONVERTED);
+			// moved toast spot, 0.22.0+
+			if (old.has("toast")) OldSaves.assertKept(old.get("toast"), now.get("toast"), "toast", CONVERTED);
 		}));
 	}
 

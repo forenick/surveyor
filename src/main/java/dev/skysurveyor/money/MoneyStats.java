@@ -13,9 +13,9 @@ import dev.skysurveyor.money.ShaftValue.CorpseValue;
 import dev.skysurveyor.money.ShaftValue.Part;
 
 // values null = no prices at all yet
-// parts = all-time total per part, in Part order, items = the same per item
+// parts = all-time total per part, in Part order, items = the same per item. ironman = only npc prices, for the wording
 public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<String, CorpseCoins> corpses, Best bestShaft,
-		BestRate bestRate, Map<Part, Map<String, ItemCoins>> items, Map<String, TypeCoins> types) {
+		BestRate bestRate, Map<Part, Map<String, ItemCoins>> items, Map<String, TypeCoins> types, boolean ironman) {
 	public record CorpseCoins(int corpses, double loot, double keys, int unpriced, Map<String, ItemCoins> items) {
 		public double net() {
 			return loot + keys;
@@ -78,7 +78,7 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 	}
 
 	public static MoneyStats of(List<JournalEntry> entries, List<SessionSummary> sessions,
-			Function<JournalEntry, ShaftValue> values) {
+			Function<JournalEntry, ShaftValue> values, boolean ironman) {
 		Double coins = null;
 		int valued = 0;
 		Map<Part, Double> parts = new EnumMap<>(Part.class);
@@ -104,8 +104,8 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 								had.unpriced() + corpse.unpriced(), loot));
 			}
 			if (!value.lines().isEmpty() && (best == null || value.net() > best.coins())) best = new Best(entry, value.net());
-			String type = JournalStats.type(entry);
-			if (type != null) types.put(type, plus(types.get(type), JournalStats.variant(entry), value));
+			String type = entry.shaftType();
+			if (type != null) types.put(type, plus(types.get(type), entry.variant(), value));
 		}
 		BestRate bestRate = null;
 		for (SessionSummary session : sessions) {
@@ -113,7 +113,7 @@ public record MoneyStats(Double coins, int valued, Map<Part, Double> parts, Map<
 			Double rate = perHour(session, values);
 			if (rate != null && (bestRate == null || rate > bestRate.perHour())) bestRate = new BestRate(session, rate);
 		}
-		return new MoneyStats(coins, valued, parts, corpses, best, bestRate, items, types);
+		return new MoneyStats(coins, valued, parts, corpses, best, bestRate, items, types, ironman);
 	}
 
 	private static TypeCoins plus(TypeCoins had, String variant, ShaftValue value) {

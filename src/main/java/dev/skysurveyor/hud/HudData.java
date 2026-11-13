@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import dev.skysurveyor.data.CorpseType;
+import dev.skysurveyor.data.ShaftNames;
 import dev.skysurveyor.detection.Corpse;
 import dev.skysurveyor.detection.CorpseLoot;
 import dev.skysurveyor.detection.Shaft;
@@ -17,7 +19,6 @@ import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.SessionSummary;
 import dev.skysurveyor.journal.LootSummary;
-import dev.skysurveyor.screen.ShaftNames;
 
 public final class HudData {
 	// mockup numbers, not game data
@@ -34,10 +35,6 @@ public final class HudData {
 
 	public long now() {
 		return now;
-	}
-
-	public Object get(HudValue value) {
-		return get(value, value.defaultRange());
 	}
 
 	public Object get(HudValue value, Range range) {
@@ -195,7 +192,7 @@ public final class HudData {
 		if (corpses.isEmpty()) return null;
 		long looted = corpses.stream().filter(Corpse::looted).count();
 		Set<String> types = new LinkedHashSet<>();
-		for (String type : JournalStats.CORPSE_ORDER) {
+		for (String type : CorpseType.ORDER) {
 			if (corpses.stream().anyMatch(c -> c.type().equals(type))) types.add(type);
 		}
 		corpses.forEach(c -> types.add(c.type()));

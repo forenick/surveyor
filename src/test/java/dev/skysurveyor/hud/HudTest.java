@@ -2,11 +2,15 @@ package dev.skysurveyor.hud;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.google.gson.JsonParseException;
 import org.junit.jupiter.api.Test;
 
+import dev.skysurveyor.data.ShaftNames;
 import dev.skysurveyor.detection.Corpse;
 import dev.skysurveyor.detection.RecordingReplay;
 import dev.skysurveyor.detection.ShaftEvent;
@@ -22,16 +26,36 @@ import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.JournalFile;
 import dev.skysurveyor.journal.JournalStats;
 import dev.skysurveyor.journal.JournalStats.SessionSummary;
-import dev.skysurveyor.screen.ShaftNames;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class HudTest {
+	// ids saved in hud.json + tags, see HudBoxText TAG
+	@Test
+	void everyValueHasAUsableIdAndExamples() {
+		Set<String> ids = new HashSet<>();
+		for (HudValue value : HudValue.values()) {
+			assertTrue(ids.add(value.id()), "id twice: " + value.id());
+			assertTrue(value.id().matches("[a-z_]+"), "not a tag id: " + value.id());
+			if (!value.hasNumber()) continue;
+			List<Range> ranges = new ArrayList<>(value.ranges());
+			if (ranges.isEmpty()) ranges.add(null);
+			for (Range range : ranges) {
+				Object example = HudData.EXAMPLE.get(value, range);
+				String where = value.id() + " " + range;
+				assertTrue(example != null, "no example for " + where);
+				Class<?> type = value.kind() == Kind.COINS || value.kind() == Kind.DECIMAL ? Double.class : Long.class;
+				assertEquals(type, example.getClass(), "example type of " + where);
+			}
+		}
+	}
+
 	@Test
 	void formatsEveryKind() {
 		assertEquals("1:42", HudFormat.format(Kind.TIME, 0, 102_900L));
@@ -217,17 +241,17 @@ class HudTest {
 	void sessionValuesFromTheRealJournal() throws Exception {
 		List<JournalEntry> entries = realJournal();
 		HudData data = live(entries, 0);
-		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS));
-		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER));
-		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, data.get(HudValue.SHAFTS_PER_HOUR)));
+		assertEquals(6L, data.get(HudValue.SESSION_SHAFTS, HudValue.SESSION_SHAFTS.defaultRange()));
+		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER, HudValue.SESSION_POWDER.defaultRange()));
+		assertEquals("19.4", HudFormat.format(Kind.DECIMAL, 0, data.get(HudValue.SHAFTS_PER_HOUR, HudValue.SHAFTS_PER_HOUR.defaultRange())));
 		// (8,889+55,940+38,186+193,848+283,594+185,948) / 6 ms
-		assertEquals("2:07", HudFormat.format(Kind.TIME, 0, data.get(HudValue.AVERAGE_SPAWN)));
-		assertNull(data.get(HudValue.SHAFT_TIME));
+		assertEquals("2:07", HudFormat.format(Kind.TIME, 0, data.get(HudValue.AVERAGE_SPAWN, HudValue.AVERAGE_SPAWN.defaultRange())));
+		assertNull(data.get(HudValue.SHAFT_TIME, HudValue.SHAFT_TIME.defaultRange()));
 		// rate counts time since last shaft too, 2x time = half rate
 		long start = entries.getFirst().sessionId();
 		long length = new JournalStats.SessionSummary(start, entries).lengthMillis();
 		HudData later = live(entries, start + 2 * length);
-		assertEquals("9.7", HudFormat.format(Kind.DECIMAL, 0, later.get(HudValue.SHAFTS_PER_HOUR)));
+		assertEquals("9.7", HudFormat.format(Kind.DECIMAL, 0, later.get(HudValue.SHAFTS_PER_HOUR, HudValue.SHAFTS_PER_HOUR.defaultRange())));
 	}
 
 	@Test
@@ -240,11 +264,11 @@ class HudTest {
 		assertEquals(43_436L, data.get(HudValue.SESSION_POWDER, Range.ALL_TIME));
 		JournalEntry last = entries.getLast();
 		assertEquals(JournalStats.powder(last), data.get(HudValue.SESSION_POWDER, Range.SHAFT), "the last shaft outside one");
-		double hours = 6 / (Double) data.get(HudValue.SHAFTS_PER_HOUR);
+		double hours = 6 / (Double) data.get(HudValue.SHAFTS_PER_HOUR, HudValue.SHAFTS_PER_HOUR.defaultRange());
 		assertEquals(Math.round(43_436 / hours), data.get(HudValue.SESSION_POWDER, Range.PER_HOUR));
-		assertEquals((Double) data.get(HudValue.SESSION_CORPSE_FINE) / hours,
+		assertEquals((Double) data.get(HudValue.SESSION_CORPSE_FINE, HudValue.SESSION_CORPSE_FINE.defaultRange()) / hours,
 				(Double) data.get(HudValue.SESSION_CORPSE_FINE, Range.PER_HOUR), 1e-9);
-		assertEquals(data.get(HudValue.SESSION_SHAFTS), data.get(HudValue.SESSION_SHAFTS, Range.PER_HOUR),
+		assertEquals(data.get(HudValue.SESSION_SHAFTS, HudValue.SESSION_SHAFTS.defaultRange()), data.get(HudValue.SESSION_SHAFTS, Range.PER_HOUR),
 				"shafts have no per hour range (shafts per hour is its own value), so the default shows");
 
 		Box box = new Box();
@@ -557,14 +581,14 @@ class HudTest {
 		HudData data = live(entries, end).money(new HudData.Money(-250_000.0, 12_000_000.0, 40_000_000.0, 20));
 		SessionSummary session = new SessionSummary(entries.getFirst().sessionId(), entries);
 		assertEquals(-250_000.0, data.get(HudValue.COINS, Range.SHAFT));
-		assertEquals(12_000_000.0, data.get(HudValue.COINS));
+		assertEquals(12_000_000.0, data.get(HudValue.COINS, HudValue.COINS.defaultRange()));
 		assertEquals(session.perHour(12_000_000, end), data.get(HudValue.COINS, Range.PER_HOUR));
-		assertEquals(12_000_000.0 / entries.size(), data.get(HudValue.COINS_PER_SHAFT));
+		assertEquals(12_000_000.0 / entries.size(), data.get(HudValue.COINS_PER_SHAFT, HudValue.COINS_PER_SHAFT.defaultRange()));
 		assertEquals(2_000_000.0, data.get(HudValue.COINS_PER_SHAFT, Range.ALL_TIME));
 
 		HudData noPrices = live(entries, end).money(new HudData.Money(null, null, null, 20));
-		assertNull(noPrices.get(HudValue.COINS));
-		assertNull(noPrices.get(HudValue.COINS_PER_SHAFT));
+		assertNull(noPrices.get(HudValue.COINS, HudValue.COINS.defaultRange()));
+		assertNull(noPrices.get(HudValue.COINS_PER_SHAFT, HudValue.COINS_PER_SHAFT.defaultRange()));
 		Box box = new Box();
 		box.lines.add(new Line(HudValue.COINS));
 		assertEquals("§7Coins: §f-", HudBoxText.lines(box, noPrices, false).getFirst(), "no prices yet");
@@ -725,5 +749,20 @@ class HudTest {
 		}
 		assertEquals("43.4kms, 1.2Mms", HudFormat.example(Kind.INTEGER, 1, HudBoxText.suffix(HudValue.PING, null)));
 		assertEquals("43,436/h", HudFormat.example(Kind.INTEGER, 0, HudBoxText.suffix(HudValue.SESSION_POWDER, Range.PER_HOUR)));
+	}
+
+	@Test
+	void toastSpotIsOptionalAndRepaired() {
+		HudLayout plain = HudLayout.defaults();
+		assertNull(plain.toast);
+		assertFalse(plain.toJson().contains("toast"), "never moved = not written");
+		HudLayout moved = HudLayout.fromJson("{\"boxes\": [{\"id\": \"toast\"}], \"toast\": {\"id\": \"x\", \"anchorX\": \"END\", \"offsetY\": 30, \"scale\": 9}}");
+		assertEquals(HudLayout.TOAST_ID, moved.toast.id);
+		assertEquals(HudLayout.Anchor.END, moved.toast.anchorX);
+		assertEquals(HudLayout.Anchor.START, moved.toast.anchorY);
+		assertEquals(30, moved.toast.offsetY);
+		assertEquals(HudLayout.MAX_SCALE, moved.toast.scale);
+		assertNotEquals(HudLayout.TOAST_ID, moved.boxes.get(0).id, "a box cant take the toasts id");
+		assertEquals(moved.toJson(), HudLayout.fromJson(moved.toJson()).toJson());
 	}
 }

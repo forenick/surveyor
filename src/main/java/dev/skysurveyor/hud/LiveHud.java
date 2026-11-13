@@ -17,15 +17,16 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import com.google.gson.JsonParseException;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.skysurveyor.Surveyor;
+import dev.skysurveyor.data.ShaftNames;
 import dev.skysurveyor.detection.LiveTracker;
 import dev.skysurveyor.detection.Shaft;
 import dev.skysurveyor.detection.TextPatterns;
@@ -35,26 +36,33 @@ import dev.skysurveyor.hud.HudLayout.Box;
 import dev.skysurveyor.journal.Journal;
 import dev.skysurveyor.journal.JournalEntry;
 import dev.skysurveyor.journal.LiveJournal;
+import dev.skysurveyor.journal.ToastText;
 import dev.skysurveyor.money.LiveMoney;
 import dev.skysurveyor.money.MoneyStats;
-import dev.skysurveyor.screen.ShaftNames;
+import dev.skysurveyor.settings.LiveSettings;
+import dev.skysurveyor.settings.SummarySettings;
 import dev.skysurveyor.util.DataFolder;
 import dev.skysurveyor.util.SafeWrite;
 
 public final class LiveHud {
 	private static final Logger LOGGER = LoggerFactory.getLogger("Surveyor");
 	private static final int REFRESH_TICKS = 4;
+	// display choice
+	private static final long TOAST_FADE = 300;
 	private static final DateTimeFormatter BACKUP_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 	private static final String DEFAULT_JSON = HudLayout.defaults().toJson();
 	// locale's own 12h/24h
 	private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT);
-	private static final String MOD_VERSION = FabricLoader.getInstance().getModContainer(Surveyor.MOD_ID)
-			.map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse(null);
+	private static final String MOD_VERSION = Surveyor.modVersion();
 
 	private final LiveTracker tracker;
 	private final LiveJournal journal;
 	private final LiveMoney money;
+	private final LiveSettings settings;
 	private HudLayout layout = HudLayout.defaults();
+	// movable shaft toast, client thread only
+	private ToastText toast;
+	private long toastAt;
 	private HudData data = HudData.live(SessionTotals.NONE, Totals.NONE, null, null, null, 0, ShaftNames.defaults());
 	// new object per saved shaft, compared by identity
 	private Journal.Session totalsSession;
@@ -96,10 +104,11 @@ public final class LiveHud {
 	private record Prepared(Box box, List<String> lines, HudRenderer.Bounds bounds) {
 	}
 
-	public LiveHud(LiveTracker tracker, LiveJournal journal, LiveMoney money) {
+	public LiveHud(LiveTracker tracker, LiveJournal journal, LiveMoney money, LiveSettings settings) {
 		this.tracker = tracker;
 		this.journal = journal;
 		this.money = money;
+		this.settings = settings;
 	}
 
 	public void start(Minecraft client) {
@@ -307,6 +316,18 @@ public final class LiveHud {
 				SharedConstants.getCurrentVersion().name());
 	}
 
+	// client thread. top right = vanillas toast slot, movable = drawn w/ the hud
+	public void showToast(ToastText text) {
+		Minecraft client = Minecraft.getInstance();
+		SummarySettings summary = settings.get().summary();
+		if (summary.position() == SummarySettings.Position.TOP_RIGHT) {
+			client.gui.toastManager().addToast(new ShaftToast(client.font, text, summary.style(), summary.seconds()));
+			return;
+		}
+		toast = text;
+		toastAt = Util.getMillis();
+	}
+
 	public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
 		Minecraft client = Minecraft.getInstance();
 		// editor draws the boxes itself
@@ -319,6 +340,24 @@ public final class LiveHud {
 			preparedHeight = height;
 		}
 		for (Prepared box : prepared) HudRenderer.draw(graphics, client.font, box.box(), box.lines(), box.bounds());
+		drawToast(graphics, client, width, height);
+	}
+
+	private void drawToast(GuiGraphicsExtractor graphics, Minecraft client, int width, int height) {
+		if (toast == null) return;
+		SummarySettings summary = settings.get().summary();
+		long shown = Math.round(summary.seconds() * 1000 * client.gui.toastManager().getNotificationDisplayTimeMultiplier());
+		long age = Util.getMillis() - toastAt;
+		if (!summary.movableToast() || age >= shown + TOAST_FADE) {
+			toast = null;
+			return;
+		}
+		float alpha = age < TOAST_FADE ? (float) age / TOAST_FADE : age > shown ? 1 - (float) (age - shown) / TOAST_FADE : 1;
+		Box box = layout.toastOrDefault();
+		ToastRenderer.Size size = ToastRenderer.size(client.font, toast, summary.style());
+		HudRenderer.Bounds bounds = ToastRenderer.bounds(size, box, width, height);
+		// text under ~4% alpha isnt drawn anyway
+		ToastRenderer.draw(graphics, client.font, toast, summary.style(), size, box, bounds, Math.max(0.05f, alpha));
 	}
 
 	private List<Prepared> prepare(Minecraft client, int width, int height) {

@@ -1,4 +1,4 @@
-package dev.skysurveyor.screen;
+package dev.skysurveyor.data;
 
 import org.junit.jupiter.api.Test;
 

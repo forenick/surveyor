@@ -5,12 +5,11 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
 
+import dev.skysurveyor.data.CorpseType;
 import dev.skysurveyor.detection.Corpse;
 import dev.skysurveyor.detection.CorpseLoot;
 import dev.skysurveyor.detection.ItemCount;
-import dev.skysurveyor.detection.TextPatterns;
 
 public final class JournalStats {
 	// display choice, not a game number
@@ -21,9 +20,6 @@ public final class JournalStats {
 
 	// nicks pick (2026-11-11), display choice, not a game number
 	public static final int MIN_SHAFTS_FOR_RATE_RECORD = 5;
-
-	// display order, not game data
-	public static final List<String> CORPSE_ORDER = List.of("Lapis", "Umber", "Tungsten", "Vanguard");
 
 	private JournalStats() {
 	}
@@ -135,6 +131,24 @@ public final class JournalStats {
 		return sessions;
 	}
 
+	// colds only from 0.22.0 shafts on
+	public record Campfires(int placed, List<Integer> colds) {
+		public Double averageCold() {
+			return colds.isEmpty() ? null : colds.stream().mapToInt(Integer::intValue).average().orElseThrow();
+		}
+	}
+
+	public static Campfires campfires(List<JournalEntry> entries) {
+		int placed = 0;
+		List<Integer> colds = new ArrayList<>();
+		for (JournalEntry entry : entries) {
+			placed += entry.campfiresAt().size();
+			if (entry.campfireColds() == null) continue;
+			for (Integer cold : entry.campfireColds()) if (cold != null) colds.add(cold);
+		}
+		return new Campfires(placed, List.copyOf(colds));
+	}
+
 	public static long powder(JournalEntry entry) {
 		return powder(entry.loots(), entry.exitPowder());
 	}
@@ -160,20 +174,6 @@ public final class JournalStats {
 		Map<String, CorpseCount> ordered = new LinkedHashMap<>();
 		for (String type : ordered(counts.keySet())) ordered.put(type, counts.get(type));
 		return ordered;
-	}
-
-	public static String type(JournalEntry entry) {
-		return idPart(entry, "type");
-	}
-
-	public static String variant(JournalEntry entry) {
-		return idPart(entry, "variant");
-	}
-
-	private static String idPart(JournalEntry entry, String group) {
-		if (entry.shaftId() == null) return null;
-		Matcher m = TextPatterns.defaults().match("shaft.id", entry.shaftId());
-		return m == null ? null : m.group(group);
 	}
 
 	public static AllTime allTime(List<JournalEntry> entries) {
@@ -208,8 +208,8 @@ public final class JournalStats {
 				once.forEach((item, count) -> items.merge(item, new ItemDrop(1, count),
 						(had, one) -> new ItemDrop(had.corpses() + 1, had.count() + count)));
 			}
-			String type = type(entry);
-			String variant = variant(entry);
+			String type = entry.shaftType();
+			String variant = entry.variant();
 			if (type != null && variant != null) {
 				types.computeIfAbsent(type, t -> new LinkedHashMap<>()).merge(variant, 1, Integer::sum);
 			}
@@ -218,7 +218,7 @@ public final class JournalStats {
 			}
 			long shaftPowder = powder(entry);
 			if (mostPowder == null || shaftPowder > mostPowder.value()) mostPowder = new Best(entry, shaftPowder);
-			long lapis = SessionSummary.looted(entry, "Lapis");
+			long lapis = SessionSummary.looted(entry, CorpseType.LAPIS.label());
 			if (lapis > 0 && (mostLapis == null || lapis > mostLapis.value())) mostLapis = new Best(entry, lapis);
 			if (entry.gems() != null && entry.gems().fineEquivalent() > 0
 					&& (mostGems == null || entry.gems().fineEquivalent() > mostGems.gems().fineEquivalent())) mostGems = entry;
@@ -276,8 +276,8 @@ public final class JournalStats {
 	private static List<String> ordered(Iterable<String> types) {
 		List<String> known = new ArrayList<>();
 		List<String> other = new ArrayList<>();
-		for (String type : types) (CORPSE_ORDER.contains(type) ? known : other).add(type);
-		known.sort(Comparator.comparingInt(CORPSE_ORDER::indexOf));
+		for (String type : types) (CorpseType.ORDER.contains(type) ? known : other).add(type);
+		known.sort(Comparator.comparingInt(CorpseType.ORDER::indexOf));
 		other.sort(null);
 		known.addAll(other);
 		return known;

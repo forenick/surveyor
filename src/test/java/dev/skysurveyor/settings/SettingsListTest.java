@@ -6,7 +6,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
-import dev.skysurveyor.money.MoneySettings;
 import dev.skysurveyor.settings.Setting.Choice;
 import dev.skysurveyor.settings.SettingsList.Category;
 
@@ -73,7 +72,7 @@ class SettingsListTest {
 	@Test
 	void everyMoneyFieldHasASetting() {
 		MoneySettings changed = new MoneySettings(MoneySettings.SellPrice.SELL_OFFER, MoneySettings.GemTier.FINE, 2.0,
-				MoneySettings.OldShafts.TODAY, MoneySettings.Crystals.ZERO);
+				MoneySettings.OldShafts.TODAY, MoneySettings.Crystals.ZERO, true);
 		Settings all = Settings.DEFAULTS.withMoney(changed);
 		assertFalse(money().isDefault(all));
 		assertEquals(Settings.DEFAULTS, money().reset(all));
@@ -81,10 +80,10 @@ class SettingsListTest {
 
 	@Test
 	void resetCategoryLeavesOthers() {
-		Settings changed = Settings.DEFAULTS.withByDay(false).withMoney(MoneySettings.DEFAULTS.withGemTier(MoneySettings.GemTier.FINE));
+		Settings changed = Settings.DEFAULTS.withJournal(new JournalSettings(false)).withMoney(MoneySettings.DEFAULTS.withGemTier(MoneySettings.GemTier.FINE));
 		Settings reset = money().reset(changed);
 		assertEquals(MoneySettings.DEFAULTS, reset.money());
-		assertFalse(reset.byDay());
+		assertFalse(reset.journal().byDay());
 	}
 
 	@Test
@@ -114,7 +113,7 @@ class SettingsListTest {
 	void searchFindsNamesDescriptionsAndChoices() {
 		assertEquals(List.of("Bazaar tax"), names(money().matching("TAX")));
 		assertEquals(List.of("Gemstone Crystals"), names(money().matching("perfect")));
-		assertEquals(List.of("Gem tier", "Gemstone Crystals"), names(money().matching("gem")));
+		assertEquals(List.of("Ironman", "Gem tier", "Gemstone Crystals"), names(money().matching("gem")));
 		assertTrue(money().matching("nothing like this").sections().isEmpty());
 		assertEquals(money().settings().size(), money().matching("  ").settings().size());
 	}
