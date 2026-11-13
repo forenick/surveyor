@@ -3,6 +3,10 @@
 Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-release (0.x), a new feature
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
+Test builds are `X.Y.Z-alpha.N` (not released), betas `X.Y.Z-beta.N` (GitHub pre-release), then `X.Y.Z`.
+
+## Unreleased
+- Nothing yet.
 
 ## 0.21.1 (2026-11-13)
 - **Surveyor is open source under the GNU LGPL v3.0** (was all rights reserved). You may use, change and share it;
