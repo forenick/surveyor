@@ -172,6 +172,10 @@ Surveyor is **information-only**:
 Whether a mod is allowed is always up to Hypixel. Surveyor is built to only show information, like a notebook next
 to your game.
 
+## Bugs and ideas
+Found a bug or got an idea? Open an [issue](../../issues/new/choose). For bugs, add your Surveyor version and a
+screenshot of the wrong number or screen.
+
 ## Building
 ```
 ./gradlew build

@@ -1,0 +1,35 @@
+name: Bug report
+description: Something's wrong, missing or counted wrong
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Surveyor version
+      description: In the mod list, or the jar name
+      placeholder: "0.21.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did the mod do instead?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag them in here. For wrong numbers, the journal or the tooltip with the number helps most.
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Your other mods, especially SkyHanni, Skyblocker, chat or font mods
+  - type: textarea
+    id: log
+    attributes:
+      label: Crash or log
+      description: For crashes, paste the crash report or `logs/latest.log` (or a link to it)
+      render: text
