@@ -6,7 +6,7 @@
 - Bars / Line switch keeps the Stats tab's scroll.
 - Small Stats tooltip fixes.
 - An old ShaftTools jar can't run next to Surveyor.
-- Square mod icon without the dark edges.
+- Square mod icon with a plain green background.
 
 ## 0.21.1 (2026-11-13)
 - Open source under the LGPL-3.0.
