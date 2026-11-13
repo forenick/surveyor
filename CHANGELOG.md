@@ -2,7 +2,7 @@
 
 [SemVer](https://semver.org). Betas are `X.Y.Z-beta.N` (GitHub pre-releases).
 
-## Unreleased
+## 0.21.2 (2026-11-13)
 - Bars / Line and range arrows keep the Stats tab's scroll.
 - Closing the game inside a shaft saves that shaft.
 - Settings changed while prices load are kept when you quit.
