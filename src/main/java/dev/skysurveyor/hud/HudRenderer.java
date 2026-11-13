@@ -4,7 +4,8 @@ import java.util.List;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 import dev.skysurveyor.hud.HudLayout.Box;
 
@@ -12,6 +13,10 @@ public final class HudRenderer {
 	static final int PADDING = 3;
 	private static final int LINE_GAP = 1;
 	private static final int DARK = 0x80000000;
+	private static final Identifier FRAME_BACKGROUND = Identifier.withDefaultNamespace("tooltip/background");
+	private static final Identifier FRAME_BORDER = Identifier.withDefaultNamespace("tooltip/frame");
+	// vanilla tooltip sprites overhang the text by 12px
+	private static final int FRAME_OVERHANG = 12;
 
 	public record Bounds(int x, int y, int width, int height) {
 		public boolean contains(double px, double py) {
@@ -53,9 +58,7 @@ public final class HudRenderer {
 		graphics.pose().scale(box.scale, box.scale);
 		switch (box.background) {
 			case DARK -> graphics.fill(0, 0, width, height, DARK);
-			// tooltip sprite overhangs 3px = our padding
-			case FRAME -> TooltipRenderUtil.extractTooltipBackground(graphics, PADDING, PADDING,
-					width - 2 * PADDING, height - 2 * PADDING, null);
+			case FRAME -> drawFrame(graphics, width, height);
 			case NONE -> {
 			}
 		}
@@ -73,6 +76,15 @@ public final class HudRenderer {
 			y += font.lineHeight + LINE_GAP;
 		}
 		graphics.pose().popMatrix();
+	}
+
+	// not via TooltipRenderUtil, iconographic recolours that w/ the last hovered item
+	private static void drawFrame(GuiGraphicsExtractor graphics, int width, int height) {
+		int x = PADDING - FRAME_OVERHANG;
+		int w = width - 2 * PADDING + 2 * FRAME_OVERHANG;
+		int h = height - 2 * PADDING + 2 * FRAME_OVERHANG;
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BACKGROUND, x, x, w, h);
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, FRAME_BORDER, x, x, w, h);
 	}
 
 	private static void drawLine(GuiGraphicsExtractor graphics, Font font, String line, int x, int y) {

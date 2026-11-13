@@ -2,6 +2,9 @@
 
 [SemVer](https://semver.org). Betas are `X.Y.Z-beta.N` (GitHub pre-releases).
 
+## 0.21.3 (2026-11-13)
+- Fixed the HUD frame taking the colour of the last hovered item with Iconographic.
+
 ## 0.21.2 (2026-11-13)
 - Bars / Line and range arrows keep the Stats tab's scroll.
 - Closing the game inside a shaft saves that shaft.
