@@ -51,6 +51,7 @@ import dev.shaftjournal.money.MoneyStats;
 import dev.shaftjournal.money.ShaftValue;
 import dev.shaftjournal.money.ShaftValue.Line;
 import dev.shaftjournal.money.ShaftValue.Part;
+import dev.shaftjournal.settings.Setting;
 
 // mc font only so pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
@@ -151,10 +152,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	public void tick() {
 		super.tick();
-		// by day lives on the settings page now
-		if (ShaftJournal.MONEY.byDay() != byDay) {
-			byDay = ShaftJournal.MONEY.byDay();
-			moneyChanges = ShaftJournal.MONEY.changes();
+		if (byDayChanged()) {
 			rebuild();
 			return;
 		}
@@ -182,7 +180,16 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	protected void init() {
 		super.init();
-		if (root != null && (width != builtWidth || height != builtHeight)) rebuild();
+		// back from settings, before the 1st frame
+		if (root != null && (byDayChanged() || width != builtWidth || height != builtHeight)) rebuild();
+	}
+
+	// by day lives on the settings page now
+	private boolean byDayChanged() {
+		if (ShaftJournal.MONEY.byDay() == byDay) return false;
+		byDay = ShaftJournal.MONEY.byDay();
+		moneyChanges = ShaftJournal.MONEY.changes();
+		return true;
 	}
 
 	private void rebuild() {
@@ -563,7 +570,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		List<Component> how = List.of(Component.literal("§fHow coins are counted"),
 				Component.literal("§7Gems as " + (settings.gemTier() == MoneySettings.GemTier.FINE ? "Fine" : "Flawless")),
 				Component.literal("§7Sold by " + (settings.sellPrice() == MoneySettings.SellPrice.INSTA_SELL ? "insta-sell" : "sell offer")
-						+ ", " + settings.bazaarTax() + "% Bazaar tax"),
+						+ ", " + Setting.Number.format(settings.bazaarTax()) + "% Bazaar tax"),
 				Component.literal("§7Keys and campfires at insta-buy"),
 				Component.literal("§8Change it in .minecraft/shaftjournal/config.json"));
 		withTooltip(heading, how);

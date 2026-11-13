@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
@@ -64,12 +65,12 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int MIN_TEXT = 140;
 	private static final int TIP_WIDTH = 200;
 	private static final int TIP_MARGIN = 5;
+	// typed tax applies after this many quiet ticks or on click away
+	private static final int TYPE_DELAY = 10;
 	private static final Identifier SEARCH_ICON = icon("search_icon");
 	private static final Identifier RESET_ICON = icon("reset_icon");
 	private static final Identifier CHECK_ICON = icon("check_icon");
 	private static final Identifier CROSS_ICON = icon("cross_icon");
-	private static final Map<String, Identifier> CATEGORY_ICONS = Map.of(SettingsList.MONEY, icon("money_icon"),
-			SettingsList.JOURNAL, icon("journal_icon"));
 	// owo's tooltips dont wrap or stay on screen
 	private static final ClientTooltipPositioner FIT = (screenW, screenH, x, y, w, h) -> new Vector2i(
 			clamp(x + 12 + w <= screenW - TIP_MARGIN ? x + 12 : x - 12 - w, w, screenW), clamp(y - 12, h, screenH));
@@ -86,6 +87,10 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	private ButtonComponent resetCategory;
 	private LabelComponent bazaarAge;
 	private LabelComponent binsAge;
+	private String bazaarText;
+	private String binsText;
+	private LabelComponent saveNote;
+	private String saveText;
 	private final List<Card> cards = new ArrayList<>();
 	private final List<TextBoxComponent> homeFields = new ArrayList<>();
 	private final Map<String, UIComponent> sectionHeads = new HashMap<>();
@@ -120,6 +125,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 	@Override
 	public void onClose() {
+		flushTyped();
 		minecraft.gui.setScreen(parent);
 	}
 
@@ -155,6 +161,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			refreshCards();
 		}
 		if (++ticks % 10 == 0) updatePrices();
+		updateSaveNote();
 	}
 
 	@Override
@@ -191,7 +198,10 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		root.child(body);
 		FlowLayout footer = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		footer.gap(16);
-		footer.child(label("§8Saved in config.json"));
+		saveNote = label("");
+		saveText = null;
+		updateSaveNote();
+		footer.child(saveNote);
 		footer.child(label("§8Changes apply right away"));
 		root.child(footer);
 		fillBody();
@@ -239,12 +249,15 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private void fillBody() {
+		flushTyped();
 		cards.clear();
 		tips.clear();
 		sectionHeads.clear();
 		resetCategory = null;
 		bazaarAge = null;
 		binsAge = null;
+		bazaarText = null;
+		binsText = null;
 		side.clearChildren();
 		main.clearChildren();
 		fillSide();
@@ -270,7 +283,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			});
 			row.padding(Insets.horizontal(4));
 			row.gap(4);
-			row.child(UIComponents.texture(CATEGORY_ICONS.get(c.id()), 0, 0, 8, 8, 8, 8));
+			row.child(UIComponents.texture(icon(c.icon()), 0, 0, 8, 8, 8, 8));
 			LabelComponent name = label((on ? "§e" : searching() && hits == 0 ? "§8" : "§f") + c.name());
 			name.horizontalSizing(Sizing.expand());
 			row.child(name);
@@ -324,7 +337,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		main.child(wrapped("§7" + c.description()));
 		sections(c);
 		if (c.id().equals(SettingsList.MONEY)) prices();
-		resetCategory = UIComponents.button(Component.literal("Reset " + c.name() + " to defaults"), b -> apply(c.reset(settings)));
+		resetCategory = UIComponents.button(Component.literal("Reset " + c.name() + " to defaults"), b -> apply(c::reset));
 		resetCategory.horizontalSizing(Sizing.fixed(font.width("Reset " + c.name() + " to defaults") + 20));
 		resetCategory.verticalSizing(Sizing.fixed(BUTTON));
 		resetCategory.margins(Insets.top(8));
@@ -369,8 +382,16 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		if (bazaarAge == null) return;
 		PriceBook book = ShaftJournal.MONEY.book();
 		long now = System.currentTimeMillis();
-		bazaarAge.text(Component.literal("§7Bazaar " + age(book.bazaarAt(), LiveMoney.BAZAAR_MAX_AGE, now)));
-		binsAge.text(Component.literal("§7Lowest BIN " + age(book.binsAt(), LiveMoney.BINS_MAX_AGE, now)));
+		String bazaar = "§7Bazaar " + age(book.bazaarAt(), LiveMoney.BAZAAR_MAX_AGE, now);
+		String bins = "§7Lowest BIN " + age(book.binsAt(), LiveMoney.BINS_MAX_AGE, now);
+		// .text() relayouts the page even when nothing changed
+		if (!bazaar.equals(bazaarText)) bazaarAge.text(Component.literal(bazaarText = bazaar));
+		if (!bins.equals(binsText)) binsAge.text(Component.literal(binsText = bins));
+	}
+
+	private void updateSaveNote() {
+		String text = ShaftJournal.MONEY.saveError() == null ? "§8Saved in config.json" : "§cCould not save config.json, see the log";
+		if (!text.equals(saveText)) saveNote.text(Component.literal(saveText = text));
 	}
 
 	// green = still fresh, gray = waits for the next shaft or journal open
@@ -392,12 +413,22 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		return box;
 	}
 
-	private void apply(Settings next) {
-		if (next.equals(settings)) return;
-		if (!next.money().equals(settings.money())) ShaftJournal.MONEY.setSettings(next.money());
-		if (next.byDay() != settings.byDay()) ShaftJournal.MONEY.setByDay(next.byDay());
+	// built on memory now, not a stale copy. true = cards refreshed
+	private boolean apply(Function<Settings, Settings> change) {
+		// a click lands before the tick, keep tax typed right before it
+		flushTyped();
+		Settings base = current();
+		Settings next = change.apply(base);
+		if (!next.money().equals(base.money())) ShaftJournal.MONEY.setSettings(next.money());
+		if (next.byDay() != base.byDay()) ShaftJournal.MONEY.setByDay(next.byDay());
+		if (next.equals(settings)) return false;
 		settings = next;
 		refreshCards();
+		return true;
+	}
+
+	private void flushTyped() {
+		for (Card card : List.copyOf(cards)) card.flush();
 	}
 
 	private void refreshCards() {
@@ -448,6 +479,9 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 		private IconButton toggle;
 		private TextBoxComponent field;
 		private String lastText;
+		private boolean pending;
+		private int typedAt;
+		private boolean wasFocused;
 
 		Card(Setting setting) {
 			this.setting = setting;
@@ -480,7 +514,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			box.child(control(beside ? controlWidth : content, beside));
 			main.child(box);
 
-			reset = new IconButton(Component.empty(), RESET_ICON, 8, 8, b -> apply(setting.reset(settings)));
+			reset = new IconButton(Component.empty(), RESET_ICON, 8, 8, b -> apply(setting::reset));
 			reset.horizontalSizing(Sizing.fixed(12));
 			reset.verticalSizing(Sizing.fixed(12));
 			tip(reset, "§fReset to " + setting.defaultText());
@@ -517,9 +551,10 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 				case Setting.Number number -> {
 					field = UIComponents.textBox(Sizing.fixed(FIELD));
 					field.verticalSizing(Sizing.fixed(BUTTON));
-					field.setMaxLength(12);
-					lastText = Setting.Number.format(number.get().applyAsDouble(settings));
-					field.text(lastText);
+					field.setMaxLength(24);
+					field.text(Setting.Number.format(number.get().applyAsDouble(settings)));
+					// box cuts past max length, compare w/ what it holds
+					lastText = field.getValue();
 					homeFields.add(field);
 					tip(field, "§8Default: " + number.defaultText());
 					control.child(field);
@@ -528,7 +563,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 					control.child(unit);
 				}
 				case Setting.Toggle t -> {
-					toggle = new IconButton(Component.literal("§fOff"), CROSS_ICON, 8, 8, b -> apply(t.set().apply(settings, !t.get().test(settings))));
+					toggle = new IconButton(Component.literal("§fOff"), CROSS_ICON, 8, 8, b -> apply(s -> t.set().apply(s, !t.get().test(s))));
 					toggle.horizontalSizing(Sizing.fixed(toggleWidth()));
 					toggle.verticalSizing(Sizing.fixed(BUTTON));
 					tip(toggle, "§8Default: " + t.defaultText());
@@ -544,7 +579,7 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 			int buttonWidth = beside ? share : Math.max(share, buttonWidth(choice, 0));
 			for (Option<T> option : choice.options()) {
 				ButtonComponent button = UIComponents.button(Component.literal(option.label()),
-						b -> apply(choice.set().apply(settings, option.value())));
+						b -> apply(s -> choice.set().apply(s, option.value())));
 				button.horizontalSizing(Sizing.fixed(buttonWidth));
 				button.verticalSizing(Sizing.fixed(BUTTON));
 				tip(button, "§e" + option.label() + "\n§7" + option.tip() + (choice.isDefault(option) ? "\n§8Default" : ""));
@@ -555,13 +590,25 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 
 		// polled bc caxton cancels onValueChange
 		void poll() {
-			if (!(setting instanceof Setting.Number number)) return;
-			String typed = field.getValue();
-			if (typed.equals(lastText)) return;
-			lastText = typed;
-			Double value = number.parse(typed);
-			if (value != null) apply(number.set().apply(settings, value));
-			refresh();
+			if (!(setting instanceof Setting.Number)) return;
+			boolean focused = field.isFocused();
+			if (!field.getValue().equals(lastText)) {
+				lastText = field.getValue();
+				pending = true;
+				typedAt = ticks;
+				refresh();
+			}
+			if (pending && (!focused || ticks - typedAt >= TYPE_DELAY)) flush();
+			// clicked away from bad text, put the saved value back
+			else if (wasFocused && !focused) refresh();
+			wasFocused = focused;
+		}
+
+		void flush() {
+			if (!pending || !(setting instanceof Setting.Number number)) return;
+			pending = false;
+			Double value = number.parse(field.getValue());
+			if (value == null || !apply(s -> number.set().apply(s, value))) refresh();
 		}
 
 		void refresh() {
@@ -576,8 +623,9 @@ public final class SettingsScreen extends BaseOwoScreen<FlowLayout> {
 					Double typed = number.parse(field.getValue());
 					// reset or hand edit, never while typing
 					if (!field.isFocused() && (typed == null || typed != value)) {
-						lastText = Setting.Number.format(value);
-						field.setValue(lastText);
+						field.setValue(Setting.Number.format(value));
+						lastText = field.getValue();
+						pending = false;
 						typed = value;
 					}
 					if (typed == null) {

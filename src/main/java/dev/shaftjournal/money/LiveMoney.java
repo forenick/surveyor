@@ -24,6 +24,8 @@ public final class LiveMoney {
 	static final long SNAPSHOT_MAX_AGE = 60 * 60_000L;
 	public static final long BAZAAR_MAX_AGE = PriceFeed.BAZAAR_MAX_AGE;
 	public static final long BINS_MAX_AGE = PriceFeed.BINS_MAX_AGE;
+	// journal groups sessions by day, nicks pick (2026-11-12)
+	public static final boolean BY_DAY_DEFAULT = true;
 
 	private final ExecutorService io = Executors.newSingleThreadExecutor(task -> {
 		Thread thread = new Thread(task, "ShaftJournal prices");
@@ -81,7 +83,7 @@ public final class LiveMoney {
 
 	// journal setting, lives in config.json too
 	public boolean byDay() {
-		return config == null || config.byDay();
+		return config == null ? BY_DAY_DEFAULT : config.byDay();
 	}
 
 	public void setByDay(boolean value) {
@@ -92,10 +94,17 @@ public final class LiveMoney {
 
 	// settings page, saved on the io thread
 	public void setSettings(MoneySettings value) {
-		if (config == null || value.equals(config.settings())) return;
+		if (config == null) return;
+		MoneySettings before = config.settings();
+		if (value.equals(before)) return;
 		config.settings(value);
 		changes.incrementAndGet();
-		run(() -> config.saveMoney(value));
+		run(() -> config.saveMoney(before, value));
+	}
+
+	// null = saved fine
+	public String saveError() {
+		return config == null ? null : config.saveError();
 	}
 
 	public boolean refreshing() {

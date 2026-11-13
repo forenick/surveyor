@@ -17,7 +17,8 @@ public final class SettingsList {
 	public record Section(String name, List<Setting> settings) {
 	}
 
-	public record Category(String id, String name, String description, List<Section> sections) {
+	// icon = textures/gui/<icon>.png
+	public record Category(String id, String name, String icon, String description, List<Section> sections) {
 		public List<Setting> settings() {
 			return sections.stream().flatMap(s -> s.settings().stream()).toList();
 		}
@@ -28,7 +29,7 @@ public final class SettingsList {
 				List<Setting> hits = section.settings().stream().filter(s -> s.matches(query)).toList();
 				if (!hits.isEmpty()) kept.add(new Section(section.name(), hits));
 			}
-			return new Category(id, name, description, kept);
+			return new Category(id, name, icon, description, kept);
 		}
 
 		public boolean isDefault(Settings settings) {
@@ -45,7 +46,7 @@ public final class SettingsList {
 	public static final String JOURNAL = "journal";
 
 	public static final List<Category> CATEGORIES = List.of(
-			new Category(MONEY, "Money", "How a shaft turns into coins, everywhere the journal and HUD show coins.", List.of(
+			new Category(MONEY, "Money", "money_icon", "How a shaft turns into coins, everywhere the journal and HUD show coins.", List.of(
 					new Section("Selling", List.of(
 							new Choice<>("Sell price", "Price used for everything sold on the Bazaar.", List.of(
 									new Option<>(SellPrice.INSTA_SELL, "Insta-sell", "The highest buy order, what you get right away."),
@@ -69,7 +70,7 @@ public final class SettingsList {
 											new Option<>(OldShafts.THAT_DAY, "That day's", "The prices saved when each shaft ended."),
 											new Option<>(OldShafts.TODAY, "Today's", "Every shaft at the latest prices.")),
 									s -> s.money().oldShafts(), (s, v) -> s.withMoney(s.money().withOldShafts(v))))))),
-			new Category(JOURNAL, "Journal", "The journal screen.", List.of(
+			new Category(JOURNAL, "Journal", "journal_icon", "The journal screen.", List.of(
 					new Section("Overview", List.of(
 							new Toggle("Group by day", "Sessions sit under a row per day with that day's totals.",
 									Settings::byDay, Settings::withByDay))))));

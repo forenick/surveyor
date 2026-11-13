@@ -79,8 +79,11 @@ public sealed interface Setting permits Setting.Choice, Setting.Number, Setting.
 
 		// null = not a number in range. comma ok for eu keyboards
 		public Double parse(String text) {
+			String t = text.strip().replace(',', '.');
+			// plain digits only, parseDouble takes 1d, 1e1, 0x1p1
+			if (!t.matches("\\d+(\\.\\d*)?|\\.\\d+")) return null;
 			try {
-				double value = Double.parseDouble(text.strip().replace(',', '.'));
+				double value = Double.parseDouble(t);
 				return Double.isFinite(value) && value >= min && value <= max ? value : null;
 			} catch (NumberFormatException e) {
 				return null;

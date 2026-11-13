@@ -4,6 +4,27 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.18.1 (2026-11-13)
+Fixes from a code review of 0.18.0.
+- **Saving from the settings page only writes the setting you changed.** Before, every money setting was written
+  from memory, so a hand edit to `config.json` that hadn't loaded yet (or couldn't load, f.e. a tax of `"1,5"`) was
+  quietly undone by the next click on the page.
+- **Opening the settings page no longer rewrites a long tax.** The tax box held 12 characters, so a hand-written tax
+  like `1.1666666666666667` was cut short and saved just by opening the page.
+- **Two quick changes can't undo each other.** A save waiting behind a price fetch could put an older setting back for
+  a moment, and a click in that moment built on it and lost the newer change.
+- **Tax box**: the tax applies half a second after you stop typing or when you click away, not on every key, so the
+  file and every coin number aren't redone per key. Text that isn't a number goes back to the saved tax when you click
+  away, so the red note doesn't stay up. `5f`, `1e1` and the like no longer count as numbers.
+- **Settings page says when it can't save.** If `config.json` can't be written (f.e. a broken hand edit), the footer
+  turns red instead of saying it saved.
+- **Deleting `config.json` while the game runs starts over** with the default settings again, as before 0.18.0.
+- **Back from settings** shows the journal with the new Group by day right away, without the old grouping for a tick.
+- The Net tooltip shows the tax as typed (`2%`, not `2.0%`).
+- Price ages on the settings page only redraw when the text changes. A new settings category names its own icon, so
+  one without an icon can't crash the page. Group by day's default lives in one place.
+- Old-save tests now include a `config.json` written by 0.18.0's settings page.
+
 ## 0.18.0 (2026-11-13)
 Settings page (money slice 3).
 - **Settings button** in the journal's top bar, next to Edit HUD, and `/sj settings`. Back (or Esc) returns to the

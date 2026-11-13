@@ -12,6 +12,7 @@ import dev.shaftjournal.settings.SettingsList.Category;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +31,14 @@ class SettingsListTest {
 		for (Category c : SettingsList.CATEGORIES) {
 			assertTrue(c.isDefault(Settings.DEFAULTS), c.name());
 			for (Setting s : c.settings()) assertTrue(s.isDefault(Settings.DEFAULTS), s.name());
+		}
+	}
+
+	// new category w/o its png = page crashes on open
+	@Test
+	void everyCategoryHasAnIcon() {
+		for (Category c : SettingsList.CATEGORIES) {
+			assertNotNull(SettingsListTest.class.getResource("/assets/shaftjournal/textures/gui/" + c.icon() + ".png"), c.name());
 		}
 	}
 
@@ -90,6 +99,13 @@ class SettingsListTest {
 		assertNull(tax.parse("abc"));
 		assertNull(tax.parse("NaN"));
 		assertNull(tax.parse("Infinity"));
+		assertNull(tax.parse("5f"));
+		assertNull(tax.parse("2d"));
+		assertNull(tax.parse("1e1"));
+		assertNull(tax.parse("0x1p1"));
+		assertNull(tax.parse("1.2.3"));
+		assertEquals(2.0, tax.parse("2."));
+		assertEquals(0.5, tax.parse(".5"));
 		assertEquals("1.125%", tax.defaultText());
 		assertEquals("2", Setting.Number.format(2.0));
 	}

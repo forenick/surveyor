@@ -18,6 +18,9 @@ import dev.shaftjournal.OldSaves;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OldConfigTest {
 	@TestFactory
@@ -47,7 +50,7 @@ class OldConfigTest {
 
 			// settings page save keeps journal + any other keys
 			MoneySettings changed = config.settings().withGemTier(MoneySettings.GemTier.FINE).withBazaarTax(1.25);
-			config.saveMoney(changed);
+			config.saveMoney(config.settings(), changed);
 			JsonObject afterMoney = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
 			JsonObject expected = saved.deepCopy();
 			expected.remove("money");
@@ -67,7 +70,7 @@ class OldConfigTest {
 		Files.writeString(file, "{\"money\": {\"gemTier\": \"fine\", \"later\": 5}, \"other\": {\"x\": 1}}");
 		MoneyConfig config = new MoneyConfig(tmp);
 		config.reloadIfChanged();
-		config.saveMoney(config.settings().withSellPrice(MoneySettings.SellPrice.SELL_OFFER));
+		config.saveMoney(config.settings(), config.settings().withSellPrice(MoneySettings.SellPrice.SELL_OFFER));
 		JsonObject json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
 		assertEquals(5, json.getAsJsonObject("money").get("later").getAsInt());
 		assertEquals("sell_offer", json.getAsJsonObject("money").get("sellPrice").getAsString());
@@ -114,5 +117,91 @@ class OldConfigTest {
 		config.saveByDay(false);
 		config.reloadIfChanged();
 		assertEquals(MoneySettings.GemTier.FLAWLESS, config.settings().gemTier());
+	}
+
+	private static JsonObject money(Path file) throws Exception {
+		return JsonParser.parseString(Files.readString(file)).getAsJsonObject().getAsJsonObject("money");
+	}
+
+	// hand edit made after the last load, page saves another setting
+	@Test
+	void pageSaveKeepsHandEditNotLoadedYet(@TempDir Path tmp) throws Exception {
+		Path file = tmp.resolve("config.json");
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		MoneySettings before = config.settings();
+		JsonObject json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+		json.getAsJsonObject("money").addProperty("crystals", "zero");
+		Files.writeString(file, json.toString());
+		config.saveMoney(before, before.withSellPrice(MoneySettings.SellPrice.SELL_OFFER));
+		assertEquals("zero", money(file).get("crystals").getAsString());
+		assertEquals("sell_offer", money(file).get("sellPrice").getAsString());
+	}
+
+	// gson cant read "1,5", load fails, a page save still leaves it
+	@Test
+	void pageSaveKeepsBrokenHandEdit(@TempDir Path tmp) throws Exception {
+		Path file = tmp.resolve("config.json");
+		Files.writeString(file, "{\"money\": {\"bazaarTax\": \"1,5\", \"gemTier\": \"fine\"}}");
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		assertEquals(MoneySettings.DEFAULTS, config.settings(), "load failed, defaults kept");
+		config.saveMoney(config.settings(), config.settings().withSellPrice(MoneySettings.SellPrice.SELL_OFFER));
+		assertEquals("1,5", money(file).get("bazaarTax").getAsString());
+		assertEquals("fine", money(file).get("gemTier").getAsString());
+		assertEquals("sell_offer", money(file).get("sellPrice").getAsString());
+	}
+
+	// queued saves run after memory moved on, they must not set it back
+	@Test
+	void savesNeverTouchMemory(@TempDir Path tmp) throws Exception {
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		MoneySettings a = MoneySettings.DEFAULTS.withGemTier(MoneySettings.GemTier.FINE);
+		MoneySettings b = a.withBazaarTax(2);
+		config.settings(b);
+		config.byDay(false);
+		config.saveMoney(MoneySettings.DEFAULTS, a);
+		config.saveByDay(true);
+		assertEquals(b, config.settings());
+		assertFalse(config.byDay());
+		config.saveMoney(a, b);
+		config.saveByDay(false);
+		MoneyConfig reloaded = new MoneyConfig(tmp);
+		reloaded.reloadIfChanged();
+		assertEquals(b, reloaded.settings());
+		assertFalse(reloaded.byDay());
+	}
+
+	@Test
+	void deletedFileBringsBackDefaults(@TempDir Path tmp) throws Exception {
+		Path file = tmp.resolve("config.json");
+		Files.writeString(file, "{\"money\": {\"gemTier\": \"fine\", \"bazaarTax\": 2}, \"journal\": {\"byDay\": false}}");
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		assertEquals(MoneySettings.GemTier.FINE, config.settings().gemTier());
+		Files.delete(file);
+		config.reloadIfChanged();
+		assertEquals(MoneySettings.DEFAULTS, config.settings());
+		assertEquals(LiveMoney.BY_DAY_DEFAULT, config.byDay());
+		MoneyConfig reloaded = new MoneyConfig(tmp);
+		reloaded.reloadIfChanged();
+		assertEquals(MoneySettings.DEFAULTS, reloaded.settings(), "file written w/ defaults");
+	}
+
+	@Test
+	void failedSaveIsReported(@TempDir Path tmp) throws Exception {
+		Path file = tmp.resolve("config.json");
+		Files.writeString(file, "{\"money\": {\"gemTier\": \"fine\",}");
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		String broken = Files.readString(file);
+		config.saveMoney(config.settings(), config.settings().withCrystals(MoneySettings.Crystals.ZERO));
+		assertNotNull(config.saveError());
+		assertEquals(broken, Files.readString(file), "never overwritten");
+		Files.writeString(file, "{}");
+		config.saveByDay(false);
+		assertNull(config.saveError());
+		assertTrue(Files.readString(file).contains("byDay"));
 	}
 }
