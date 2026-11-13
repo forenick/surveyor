@@ -33,6 +33,7 @@ import dev.shaftjournal.journal.LiveJournal;
 import dev.shaftjournal.money.LiveMoney;
 import dev.shaftjournal.recorder.ShaftRecorder;
 import dev.shaftjournal.screen.JournalScreen;
+import dev.shaftjournal.screen.SettingsScreen;
 import dev.shaftjournal.util.DataFolder;
 
 /**
@@ -65,6 +66,7 @@ public class ShaftJournal implements ClientModInitializer {
 
 	// opens next tick once the chat screen is closed
 	private boolean openJournal;
+	private boolean openSettings;
 
 	@Override
 	public void onInitializeClient() {
@@ -104,6 +106,7 @@ public class ShaftJournal implements ClientModInitializer {
 		return ClientCommands.literal(name)
 				.executes(this::openJournal)
 				.then(ClientCommands.literal("journal").executes(this::openJournal))
+				.then(ClientCommands.literal("settings").executes(this::openSettings))
 				.then(ClientCommands.literal("record")
 						.then(ClientCommands.literal("start").executes(this::startRecording))
 						.then(ClientCommands.literal("stop").executes(this::stopRecording)))
@@ -119,6 +122,11 @@ public class ShaftJournal implements ClientModInitializer {
 		return 1;
 	}
 
+	private int openSettings(CommandContext<FabricClientCommandSource> context) {
+		openSettings = true;
+		return 1;
+	}
+
 	private static void moveOldDataFolder() {
 		Path gameDir = FabricLoader.getInstance().getGameDir();
 		try {
@@ -130,10 +138,14 @@ public class ShaftJournal implements ClientModInitializer {
 
 	private void openJournalIfAsked(Minecraft client) {
 		while (JOURNAL_KEY.consumeClick()) openJournal = true;
-		if (!openJournal) return;
+		if (!openJournal && !openSettings) return;
+		boolean settings = openSettings;
 		openJournal = false;
+		openSettings = false;
 		MONEY.refresh();
-		client.gui.setScreen(new JournalScreen(JOURNAL.entries()));
+		JournalScreen journal = new JournalScreen(JOURNAL.entries());
+		// back from settings lands in the journal
+		client.gui.setScreen(settings ? new SettingsScreen(journal) : journal);
 	}
 
 	private static String modVersion() {

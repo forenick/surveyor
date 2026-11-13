@@ -92,8 +92,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final Identifier OVERVIEW_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/overview_icon.png");
 	private static final Identifier SESSION_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/session_icon.png");
 	private static final Identifier STATS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/stats_icon.png");
-	private static final Identifier CHECK_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/check_icon.png");
-	private static final Identifier CROSS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/cross_icon.png");
+	private static final Identifier SETTINGS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/settings_icon.png");
 	private static final Identifier OPEN_ARROW = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/open_arrow.png");
 
 	// width 0 = measured per table, see measured()
@@ -152,6 +151,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	@Override
 	public void tick() {
 		super.tick();
+		// by day lives on the settings page now
+		if (ShaftJournal.MONEY.byDay() != byDay) {
+			byDay = ShaftJournal.MONEY.byDay();
+			moneyChanges = ShaftJournal.MONEY.changes();
+			rebuild();
+			return;
+		}
 		int changes = ShaftJournal.MONEY.changes();
 		if (changes == moneyChanges) return;
 		moneyChanges = changes;
@@ -259,7 +265,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		// same as owo's content(6)
 		editHud.horizontalSizing(Sizing.fixed(font.width("Edit HUD") + 20));
 		editHud.margins(Insets.left(6));
+		IconButton settings = new IconButton(Component.literal("§fSettings"), SETTINGS_ICON, 8, 8,
+				b -> minecraft.gui.setScreen(new SettingsScreen(this)));
+		settings.margins(Insets.left(6));
 		List<UIComponent> items = new ArrayList<>(tabs);
+		items.add(settings);
 		items.add(editHud);
 		boolean showTitle = true;
 		ButtonComponent back = null;
@@ -288,14 +298,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			nav.child(button(">", sessionIndex > 0, () -> showSession(sessionIndex - 1)));
 		} else if (tab == Tab.SESSION && current) {
 			nav.child(label("§f" + sessionRange(sessions.getFirst(), navRoom(items, null))));
-		} else if (tab == Tab.OVERVIEW && !sessions.isEmpty()) {
-			nav.child(new IconButton(Component.literal("§fBy day"), byDay ? CHECK_ICON : CROSS_ICON, 8, 8, b -> {
-				byDay = !byDay;
-				ShaftJournal.MONEY.setByDay(byDay);
-				rebuild();
-			}));
 		}
 		bar.child(nav);
+		bar.child(settings);
 		bar.child(editHud);
 		return bar;
 	}

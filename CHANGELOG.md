@@ -4,6 +4,20 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.18.0 (2026-11-13)
+Settings page (money slice 3).
+- **Settings button** in the journal's top bar, next to Edit HUD, and `/sj settings`. Back (or Esc) returns to the
+  journal.
+- **A real settings page**: categories on the left (Money, Journal), a search box that looks through every category,
+  and a card per setting with its description. A reset arrow shows next to a setting once it's changed, and each
+  category has a "Reset to defaults" button. Hover a choice for what it means and which one is the default.
+- **Money**: sell price, Bazaar tax, gem tier, Gemstone Crystals and prices for old shafts, the settings that were
+  only in `config.json` before. A tax that isn't a number from 0 to 100 shows a red note and the last good value stays.
+- **Prices**: when the Bazaar and lowest BIN prices were last fetched.
+- **Group by day** moved from the Overview tab to the settings page (Journal).
+- Every change saves to `config.json` right away and every coin number in the journal and HUD updates. Other keys
+  in the file stay as they are, and hand edits still work.
+
 ## 0.17.3 (2026-11-13)
 Fixes from a code review of 0.15.0 to 0.17.2.
 - **Sessions only count Mines and shaft time.** Hitting blocks on the Garden, the Hub or anywhere else no longer starts

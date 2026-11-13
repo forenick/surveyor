@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -42,17 +43,32 @@ final class MoneyConfig {
 		byDay = value;
 	}
 
-	// rewrites the file, other values kept but json comments + layout arent
+	// any thread, so the page + journal see it before the save ran
+	void settings(MoneySettings value) {
+		settings = value;
+	}
+
 	void saveByDay(boolean value) {
 		byDay = value;
+		save("journal", journal -> journal.addProperty("byDay", value));
+	}
+
+	// unknown keys in "money" stay, f.e. from a newer version
+	void saveMoney(MoneySettings value) {
+		settings = value;
+		save("money", money -> GSON.toJsonTree(value).getAsJsonObject().entrySet().forEach(e -> money.add(e.getKey(), e.getValue())));
+	}
+
+	// rewrites the file, other values kept but json comments + layout arent
+	private void save(String key, Consumer<JsonObject> edit) {
 		try {
 			JsonObject json = Files.exists(file)
 					? JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject()
 					: defaults();
-			JsonObject journal = json.has("journal") && json.get("journal").isJsonObject() ? json.getAsJsonObject("journal") : new JsonObject();
-			journal.addProperty("byDay", value);
-			json.add("journal", journal);
-			// loadedMtime stays, so the next reload picks up "money" edits made before this
+			JsonObject part = json.has(key) && json.get(key).isJsonObject() ? json.getAsJsonObject(key) : new JsonObject();
+			edit.accept(part);
+			json.add(key, part);
+			// loadedMtime stays, so the next reload picks up other edits made before this
 			SafeWrite.write(file, GSON.toJson(json));
 		} catch (IOException | RuntimeException e) {
 			// broken hand edit, never overwrite it
@@ -62,7 +78,7 @@ final class MoneyConfig {
 
 	private JsonObject defaults() {
 		JsonObject json = new JsonObject();
-		json.add("money", GSON.toJsonTree(MoneySettings.DEFAULTS));
+		json.add("money", GSON.toJsonTree(settings));
 		JsonObject journal = new JsonObject();
 		journal.addProperty("byDay", byDay);
 		json.add("journal", journal);

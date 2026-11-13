@@ -17,7 +17,7 @@ import net.minecraft.resources.Identifier;
 // owo only centres text, so icon + text centred here. icon has its shadow baked in
 final class IconButton extends ButtonComponent {
 	private static final int GAP = 3;
-	private final Identifier icon;
+	private Identifier icon;
 	private final int iconWidth;
 	private final int iconHeight;
 
@@ -26,7 +26,16 @@ final class IconButton extends ButtonComponent {
 		this.icon = icon;
 		this.iconWidth = iconWidth;
 		this.iconHeight = iconHeight;
-		horizontalSizing(Sizing.fixed(Minecraft.getInstance().font.width(message) + iconWidth + GAP + 12));
+		horizontalSizing(Sizing.fixed(Minecraft.getInstance().font.width(message) + iconWidth + gap() + 12));
+	}
+
+	void icon(Identifier value) {
+		icon = value;
+	}
+
+	// icon only = no gap
+	private int gap() {
+		return getMessage().getString().isEmpty() ? 0 : GAP;
 	}
 
 	@Override
@@ -35,7 +44,7 @@ final class IconButton extends ButtonComponent {
 		Font font = Minecraft.getInstance().font;
 		// same colours as owo's own label
 		int color = active ? 0xFFFFFFFF : 0xFFA0A0A0;
-		int x = getX() + (width - iconWidth - GAP - font.width(getMessage())) / 2;
+		int x = getX() + (width - iconWidth - gap() - font.width(getMessage())) / 2;
 		int y = getY() + (height - 8) / 2;
 		graphics.blit(RenderPipelines.GUI_TEXTURED, icon, x, y, 0, 0, iconWidth, iconHeight, iconWidth, iconHeight);
 		graphics.text(font, getMessage(), x + iconWidth + GAP, y, color, textShadow);

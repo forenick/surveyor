@@ -22,6 +22,8 @@ import dev.shaftjournal.money.MoneySettings.OldShafts;
 public final class LiveMoney {
 	// display choice, older = refresh failed or still running, not that days prices
 	static final long SNAPSHOT_MAX_AGE = 60 * 60_000L;
+	public static final long BAZAAR_MAX_AGE = PriceFeed.BAZAAR_MAX_AGE;
+	public static final long BINS_MAX_AGE = PriceFeed.BINS_MAX_AGE;
 
 	private final ExecutorService io = Executors.newSingleThreadExecutor(task -> {
 		Thread thread = new Thread(task, "ShaftJournal prices");
@@ -61,7 +63,7 @@ public final class LiveMoney {
 				config.reloadIfChanged();
 				long now = System.currentTimeMillis();
 				if (feed.stale(now)) feed.fetchStale(now);
-				if (config.settings() != settings || feed.book() != book) changes.incrementAndGet();
+				if (!config.settings().equals(settings) || feed.book() != book) changes.incrementAndGet();
 			} finally {
 				refreshing.set(false);
 			}
@@ -86,6 +88,18 @@ public final class LiveMoney {
 		if (config == null) return;
 		config.byDay(value);
 		run(() -> config.saveByDay(value));
+	}
+
+	// settings page, saved on the io thread
+	public void setSettings(MoneySettings value) {
+		if (config == null || value.equals(config.settings())) return;
+		config.settings(value);
+		changes.incrementAndGet();
+		run(() -> config.saveMoney(value));
+	}
+
+	public boolean refreshing() {
+		return refreshing.get();
 	}
 
 	public MoneySettings settings() {

@@ -44,7 +44,47 @@ class OldConfigTest {
 			reloaded.reloadIfChanged();
 			assertEquals(byDay, reloaded.byDay(), "by day comes back");
 			assertEquals(config.settings(), reloaded.settings());
+
+			// settings page save keeps journal + any other keys
+			MoneySettings changed = config.settings().withGemTier(MoneySettings.GemTier.FINE).withBazaarTax(1.25);
+			config.saveMoney(changed);
+			JsonObject afterMoney = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+			JsonObject expected = saved.deepCopy();
+			expected.remove("money");
+			JsonObject withoutMoney = afterMoney.deepCopy();
+			withoutMoney.remove("money");
+			assertEquals(expected, withoutMoney, "only money changes");
+			MoneyConfig again = new MoneyConfig(tmp);
+			again.reloadIfChanged();
+			assertEquals(changed, again.settings(), "money comes back");
+			assertEquals(byDay, again.byDay());
 		}));
+	}
+
+	@Test
+	void savingMoneyKeepsUnknownKeys(@TempDir Path tmp) throws Exception {
+		Path file = tmp.resolve("config.json");
+		Files.writeString(file, "{\"money\": {\"gemTier\": \"fine\", \"later\": 5}, \"other\": {\"x\": 1}}");
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.reloadIfChanged();
+		config.saveMoney(config.settings().withSellPrice(MoneySettings.SellPrice.SELL_OFFER));
+		JsonObject json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+		assertEquals(5, json.getAsJsonObject("money").get("later").getAsInt());
+		assertEquals("sell_offer", json.getAsJsonObject("money").get("sellPrice").getAsString());
+		assertEquals("fine", json.getAsJsonObject("money").get("gemTier").getAsString());
+		assertEquals(1, json.getAsJsonObject("other").get("x").getAsInt());
+	}
+
+	// no file yet: saving by day keeps money changed on the page before
+	@Test
+	void firstSaveKeepsMemorySettings(@TempDir Path tmp) throws Exception {
+		MoneyConfig config = new MoneyConfig(tmp);
+		config.settings(MoneySettings.DEFAULTS.withCrystals(MoneySettings.Crystals.ZERO));
+		config.saveByDay(false);
+		MoneyConfig reloaded = new MoneyConfig(tmp);
+		reloaded.reloadIfChanged();
+		assertEquals(MoneySettings.Crystals.ZERO, reloaded.settings().crystals());
+		assertFalse(reloaded.byDay());
 	}
 
 	@Test

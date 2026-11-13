@@ -43,6 +43,18 @@ public record MoneySettings(SellPrice sellPrice, GemTier gemTier, Double bazaarT
 				tax, oldShafts == null ? DEFAULTS.oldShafts : oldShafts, crystals == null ? DEFAULTS.crystals : crystals);
 	}
 
+	public MoneySettings withSellPrice(SellPrice value) {
+		return new MoneySettings(value, gemTier, bazaarTax, oldShafts, crystals);
+	}
+
+	public MoneySettings withBazaarTax(double value) {
+		return new MoneySettings(sellPrice, gemTier, value, oldShafts, crystals);
+	}
+
+	public MoneySettings withOldShafts(OldShafts value) {
+		return new MoneySettings(sellPrice, gemTier, bazaarTax, value, crystals);
+	}
+
 	public MoneySettings withGemTier(GemTier tier) {
 		return new MoneySettings(sellPrice, tier, bazaarTax, oldShafts, crystals);
 	}
