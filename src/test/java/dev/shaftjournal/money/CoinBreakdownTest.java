@@ -121,8 +121,11 @@ class CoinBreakdownTest {
 		assertEquals(2, jade.shafts());
 		// 3M + 3.5k + 602k - 400k per shaft
 		assertEquals(3_205_500, jade.each(), 1e-6);
-		List<String> lines = CoinBreakdown.shaftType("Jade", jade, v -> "Type " + v);
-		assertEquals(List.of("§fJade shafts", "", "§7Avg §6+3.2M §7per shaft §8(2 shafts)", "§7Best §6+3.2M", "§7Total §6+6.4M", "",
-				"§fPer shaft", "§7Mined gems §6+3.0M", "§7Other drops §6+3.5k", "§7Corpse loot §6+602.0k", "§7Keys §c-400.0k"), lines);
+		List<String> lines = CoinBreakdown.shaftType("Jade", jade, 0.25, v -> "Type " + v);
+		assertEquals(List.of("§fJade shafts", "", "§7Avg §6+3.2M §7per shaft §8(2 shafts)", "§7Best §6+3.2M", "§7Total §6+6.4M",
+				"§7Share of all shaft coins §f25% §8(the bar)", "", "§fPer shaft §8(avg)", "§7Mined gems §6+3.0M",
+				"§7Other drops §6+3.5k", "§7Corpse loot §6+602.0k", "§7Keys §c-400.0k"), lines);
+		assertTrue(CoinBreakdown.shaftType("Jade", jade, 0.0, v -> v).contains("§7Share of all shaft coins §f0% §8(the bar)"),
+				"a type that lost coins");
 	}
 }

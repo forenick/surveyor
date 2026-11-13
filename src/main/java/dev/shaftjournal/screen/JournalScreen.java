@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.DoubleFunction;
 import java.util.function.DoubleUnaryOperator;
+import java.util.function.IntConsumer;
 
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.BoxComponent;
@@ -26,6 +27,7 @@ import io.wispforest.owo.ui.core.CursorStyle;
 import io.wispforest.owo.ui.core.HorizontalAlignment;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.OwoUIAdapter;
+import io.wispforest.owo.ui.core.ParentUIComponent;
 import io.wispforest.owo.ui.core.Positioning;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
@@ -50,6 +52,7 @@ import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.journal.LootSummary;
 import dev.shaftjournal.journal.StatsRange;
 import dev.shaftjournal.journal.SummaryText;
+import dev.shaftjournal.money.ChartTips;
 import dev.shaftjournal.money.CoinBreakdown;
 import dev.shaftjournal.money.Coins;
 import dev.shaftjournal.money.MoneySettings;
@@ -62,6 +65,25 @@ import dev.shaftjournal.settings.Setting;
 // mc font only so pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private enum Tab { OVERVIEW, SESSION, STATS }
+
+	private enum ChartType {
+		BARS("Bars"),
+		LINE("Line");
+
+		private final String displayName;
+
+		ChartType(String displayName) {
+			this.displayName = displayName;
+		}
+
+		String displayName() {
+			return displayName;
+		}
+
+		ChartType next(int step) {
+			return values()[Math.floorMod(ordinal() + step, values().length)];
+		}
+	}
 
 	private record ShiftTip(FlowLayout row, List<ClientTooltipComponent> normal, List<ClientTooltipComponent> shifted) {
 	}
@@ -145,6 +167,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private final List<ShiftTip> shiftTips = new ArrayList<>();
 	// kept while the game runs, not saved
 	private static StatsRange statsRange = StatsRange.ALL_TIME;
+	private static ChartType spawnChartType = ChartType.BARS;
+	private static ChartType coinChartType = ChartType.BARS;
 	private int statsShafts;
 	private boolean shiftShown;
 	private int moneyChanges = ShaftJournal.MONEY.changes();
@@ -834,7 +858,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			spawn.child(keyValue("All-time avg", allTime == null ? "§8-" : "§f" + SummaryText.duration(allTime)));
 		}
 		String legend = all ? "all-time avg" : "avg";
-		spawn.child(section("Avg spawn per session"));
+		spawn.child(chartSection("Avg spawn per session", spawnChartType, step -> spawnChartType = spawnChartType.next(step)));
 		spawn.child(spawnChart(stats.oldestFirst(), stats.averageSearchMillis(), legend));
 		spawn.child(section("Corpse % per shaft"));
 		for (String type : stats.corpsesSeen().keySet()) {
@@ -847,9 +871,9 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 							+ " per shaft on average")));
 			spawn.child(row);
 		}
-		spawn.child(section("Coins / h per session"));
+		spawn.child(chartSection("Coins / h per session", coinChartType, step -> coinChartType = coinChartType.next(step)));
 		Double averageRate = money.coins() == null ? null : JournalStats.perHour(money.coins(), stats.timeMillis());
-		spawn.child(coinChart(stats.oldestFirst(), averageRate, money.coins() != null, legend));
+		spawn.child(coinChart(stats.oldestFirst(), averageRate, money.coins() != null, legend, stats.timeMillis()));
 		columns.child(scrollColumn(Sizing.expand(), spawn));
 
 		FlowLayout odds = column();
@@ -890,20 +914,20 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		return withTips(row, TooltipLines.of(CoinBreakdown.corpse(type, looted, corpse, drops, tooltipHeight())));
 	}
 
-	// best avg first
+	// best avg first, bar = share of the coins all types made
 	private void typeCoins(FlowLayout column, MoneyStats money) {
 		List<Map.Entry<String, MoneyStats.TypeCoins>> types = money.types().entrySet().stream()
 				.sorted(Comparator.comparingDouble((Map.Entry<String, MoneyStats.TypeCoins> e) -> -e.getValue().each())).toList();
 		if (types.isEmpty()) return;
 		column.child(section("Avg coins per shaft"));
-		double most = types.stream().mapToDouble(e -> e.getValue().each()).max().orElse(0);
+		double made = types.stream().mapToDouble(e -> Math.max(0, e.getValue().coins())).sum();
 		int valueWidth = types.stream().mapToInt(e -> font.width(coins(e.getValue().each()))).max().orElse(0);
 		for (Map.Entry<String, MoneyStats.TypeCoins> type : types) {
 			String name = shaftNames.name(type.getKey());
-			double each = type.getValue().each();
-			FlowLayout row = barRow(name, most > 0 ? Math.max(0, each) / most : 0, coins(each),
+			Double share = made > 0 ? Math.max(0, type.getValue().coins()) / made : null;
+			FlowLayout row = barRow(name, share == null ? 0 : share, coins(type.getValue().each()),
 					0xFF000000 | shaftNames.rgb(type.getKey()), valueWidth);
-			column.child(withTips(row, TooltipLines.of(CoinBreakdown.shaftType(name, type.getValue(),
+			column.child(withTips(row, TooltipLines.of(CoinBreakdown.shaftType(name, type.getValue(), share,
 					v -> capitalized(variantName(v))))));
 		}
 	}
@@ -911,28 +935,75 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private FlowLayout rangeHeader() {
 		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
 		row.verticalAlignment(VerticalAlignment.CENTER);
-		row.margins(Insets.bottom(3));
-		LabelComponent name = label("§f" + statsRange.displayName());
+		row.surface(Surface.flat(0x14FFFFFF));
+		row.padding(Insets.of(2, 2, 4, 1));
+		row.margins(Insets.bottom(4));
+		LabelComponent name = label("§7Range §e" + statsRange.displayName());
 		name.horizontalSizing(Sizing.expand());
 		row.child(name);
-		row.child(rangeArrow(PREV_ARROW, -1));
-		row.child(rangeArrow(OPEN_ARROW, 1));
+		row.child(cycler(statsRange.ordinal(), StatsRange.values().length, step -> statsRange = statsRange.next(step)));
+		List<Component> tooltip = List.of(Component.literal("§fTime range"),
+				Component.literal("§7Which sessions the whole Stats tab counts"),
+				Component.literal("§8Click the arrows to cycle"));
+		row.tooltip(tooltip);
+		applyTooltip(row, tooltip);
 		return row;
 	}
 
+	private static void applyTooltip(UIComponent component, List<Component> tooltip) {
+		component.tooltip(tooltip);
+		if (component instanceof ParentUIComponent parent) {
+			for (UIComponent child : parent.children()) applyTooltip(child, tooltip);
+		}
+	}
+
+	// dots show where u are, arrows wrap around
+	private FlowLayout cycler(int index, int count, IntConsumer step) {
+		FlowLayout cycler = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		cycler.verticalAlignment(VerticalAlignment.CENTER);
+		FlowLayout dots = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+		dots.gap(2);
+		dots.margins(Insets.right(3));
+		for (int i = 0; i < count; i++) {
+			BoxComponent dot = UIComponents.box(Sizing.fixed(3), Sizing.fixed(3));
+			dot.fill(true);
+			dot.color(Color.ofArgb(i == index ? 0xFFFFFF55 : 0xFF555555));
+			dots.child(dot);
+		}
+		cycler.child(dots);
+		cycler.child(cyclerArrow(PREV_ARROW, () -> step.accept(-1)));
+		cycler.child(cyclerArrow(OPEN_ARROW, () -> step.accept(1)));
+		return cycler;
+	}
+
 	// padding = bigger click area
-	private UIComponent rangeArrow(Identifier texture, int step) {
+	private UIComponent cyclerArrow(Identifier texture, Runnable action) {
 		FlowLayout arrow = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-		arrow.padding(Insets.of(2, 2, 4, 4));
+		arrow.padding(Insets.of(2, 2, 3, 3));
 		arrow.child(UIComponents.texture(texture, 0, 0, 3, 5, 3, 5).blend(true));
 		arrow.cursorStyle(CursorStyle.HAND);
-		arrow.tooltip(Component.literal("§7Show §f" + statsRange.next(step).displayName()));
 		arrow.mouseDown().subscribe((event, doubleClick) -> {
-			statsRange = statsRange.next(step);
+			action.run();
 			rebuild();
 			return true;
 		});
 		return arrow;
+	}
+
+	private FlowLayout chartSection(String title, ChartType type, IntConsumer step) {
+		FlowLayout section = section(title);
+		LabelComponent label = (LabelComponent) section.children().getLast();
+		section.removeChild(label);
+		FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
+		row.verticalAlignment(VerticalAlignment.CENTER);
+		label.horizontalSizing(Sizing.expand());
+		row.child(label);
+		FlowLayout cycler = cycler(type.ordinal(), ChartType.values().length, step);
+		applyTooltip(cycler, List.of(Component.literal("§fChart §e" + type.displayName()),
+				Component.literal("§7Switches between bars and a line"), Component.literal("§8Click the arrows to cycle")));
+		row.child(cycler);
+		section.child(row);
+		return section;
 	}
 
 	// durations show whole secs, <1s = same
@@ -1048,16 +1119,19 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 					Component.literal("§7Avg spawn " + spawn(session.averageSearchMillis()) + " §7over " + session.timedSpawns() + " shafts"),
 					Component.literal("§8Click to open"))));
 		}
-		return barChart(bars, SPAWN_STEPS, seconds -> axisLabel(Math.round(seconds)), average == null ? null : average / 1000.0,
-				0xB0FFFF55, "§eYellow line §7" + legend, "§8No timed spawns yet");
+		return barChart(bars, spawnChartType, 0xFF55FF55, SPAWN_STEPS, seconds -> axisLabel(Math.round(seconds)),
+				average == null ? null : average / 1000.0, 0xB0FFFF55, "§eYellow line§7: " + legend, ChartTips.spawn(oldestFirst),
+				"§8No timed spawns yet");
 	}
 
-	private FlowLayout coinChart(List<SessionSummary> oldestFirst, Double average, boolean priced, String legend) {
+	private FlowLayout coinChart(List<SessionSummary> oldestFirst, Double average, boolean priced, String legend, long totalMillis) {
 		List<Bar> bars = new ArrayList<>();
+		List<ChartTips.SessionCoins> sessionCoins = new ArrayList<>();
 		for (SessionSummary session : oldestFirst) {
 			Double rate = MoneyStats.perHour(session, ShaftJournal.MONEY::value);
-			if (rate == null) continue;
 			Double coins = MoneyStats.coins(session.entries(), ShaftJournal.MONEY::value);
+			sessionCoins.add(new ChartTips.SessionCoins(coins, session.lengthMillis(), rate));
+			if (rate == null) continue;
 			bars.add(new Bar(session, rate, Math.round(rate) < 0 ? BAR_RED : BAR_GOLD, List.of(
 					Component.literal("§f" + day(session.start()) + " " + clock(session.start())),
 					Component.literal("§7Coins / h " + coins(rate)),
@@ -1066,7 +1140,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 					Component.literal("§8Click to open"))));
 		}
 		String empty = priced ? "§8Needs a session of " + JournalStats.MIN_RATE_MILLIS / 60_000 + "+ minutes" : "§8No prices yet";
-		return barChart(bars, COIN_STEPS, JournalScreen::axisCoins, average, 0xB0FFFFFF, "§fWhite line §7" + legend, empty);
+		return barChart(bars, coinChartType, 0xFFFFAA00, COIN_STEPS, JournalScreen::axisCoins, average, 0xB0FFFFFF,
+				"§fWhite line§7: " + legend, ChartTips.coins(sessionCoins, totalMillis), empty);
 	}
 
 	private static String axisCoins(double coins) {
@@ -1074,8 +1149,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	// up to 4 steps, bars under 0 hang down from the 0 line
-	private FlowLayout barChart(List<Bar> all, double[] steps, DoubleFunction<String> axisText, Double average, int averageArgb,
-			String legend, String empty) {
+	private FlowLayout barChart(List<Bar> all, ChartType type, int lineArgb, double[] steps, DoubleFunction<String> axisText,
+			Double average, int averageArgb, String legend, List<String> averageTip, String empty) {
 		FlowLayout wrapper = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 		if (all.isEmpty()) {
 			wrapper.child(label(empty));
@@ -1125,14 +1200,35 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			plot.child(line(lineY, Math.abs(value) < step / 2 ? 0x40FFFFFF : 0x18FFFFFF));
 		}
 		int zero = (int) y.applyAsDouble(0);
+		if (type == ChartType.LINE) {
+			int[] xs = new int[shown.size()];
+			int[] ys = new int[shown.size()];
+			int[] dots = new int[shown.size()];
+			for (int i = 0; i < shown.size(); i++) {
+				xs[i] = 2 + i * (barWidth + barGap) + barWidth / 2;
+				ys[i] = (int) y.applyAsDouble(shown.get(i).value());
+				dots[i] = 0xFF000000 | shown.get(i).argb();
+			}
+			LinePlot line = new LinePlot(xs, ys, dots, lineArgb);
+			line.positioning(Positioning.absolute(0, 0));
+			plot.child(line);
+		}
 		for (int i = 0; i < shown.size(); i++) {
 			Bar bar = shown.get(i);
 			int end = (int) y.applyAsDouble(bar.value());
 			int barHeight = Math.max(1, Math.abs(zero - end));
-			BoxComponent box = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
+			BoxComponent box;
+			if (type == ChartType.LINE) {
+				// invisible column, easy to hover
+				box = UIComponents.box(Sizing.fixed(barWidth + barGap), Sizing.fixed(base - plotTop + 1));
+				box.color(Color.ofArgb(0));
+				box.positioning(Positioning.absolute(2 + i * (barWidth + barGap) - barGap / 2, plotTop));
+			} else {
+				box = UIComponents.box(Sizing.fixed(barWidth), Sizing.fixed(barHeight));
+				box.color(Color.ofArgb(bar.argb()));
+				box.positioning(Positioning.absolute(2 + i * (barWidth + barGap), bar.value() < 0 ? zero + 1 : zero - barHeight));
+			}
 			box.fill(true);
-			box.color(Color.ofArgb(bar.argb()));
-			box.positioning(Positioning.absolute(2 + i * (barWidth + barGap), bar.value() < 0 ? zero + 1 : zero - barHeight));
 			box.cursorStyle(CursorStyle.HAND);
 			box.tooltip(bar.tooltip());
 			box.mouseDown().subscribe((event, doubleClick) -> {
@@ -1141,7 +1237,19 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			});
 			plot.child(box);
 		}
-		if (average != null) plot.child(line((int) y.applyAsDouble(Math.clamp(average, bottom, top)), averageArgb));
+		List<ClientTooltipComponent> averageTips = TooltipLines.of(averageTip);
+		if (average != null) {
+			int averageY = (int) y.applyAsDouble(Math.clamp(average, bottom, top));
+			plot.child(line(averageY, averageArgb));
+			if (!averageTips.isEmpty()) {
+				// 1 px line is too thin to hover
+				BoxComponent band = UIComponents.box(Sizing.fill(100), Sizing.fixed(5));
+				band.color(Color.ofArgb(0));
+				band.positioning(Positioning.absolute(0, averageY - 2));
+				band.tooltip(averageTips);
+				plot.child(band);
+			}
+		}
 		chart.child(axis);
 		chart.child(plot);
 		wrapper.child(chart);
@@ -1161,7 +1269,11 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 			}
 		}
 		wrapper.child(dates);
-		if (average != null) wrapper.child(label(legend));
+		if (average != null) {
+			LabelComponent legendLabel = label(legend);
+			if (!averageTips.isEmpty()) legendLabel.tooltip(averageTips);
+			wrapper.child(legendLabel);
+		}
 		return wrapper;
 	}
 

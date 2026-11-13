@@ -150,25 +150,27 @@ public final class CoinBreakdown {
 		return lines;
 	}
 
-	public static List<String> shaftType(String name, TypeCoins type, Function<String, String> variantNames) {
+	// share null = no shaft type made coins
+	public static List<String> shaftType(String name, TypeCoins type, Double share, Function<String, String> variantNames) {
 		List<String> lines = new ArrayList<>();
 		lines.add("§f" + name + " shafts");
 		gap(lines);
 		lines.add("§7Avg " + coins(type.each()) + " §7per shaft §8(" + type.shafts() + (type.shafts() == 1 ? " shaft)" : " shafts)"));
 		lines.add("§7Best " + coins(type.best()));
 		lines.add("§7Total " + coins(type.coins()));
+		if (share != null) lines.add("§7Share of all shaft coins §f" + (share <= 0 ? "0%" : share(share)) + " §8(the bar)");
 		List<String> parts = new ArrayList<>();
 		type.parts().forEach((part, coins) -> {
 			if (Math.round(coins / type.shafts()) != 0) parts.add("§7" + part.displayName() + " " + coins(coins / type.shafts()));
 		});
 		if (!parts.isEmpty()) {
 			gap(lines);
-			lines.add("§fPer shaft");
+			lines.add("§fPer shaft §8(avg)");
 			lines.addAll(parts);
 		}
 		if (type.variants().size() > 1) {
 			gap(lines);
-			lines.add("§fPer variant");
+			lines.add("§fPer variant §8(avg)");
 			type.variants().forEach((variant, avg) -> lines.add("§7" + variantNames.apply(variant) + " " + coins(avg.each())
 					+ " §8(" + avg.shafts() + (avg.shafts() == 1 ? " shaft)" : " shafts)")));
 		}

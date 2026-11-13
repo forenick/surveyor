@@ -4,6 +4,21 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.20.0 (2026-11-13)
+Stats tab feedback round.
+- **Bars or a line.** Both charts have their own `< >` arrows (with dots showing which one you're on) to switch
+  between bars and a line chart. Hover or click anywhere in a session's column in line mode.
+- **Hover an average line** (or its "Yellow line" / "White line" legend) for a closer look. Spawn time: median
+  shaft, the middle half of your shafts, how many sessions and shafts beat the average, fastest and slowest
+  session, and your latest session vs the average in %. Coins / h: median, best and worst session, sessions above
+  average, sessions that made coins, how much of all coins your best session made, and your latest session vs the
+  average in %.
+- **The range picker is clearer.** It reads `Range All time` with the range in yellow on a light panel, dots show
+  where you are in the cycle, and the tooltip says what it does instead of naming the next range.
+- **Avg coins per shaft bars show each shaft type's share of all coins made in shafts**, so they no longer fill up
+  for the best type. The share is in the tooltip too, and its "Per shaft" and "Per variant" parts say "(avg)".
+- Chart legends read `Yellow line: all-time avg`.
+
 ## 0.19.0 (2026-11-13)
 More on the Stats tab.
 - **Pick a range.** The `<` `>` arrows next to the left column's title switch the whole Stats tab between
