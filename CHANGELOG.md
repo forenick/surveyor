@@ -4,6 +4,16 @@ Versions follow [Semantic Versioning](https://semver.org): while the mod is pre-
 bumps the minor number (0.2.0 → 0.3.0) and a fix or small tweak bumps the patch number (0.2.0 → 0.2.1).
 The version lives in `gradle.properties` and ends up in the jar name and in `fabric.mod.json`.
 
+## 0.18.3 (2026-11-13)
+Stats tab tweaks.
+- **All time is Coins, Powder, then a gap, then Shafts, Sessions and Time shafting.**
+- **The Coins tooltip is a full breakdown now.** Each part (mined gems, other drops, corpse loot, keys, campfires and
+  so on) shows its share of what you earned and its biggest items, corpse loot is split per corpse type, and when
+  there are costs you get earned, spent and net apart. Hold **Shift** for the short version with just the parts.
+  Long lists are cut to fit your screen, with an "N more" line for the rest.
+- **Corpse rows only show the average**, f.e. `Lapis 172 (+178.6k avg.)`. The total is in the tooltip, which now
+  also lists that corpse type's loot items by coins.
+
 ## 0.18.2 (2026-11-13)
 Settings page tweaks.
 - **Choices are a list of radio options** instead of a row of wide buttons. Every setting's control (choices, the tax

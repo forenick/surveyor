@@ -37,12 +37,12 @@ class MoneyStatsTest {
 		for (int i = 0; i < 5; i++) {
 			JournalEntry entry = entry(0, i * 120_000L);
 			entries.add(entry);
-			values.put(entry, worth(1_000_000, new CorpseValue("Umber", 500_000, -300_000, 0)));
+			values.put(entry, worth(1_000_000, new CorpseValue("Umber", 500_000, -300_000, 0, List.of())));
 		}
 		// session 2: 1 rich shaft, too few for the rate record
 		JournalEntry rich = entry(10_000_000, 10_000_000);
 		entries.add(rich);
-		values.put(rich, worth(9_000_000, new CorpseValue("Umber", 100_000, -300_000, 1), new CorpseValue("Lapis", 50_000, 0, 0)));
+		values.put(rich, worth(9_000_000, new CorpseValue("Umber", 100_000, -300_000, 1, List.of()), new CorpseValue("Lapis", 50_000, 0, 0, List.of())));
 		// no prices for this one
 		entries.add(entry(10_000_000, 10_100_000));
 		// left right away, worth nothing

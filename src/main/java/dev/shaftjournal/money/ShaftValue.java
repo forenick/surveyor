@@ -56,7 +56,7 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 	}
 
 	// per looted corpse, key negative, unpriced = items w/o a price (counted as 0)
-	public record CorpseValue(String type, double loot, double key, int unpriced) {
+	public record CorpseValue(String type, double loot, double key, int unpriced, List<Line> items) {
 		public double net() {
 			return loot + key;
 		}
@@ -108,11 +108,13 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 		for (CorpseLoot corpse : entry.loots()) {
 			double lootCoins = 0;
 			int unpriced = 0;
+			List<Line> items = new ArrayList<>();
 			for (ItemCount item : corpse.items()) {
 				loot.merge(item.item(), item.count(), Long::sum);
-				Double coins = v.line(Part.CORPSES, item.item(), item.count()).coins();
-				if (coins == null) unpriced++;
-				else lootCoins += coins;
+				Line line = v.line(Part.CORPSES, item.item(), item.count());
+				items.add(line);
+				if (line.coins() == null) unpriced++;
+				else lootCoins += line.coins();
 			}
 			String key = KEYS.get(corpse.type());
 			Double keyCost = null;
@@ -121,7 +123,7 @@ public record ShaftValue(List<Line> lines, List<CorpseValue> corpses) {
 				keyCost = v.buy(ids.id(key));
 				if (keyCost == null) unpriced++;
 			}
-			corpses.add(new CorpseValue(corpse.type(), lootCoins, keyCost == null ? 0 : -keyCost, unpriced));
+			corpses.add(new CorpseValue(corpse.type(), lootCoins, keyCost == null ? 0 : -keyCost, unpriced, List.copyOf(items)));
 		}
 		loot.forEach((item, count) -> lines.add(v.line(Part.CORPSES, item, count)));
 

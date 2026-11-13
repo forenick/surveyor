@@ -29,6 +29,7 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 import io.wispforest.owo.ui.core.UIComponent;
 import io.wispforest.owo.ui.core.VerticalAlignment;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -45,6 +46,7 @@ import dev.shaftjournal.journal.JournalStats.CorpseCount;
 import dev.shaftjournal.journal.JournalStats.SessionSummary;
 import dev.shaftjournal.journal.LootSummary;
 import dev.shaftjournal.journal.SummaryText;
+import dev.shaftjournal.money.CoinBreakdown;
 import dev.shaftjournal.money.Coins;
 import dev.shaftjournal.money.MoneySettings;
 import dev.shaftjournal.money.MoneyStats;
@@ -56,6 +58,9 @@ import dev.shaftjournal.settings.Setting;
 // mc font only so pack fonts work
 public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private enum Tab { OVERVIEW, SESSION, STATS }
+
+	private record ShiftTip(FlowLayout row, List<Component> normal, List<Component> shifted) {
+	}
 
 	// higher dropOrder hides first, 0 = never. extra = spare room handed out by fit()
 	private record Column(String key, String title, int width, boolean right, int dropOrder, int extra) {
@@ -90,6 +95,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private static final int INDENT = 6;
 	// display choice
 	private static final int DAY_GAP = 8;
+	// display choice
+	private static final int LINE_GAP = 8;
 	private static final Identifier OVERVIEW_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/overview_icon.png");
 	private static final Identifier SESSION_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/session_icon.png");
 	private static final Identifier STATS_ICON = Identifier.fromNamespaceAndPath("shaftjournal", "textures/gui/stats_icon.png");
@@ -129,6 +136,8 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	private FlowLayout detail;
 	private final List<FlowLayout> shaftRows = new ArrayList<>();
 	private final List<KeptScroll> scrolls = new ArrayList<>();
+	private final List<ShiftTip> shiftTips = new ArrayList<>();
+	private boolean shiftShown;
 	private int moneyChanges = ShaftJournal.MONEY.changes();
 
 	public JournalScreen(List<JournalEntry> entries) {
@@ -217,6 +226,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		builtHeight = height;
 		root.clearChildren();
 		shaftRows.clear();
+		shiftTips.clear();
 		detail = null;
 		root.child(topBar());
 		FlowLayout content = UIContainers.verticalFlow(Sizing.fill(100), Sizing.expand());
@@ -586,7 +596,7 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 	}
 
 	private static String coins(double coins) {
-		return (Math.round(coins) < 0 ? "§c" : "§6") + Coins.signed(coins);
+		return CoinBreakdown.coins(coins);
 	}
 
 	private static String count(Line line) {
@@ -744,11 +754,13 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 
 		FlowLayout totals = column();
 		totals.child(header("All time"));
-		totals.child(keyValue("Shafts", "§f" + stats.shafts()));
+		totals.child(coinsTotal(money, stats));
+		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
+		FlowLayout shafts = keyValue("Shafts", "§f" + stats.shafts());
+		shafts.margins(Insets.top(LINE_GAP));
+		totals.child(shafts);
 		totals.child(keyValue("Sessions", "§f" + stats.sessions()));
 		totals.child(keyValue("Time shafting", "§f" + SummaryText.duration(stats.timeMillis())));
-		totals.child(keyValue("Powder", "§b" + number(stats.powder())));
-		totals.child(coinsTotal(money, stats));
 		totals.child(section("Corpses looted"));
 		for (String type : stats.corpsesSeen().keySet()) totals.child(corpseRow(type, stats.looted().getOrDefault(type, 0), money));
 		totals.child(section("Personal bests"));
@@ -829,43 +841,46 @@ public final class JournalScreen extends BaseOwoScreen<FlowLayout> {
 		content.child(columns);
 	}
 
-	private static FlowLayout coinsTotal(MoneyStats money, AllTime stats) {
+	private FlowLayout coinsTotal(MoneyStats money, AllTime stats) {
 		FlowLayout row = keyValue("Coins", coinText(money.coins()));
 		if (money.coins() == null) return row;
-		List<Component> tooltip = new ArrayList<>();
-		tooltip.add(Component.literal("§fWhere your coins came from"));
-		money.parts().forEach((part, coins) -> {
-			if (Math.round(coins) != 0) tooltip.add(Component.literal("§7" + part.displayName() + " " + coins(coins)));
-		});
-		tooltip.add(Component.literal(""));
-		tooltip.add(Component.literal("§7Avg per shaft " + coins(money.perShaft()) + " §8(" + money.valued() + " shafts)"));
 		Double perHour = JournalStats.perHour(money.coins(), stats.timeMillis());
-		if (perHour != null) {
-			tooltip.add(Component.literal("§7Avg per hour shafting " + coins(perHour) + " §8(" + SummaryText.duration(stats.timeMillis()) + ")"));
-		}
-		return withTooltip(row, tooltip);
+		shiftTooltip(row, CoinBreakdown.detailed(money, perHour, stats.timeMillis(), tooltipLines()),
+				CoinBreakdown.basic(money, perHour, stats.timeMillis()));
+		return row;
 	}
 
 	private FlowLayout corpseRow(String type, int looted, MoneyStats money) {
 		MoneyStats.CorpseCoins corpse = money.corpses().get(type);
 		String value = corpseColor(type) + looted;
 		if (corpse == null) return keyValue(type, value);
-		String avg = " §7(" + coins(corpse.each()) + " §7avg.)";
-		String full = value + " " + coins(corpse.net()) + avg;
-		// narrow screens: total moves to the tooltip
-		int room = width * STATS_LEFT / 100 - 2 * COLUMN_PADDING - 3 - font.width(type) - 6;
-		FlowLayout row = keyValue(type, font.width(full) <= room ? full : value + avg);
-		List<Component> tooltip = new ArrayList<>();
-		tooltip.add(Component.literal("§f" + type + " corpses"));
-		tooltip.add(Component.literal("§7" + corpse.corpses() + " with loot, " + coins(corpse.net()) + " §7in all"));
-		if (corpse.keys() != 0) {
-			tooltip.add(Component.literal("§7Loot " + coins(corpse.loot() / corpse.corpses()) + " §7each"));
-			tooltip.add(Component.literal("§7Key " + coins(corpse.keys() / corpse.corpses()) + " §7each"));
+		FlowLayout row = keyValue(type, value + " §7(" + coins(corpse.each()) + " §7avg.)");
+		return withTooltip(row, literals(CoinBreakdown.corpse(type, looted, corpse, tooltipLines())));
+	}
+
+	// tooltip lines are 10 px, 12 for padding + title gap
+	private int tooltipLines() {
+		return (height - 12) / 10;
+	}
+
+	private static List<Component> literals(List<String> lines) {
+		return lines.stream().<Component>map(Component::literal).toList();
+	}
+
+	private void shiftTooltip(FlowLayout row, List<String> normal, List<String> shifted) {
+		ShiftTip tip = new ShiftTip(row, literals(normal), literals(shifted));
+		shiftTips.add(tip);
+		withTooltip(row, shiftShown ? tip.shifted() : tip.normal());
+	}
+
+	@Override
+	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+		boolean shift = minecraft.hasShiftDown();
+		if (shift != shiftShown) {
+			shiftShown = shift;
+			for (ShiftTip tip : shiftTips) withTooltip(tip.row(), shift ? tip.shifted() : tip.normal());
 		}
-		if (corpse.unpriced() > 0) {
-			tooltip.add(Component.literal("§c" + corpse.unpriced() + (corpse.unpriced() == 1 ? " item" : " items") + " without a price"));
-		}
-		return withTooltip(row, tooltip);
+		super.extractRenderState(graphics, mouseX, mouseY, delta);
 	}
 
 	private static FlowLayout withTooltip(FlowLayout row, List<Component> tooltip) {
