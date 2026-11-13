@@ -173,7 +173,7 @@ public final class EditHudScreen extends BaseOwoScreen<FlowLayout> {
 	private HudHistory history;
 	private String unsettled;
 	private long unsettledSince;
-	// tooltips drawn by us, owo's dont wrap or stay on screen
+	// tooltips drawn by us, owo's dont wrap or stay on screen -> might have to look into this later tho
 	private final Map<UIComponent, List<FormattedCharSequence>> toolbarTips = new IdentityHashMap<>();
 	private final Map<UIComponent, List<FormattedCharSequence>> panelTips = new IdentityHashMap<>();
 	private final Map<UIComponent, List<FormattedCharSequence>> menuTips = new IdentityHashMap<>();

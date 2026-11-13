@@ -14,8 +14,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 
-// screen only, never at class load
-// skyblock id in custom_data like hypixel, so texture mods (firmament, catharsis) find it
+// screen only
+// skyblock id in custom_data like hypixel, so texture mods may find it??
 final class ItemIcons {
 	// per screen so pack changes get picked up
 	private final Map<String, ItemStack> cache = new HashMap<>();
