@@ -4,7 +4,7 @@
 
 <p align="center">
   Multi Purpose Mining Mod for Hypixel SkyBlock.<br>
-  (For now, mainly focussed around the Glacite Tunnels!)
+  (For now, mainly focused around the Glacite Tunnels!)
 </p>
 
 <p align="center">
